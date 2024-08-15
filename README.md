@@ -1,19 +1,23 @@
 [![License CC BY-NC-SA 4.0](https://img.shields.io/badge/license-CC4.0-blue.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode)
-## BUFFER: Balancing Accuracy, Efficiency, and Generalizability in Point Cloud Registration (CVPR 2023)
 
-This is the official repository of **BUFFER**, a point cloud registration method for balancing accuracy, efficiency, and generalizability. For technical details, please refer to:
+테스트 환경
+- Python 3.10 
+- Cuda 11.8 
+- Cudnn 8 
 
-**[BUFFER: Balancing Accuracy, Efficiency, and Generalizability in Point Cloud Registration](https://openaccess.thecvf.com/content/CVPR2023/html/Ao_BUFFER_Balancing_Accuracy_Efficiency_and_Generalizability_in_Point_Cloud_Registration_CVPR_2023_paper.html)**  <br />
-[Sheng Ao](http://scholar.google.com/citations?user=cvS1yuMAAAAJ&hl=zh-CN), [Qingyong Hu](https://www.cs.ox.ac.uk/people/qingyong.hu/), [Hanyun Wang](https://scholar.google.com.hk/citations?user=QG3LdUcAAAAJ&hl=zh-CN), [Kai Xu](https://scholar.google.com/citations?user=GuVkg-8AAAAJ), [Yulan Guo](http://yulanguo.me/). <br />
+## 참고용:
 
-**[[Paper](https://openaccess.thecvf.com/content/CVPR2023/html/Ao_BUFFER_Balancing_Accuracy_Efficiency_and_Generalizability_in_Point_Cloud_Registration_CVPR_2023_paper.html)] [[Video](https://www.youtube.com/watch?v=STmAkRWuSiY)] [Project page]** <br />
+- 알고리즘에서 scale을 쓰는 부분을 모두 제거했음!
+- Superset 관리를 `config["KITTI"]`, `config["ThreeDMatch"]`와 같이 dataset의 이름을 key로 받아서 관리하도록 수정함
+- `config.data.voxel_size_0`의 값을 reference voxel size로 사용함
 
+## 하면 좋은 것 q
 
-### (1) Overview
-![fig1](fig/pipeline.png)
+- 현재는 batch를 1밖에 지원안 함...이를 수정하면 더 좋을 것 같음!
 
+---
 
-### (2) Setup
+###  Setup
 This code has been tested with Python 3.8, Pytorch 1.9.1, CUDA 11.1 on Ubuntu 20.04.
  
 - Clone the repository 

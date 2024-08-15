@@ -18,12 +18,12 @@ class MiniSpinNet(nn.Module):
     def __init__(self, config):
         super(MiniSpinNet, self).__init__()
         self.config = config
-        self.des_r = config.patch.des_r
+        # Data-dependent param: `des_r`
+        # self.des_r = config.patch.des_r
         self.patch_sample = config.patch.num_points_per_patch
         self.rad_n = config.patch.rad_n
         self.azi_n = config.patch.azi_n
         self.ele_n = config.patch.ele_n
-        self.des_r = config.patch.des_r
         self.delta = config.patch.delta
         self.voxel_sample = config.patch.voxel_sample
         self.dataset = config.data.dataset
@@ -44,15 +44,15 @@ class MiniSpinNet(nn.Module):
 
         self.conv_net = pn.Cylindrical_Net(inchan=16, dim=32)
 
-    def forward(self, pts, kpts, z_axis=None, is_aug=False):
-
+    def forward(self, pts, kpts, dataset_name, z_axis=None, is_aug=False):
+        des_r = self.config[dataset_name].patch.des_r
         # extract patches
-        init_patch = self.select_patches(pts, kpts, vicinity=self.des_r, patch_sample=self.patch_sample)
+        init_patch = self.select_patches(pts, kpts, vicinity=des_r, patch_sample=self.patch_sample)
         init_patch = init_patch.squeeze(0)
 
         # align with reference axis
         patches, rand_axis, R = self.axis_align(init_patch, self.dataset, z_axis)
-        patches = self.normalize(patches, self.des_r)
+        patches = self.normalize(patches, des_r)
 
         # SO(2) augmentation
         if is_aug is True:

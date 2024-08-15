@@ -78,6 +78,7 @@ class Args(object):
 
 if __name__ == '__main__':
     cfg = make_cfg()
+    cfg[cfg.data.dataset] = cfg.copy()
 
     # snapshot
     if cfg.train.pretrain_model == '':

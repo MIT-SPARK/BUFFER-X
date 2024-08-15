@@ -19,7 +19,7 @@ _C.train = edict()
 _C.train.epoch = 50
 _C.train.max_iter = 50000
 _C.train.batch_size = 1
-_C.train.num_workers = 16
+_C.train.num_workers = 0
 _C.train.pos_num = 512
 _C.train.augmentation_noise = 0.01
 _C.train.pretrain_model = ''
@@ -27,7 +27,6 @@ _C.train.all_stage = ['Ref', 'Desc', 'Keypt', 'Inlier']
 
 # test
 _C.test = edict()
-_C.test.scale = _C.data.voxel_size_0 / _C.data.voxel_size_1 # 'target size / source size'
 _C.test.experiment_id = '06050001'
 _C.test.pose_refine = False
 

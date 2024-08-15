@@ -70,6 +70,7 @@ class buffer(nn.Module):
     def __init__(self, config):
         super(buffer, self).__init__()
         self.config = config
+        self.config.stage = config.stage
 
         self.Ref = EFCNN(config)
         self.Desc = MiniSpinNet(config)
@@ -129,7 +130,9 @@ class buffer(nn.Module):
 
             # find positive correspondences
             gt_trans = data_source['relt_pose']
-            match_inds = self.get_matching_indices(src_pts, tgt_pts, gt_trans, self.config.data.voxel_size_0)
+            match_inds = self.get_matching_indices(src_pts, tgt_pts, gt_trans, data_source['voxel_size'])
+            dataset_name = data_source["dataset_names"][0]
+            cfg = self.config[dataset_name]
 
             #######################
             # training ref axis
@@ -175,12 +178,12 @@ class buffer(nn.Module):
             # training descriptor
             #######################
             # calculate feature descriptor
-            src = self.Desc(src_pcd_raw[None], src_kpt[None], src_axis[None])
+            src = self.Desc(src_pcd_raw[None], src_kpt[None], dataset_name, src_axis[None])
             if self.config.stage == 'Inlier':
                 # SO(2) augmentation
-                tgt = self.Desc(tgt_pcd_raw[None], tgt_kpt[None], tgt_axis[None], True)
+                tgt = self.Desc(tgt_pcd_raw[None], tgt_kpt[None], dataset_name, tgt_axis[None], True)
             else:
-                tgt = self.Desc(tgt_pcd_raw[None], tgt_kpt[None], tgt_axis[None])
+                tgt = self.Desc(tgt_pcd_raw[None], tgt_kpt[None], dataset_name, tgt_axis[None])
 
             if self.config.stage == 'Desc':
                 # calc matching score of equivariant feature maps
@@ -236,6 +239,8 @@ class buffer(nn.Module):
             src_pcd_raw, tgt_pcd_raw = data_source['src_pcd_raw'], data_source['tgt_pcd_raw']
             len_src_f = data_source['stack_lengths'][0][0]
             gt_trans = data_source['relt_pose']
+            dataset_name = data_source["dataset_names"][0]
+            cfg = self.config[dataset_name]
 
             axis, eps, branch = self.Ref(data_source)
             src_axis, tgt_axis = axis[:len_src_f], axis[len_src_f:]
@@ -253,8 +258,8 @@ class buffer(nn.Module):
 
             # select keypts by detection scores
             src_s, tgt_s = src_s[:, 0], tgt_s[:, 0]
-            s_det_idx, t_det_idx = torch.where(src_s > self.config.point.keypts_th), torch.where(
-                tgt_s > self.config.point.keypts_th)
+            s_det_idx, t_det_idx = torch.where(src_s > cfg.point.keypts_th), torch.where(
+                tgt_s > cfg.point.keypts_th)
             src_pts, tgt_pts = src_pts[s_det_idx[0]], tgt_pts[t_det_idx[0]]
             s_axis, t_axis = src_axis[s_det_idx[0]], tgt_axis[t_det_idx[0]]
             
@@ -263,16 +268,16 @@ class buffer(nn.Module):
                                                                                                                2).contiguous()
             s_axis_flipped, t_axis_flipped = s_axis[None].transpose(1, 2).contiguous(), t_axis[None].transpose(1,
                                                                                                                2).contiguous()
-            s_fps_idx = pnt2.furthest_point_sample(src_pts[None], self.config.point.num_keypts)
-            t_fps_idx = pnt2.furthest_point_sample(tgt_pts[None], self.config.point.num_keypts)
+            s_fps_idx = pnt2.furthest_point_sample(src_pts[None], cfg.point.num_keypts)
+            t_fps_idx = pnt2.furthest_point_sample(tgt_pts[None], cfg.point.num_keypts)
             kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
             kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
             k_axis1 = pnt2.gather_operation(s_axis_flipped, s_fps_idx).transpose(1, 2).contiguous()
             k_axis2 = pnt2.gather_operation(t_axis_flipped, t_fps_idx).transpose(1, 2).contiguous()
 
             # calculate descriptor
-            src = self.Desc(src_pcd_raw[None], kpts1, k_axis1)
-            tgt = self.Desc(tgt_pcd_raw[None], kpts2, k_axis2)
+            src = self.Desc(src_pcd_raw[None], kpts1, dataset_name, k_axis1)
+            tgt = self.Desc(tgt_pcd_raw[None], kpts2, dataset_name, k_axis2)
             src_des, src_equi, s_rand_axis, s_R, s_patches = src['desc'], src['equi'], src['rand_axis'], src['R'], src[
                 'patches']
             tgt_des, tgt_equi, t_rand_axis, t_R, t_patches = tgt['desc'], tgt['equi'], tgt['rand_axis'], tgt['R'], tgt[
@@ -288,11 +293,11 @@ class buffer(nn.Module):
             tt_equi = tgt_equi[t_mids]
             tt_R = t_R[t_mids]
 
-            ind = self.Inlier(ss_equi[:, :, 1:self.config.patch.ele_n - 1],
-                              tt_equi[:, :, 1:self.config.patch.ele_n - 1])
+            ind = self.Inlier(ss_equi[:, :, 1:cfg.patch.ele_n - 1],
+                              tt_equi[:, :, 1:cfg.patch.ele_n - 1])
 
             # recover pose
-            angle = ind * 2 * np.pi / self.config.patch.azi_n + 1e-6
+            angle = ind * 2 * np.pi / cfg.patch.azi_n + 1e-6
             angle_axis = torch.zeros_like(ss_kpts)
             angle_axis[:, -1] = 1
             angle_axis = angle_axis * angle[:, None]
@@ -306,7 +311,7 @@ class buffer(nn.Module):
             tss_kpts = ss_kpts[None] @ R.transpose(-1, -2) + t[:, None]
             diffs = torch.sqrt(torch.sum((tss_kpts - tt_kpts[None]) ** 2, dim=-1))
             thr = torch.sqrt(
-                torch.sum(ss_kpts ** 2, dim=-1)) * np.pi / self.config.patch.azi_n * self.config.match.inlier_th
+                torch.sum(ss_kpts ** 2, dim=-1)) * np.pi / cfg.patch.azi_n * cfg.match.inlier_th
             sign = diffs < thr[None]
             inlier_num = torch.sum(sign, dim=-1)
             best_ind = torch.argmax(inlier_num)
@@ -318,15 +323,15 @@ class buffer(nn.Module):
             corr = o3d.utility.Vector2iVector(np.array([inlier_ind, inlier_ind]).T)
 
             result = o3d.pipelines.registration.registration_ransac_based_on_correspondence(
-                pcd0, pcd1, corr, self.config.match.dist_th,
+                pcd0, pcd1, corr, cfg.match.dist_th,
                 o3d.pipelines.registration.TransformationEstimationPointToPoint(False), 3,
-                [o3d.pipelines.registration.CorrespondenceCheckerBasedOnEdgeLength(self.config.match.similar_th),
-                 o3d.pipelines.registration.CorrespondenceCheckerBasedOnDistance(self.config.match.dist_th)],
-                o3d.pipelines.registration.RANSACConvergenceCriteria(self.config.match.iter_n,
-                                                                     self.config.match.confidence))
+                [o3d.pipelines.registration.CorrespondenceCheckerBasedOnEdgeLength(cfg.match.similar_th),
+                 o3d.pipelines.registration.CorrespondenceCheckerBasedOnDistance(cfg.match.dist_th)],
+                o3d.pipelines.registration.RANSACConvergenceCriteria(cfg.match.iter_n,
+                                                                     cfg.match.confidence))
 
             init_pose = result.transformation
-            if self.config.test.pose_refine is True:
+            if cfg.test.pose_refine is True:
                 pose = self.post_refinement(torch.FloatTensor(init_pose[None]).cuda(), ss_kpts[None], tt_kpts[None])
                 pose = pose[0].detach().cpu().numpy()
             else:

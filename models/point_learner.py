@@ -24,12 +24,15 @@ class Encoder(nn.Module):
         ############
         # Current radius of convolution and feature dimension
         self.layer = 0
-        self.r = config.data.voxel_size_0 * config.point.conv_radius
+
+        # ToDo. Currently, just fix the reference voxel size
+        self.reference_voxel_size = config.data.voxel_size_0
+        self.r = self.reference_voxel_size * config.point.conv_radius
+
+        # Data-agnostic parameters
         self.in_dim = config.point.in_feats_dim // 3
         self.out_dim = config.point.first_feats_dim // 3
         self.epsilon = torch.nn.Parameter(torch.tensor(-5.0))
-        # scale normalization
-        self.scale = config.test.scale
 
         #####################
         # List Encoder blocks
@@ -62,7 +65,7 @@ class Encoder(nn.Module):
                                                          self.in_dim,
                                                          self.out_dim,
                                                          self.layer,
-                                                         self.scale))
+                                                         self.reference_voxel_size))
 
             # Update dimension of input from output
             self.in_dim = self.out_dim
@@ -106,7 +109,8 @@ class Decoder(Encoder):
                                                      self.r,
                                                      self.in_dim,
                                                      self.out_dim,
-                                                     self.layer))
+                                                     self.layer,
+                                                     self.reference_voxel_size))
 
             # Update dimension of input from output
             self.in_dim = self.out_dim
@@ -215,20 +219,21 @@ def block_decider(block_name,
                   in_dim,
                   out_dim,
                   layer_ind,
+                  reference_voxel_size,
                   scale=1.0):
     if block_name == 'VN':
         return VNBlock(in_dim, out_dim)
 
     elif block_name in 'VNN_first':
-        return VNNBlock(block_name, in_dim, out_dim, radius, scale, layer_ind, pooling='mean', mode='6')
+        return VNNBlock(block_name, in_dim, out_dim, radius, reference_voxel_size, layer_ind, pooling='mean', mode='6')
 
     elif block_name in ['VNN',
                         'VNN_strided']:
-        return VNNBlock(block_name, in_dim, out_dim, radius, scale, layer_ind, pooling='mean', mode='1')
+        return VNNBlock(block_name, in_dim, out_dim, radius, reference_voxel_size, layer_ind, pooling='mean', mode='1')
 
     elif block_name in ['VNN_resnetb',
                         'VNN_resnetb_strided']:
-        return VNNResnetBlock(block_name, in_dim, out_dim, radius, scale, layer_ind, pooling='mean', mode='1')
+        return VNNResnetBlock(block_name, in_dim, out_dim, radius, reference_voxel_size, layer_ind, pooling='mean', mode='1')
 
     elif block_name == 'max_pool' or block_name == 'max_pool_wide':
         return MaxPoolBlock(layer_ind)
@@ -267,7 +272,7 @@ class VNBlock(nn.Module):
 
 class VNNBlock(nn.Module):
 
-    def __init__(self, block_name, in_dim, out_dim, radius, scale, layer_ind, pooling='mean', mode='0'):
+    def __init__(self, block_name, in_dim, out_dim, radius, reference_voxel_size, layer_ind, pooling='mean', mode='0'):
         """
         Initialize the first VNN block with its ReLU and BatchNorm.
         :param in_dim: dimension input features
@@ -286,7 +291,7 @@ class VNNBlock(nn.Module):
 
         # Get other parameters
         self.radius = radius
-        self.scale = scale
+        self.reference_voxel_size = reference_voxel_size
         self.layer_ind = layer_ind
         self.block_name = block_name
         self.mode = mode
@@ -313,7 +318,6 @@ class VNNBlock(nn.Module):
         return
 
     def forward(self, x, batch):
-
         if 'strided' in self.block_name:
             q_pts = batch['points'][self.layer_ind + 1]
             s_pts = batch['points'][self.layer_ind]
@@ -340,7 +344,8 @@ class VNNBlock(nn.Module):
 
         #########################
         # scale normalization
-        eqv_neighbors = eqv_neighbors / self.scale
+        scale = self.reference_voxel_size / batch["voxel_sizes"][0]
+        eqv_neighbors = eqv_neighbors / scale
 
         if self.mode == '0' and min(x.shape) == 0:
             raise ValueError('Features can not be empty!')
@@ -418,7 +423,7 @@ class VNNBlock(nn.Module):
 
 class VNNResnetBlock(nn.Module):
 
-    def __init__(self, block_name, in_dim, out_dim, radius, scale, layer_ind, pooling='mean', mode='0'):
+    def __init__(self, block_name, in_dim, out_dim, radius, reference_voxel_size, layer_ind, pooling='mean', mode='0'):
         """
         Initialize the first VNN block with its ReLU and BatchNorm.
         :param in_dim: dimension input features
@@ -435,7 +440,7 @@ class VNNResnetBlock(nn.Module):
 
         # Get other parameters
         self.radius = radius
-        self.scale = scale
+        self.reference_voxel_size = reference_voxel_size
         self.layer_ind = layer_ind
         self.block_name = block_name
         self.mode = mode
@@ -492,7 +497,8 @@ class VNNResnetBlock(nn.Module):
 
         #########################
         # scale normalization
-        eqv_neighbors = eqv_neighbors / self.scale
+        scale = self.reference_voxel_size / batch["voxel_sizes"][0]
+        eqv_neighbors = eqv_neighbors / scale
 
         if self.mode == '0' and min(features.shape) == 0:
             raise ValueError('Features can not be empty!')

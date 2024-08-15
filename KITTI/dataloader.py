@@ -114,7 +114,10 @@ def batch_neighbors_kpconv(queries, supports, q_batches, s_batches, radius, max_
 def collate_fn_descriptor(list_data, config, neighborhood_limits):
     batched_points_list = []
     batched_lengths_list = []
-    batched_features_list = []# = np.ones_like(input_points[0][:, :0]).astype(np.float32)
+    batched_features_list = []
+    batched_voxel_size_list = []
+    batched_dataset_names = []
+    # = np.ones_like(input_points[0][:, :0]).astype(np.float32)
     assert len(list_data) == 1
     list_data = list_data[0]
 
@@ -131,10 +134,13 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
     batched_features_list.append(tgt_f)
     batched_lengths_list.append(len(src_kpt))
     batched_lengths_list.append(len(tgt_kpt))
+    batched_voxel_size_list.append(list_data['voxel_size'])
+    batched_dataset_names.append(list_data['dataset_name'])
 
     batched_points = torch.from_numpy(np.concatenate(batched_points_list, axis=0))
     batched_features = torch.from_numpy(np.concatenate(batched_features_list, axis=0))
     batched_lengths = torch.from_numpy(np.array(batched_lengths_list)).int()
+    batched_voxel_sizes = torch.from_numpy(np.array(batched_voxel_size_list))
 
     # Starting radius of convolutions
     r_normal = config.data.voxel_size_0 * config.point.conv_radius
@@ -236,6 +242,8 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
         'src_pcd': torch.from_numpy(src_kpt).float(),
         'tgt_pcd': torch.from_numpy(tgt_kpt).float(),
         'relt_pose': torch.from_numpy(relt_pose).float(),
+        'voxel_sizes': batched_voxel_sizes,
+        'dataset_names': batched_dataset_names,
     }
 
     return dict_inputs

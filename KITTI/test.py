@@ -16,6 +16,7 @@ from KITTI.dataloader import get_dataloader
 
 if __name__ == '__main__':
     cfg = make_cfg()
+    cfg[cfg.data.dataset] = cfg.copy()
     cfg.stage = 'test'
     timestr = time.strftime('%m%d%H%M')
     model = buffer(cfg)
@@ -63,8 +64,8 @@ if __name__ == '__main__':
                 trans_est = np.eye(4, 4)
 
             ####### calculate the recall of DGR #######
-            rte_thresh = 0.3
-            rre_thresh = 1
+            rte_thresh = 2.0
+            rre_thresh = 5.0
             trans = data_source['relt_pose'].numpy()
             rte = np.linalg.norm(trans_est[:3, 3] - trans[:3, 3])
             rre = np.arccos(
