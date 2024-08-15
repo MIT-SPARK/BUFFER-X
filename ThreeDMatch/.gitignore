@@ -2,3 +2,26 @@ __pycache__
 log_3DMatch
 snapshot
 tensorboard
+
+.vscode/
+*/*.pth
+
+# Temp files
+*.swp
+*.swo
+*.orig
+.idea
+outputs/
+outputs*/
+*outputs/
+*.pyc
+*.ply
+*.pth
+
+05*/
+06*/
+07*/
+08*/
+09*/
+10*/
+11*/
