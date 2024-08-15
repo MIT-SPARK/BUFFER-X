@@ -110,7 +110,7 @@ class Trainer(object):
             data_timer.tic()
             data_source = data_iter.__next__()
 
-            # calc normals
+            # compute normals
             src_pts, tgt_pts = data_source['src_pcd'], data_source['tgt_pcd']
             src_pcd = make_open3d_point_cloud(src_pts.numpy(), [1, 0.706, 0])
             src_pcd.estimate_normals()
@@ -235,7 +235,7 @@ class Trainer(object):
                 data_timer.tic()
                 data_source = data_iter.__next__()
 
-                # calc normals
+                # compute normals
                 src_pts, tgt_pts = data_source['src_pcd'], data_source['tgt_pcd']
                 src_pcd = make_open3d_point_cloud(src_pts.numpy(), [0.2, 0.3, 0.4])
                 src_pcd.estimate_normals()
@@ -293,7 +293,6 @@ class Trainer(object):
 
                     loss = det_loss
                     stats = {
-                        # "axis_loss": float(err.mean().item()),
                         'det_loss': float(det_loss.item()),
                         "desc_acc": float(accuracy.item()),
                     }
