@@ -60,7 +60,9 @@ class MiniSpinNet(nn.Module):
             angles[:, -1] = 1
             angles = angles * np.random.random([patches.shape[0], 1]) * 2 * np.pi
             angles = torch.FloatTensor(angles).to(patches.device)
-            aug_rotation = Convert.angle_axis_to_rotation_matrix(angles)
+            # By Hyungtae: To resolve warning message about kornia 0.7.0
+            # aug_rotation = Convert.angle_axis_to_rotation_matrix(angles)
+            aug_rotation = Convert.axis_angle_to_rotation_matrix(angles)
         else:
             aug_rotation = np.eye(3)[None].repeat(patches.shape[0], axis=0)
             aug_rotation = torch.FloatTensor(aug_rotation).to(patches.device)
