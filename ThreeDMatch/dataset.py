@@ -159,8 +159,9 @@ class ThreeDMatchDataset(Data.Dataset):
                 'src_sds_pts': src_kpt, # second downsampling
                 'tgt_sds_pts': tgt_kpt,
                 'src_id': src_id,
-                'tgt_id': tgt_id}
-
+                'tgt_id': tgt_id,
+                'voxel_size': self.config.data.downsample,
+                'dataset_name': self.config.data.dataset}
 
     def __len__(self):
         return self.length

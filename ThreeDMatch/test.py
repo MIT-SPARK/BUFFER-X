@@ -198,6 +198,7 @@ def extract_corresponding_trajectors(est_pairs, gt_pairs, gt_traj):
 
 if __name__ == '__main__':
     cfg = make_cfg()
+    cfg[cfg.data.dataset] = cfg.copy()
     cfg.stage = 'test'
     timestr = time.strftime('%m%d%H%M')
     model = buffer(cfg)

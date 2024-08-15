@@ -7,7 +7,7 @@ _C = edict()
 # data
 _C.data = edict()
 _C.data.dataset = '3DMatch'
-_C.data.root = '../data/ThreeDMatch'
+_C.data.root = '../../datasets/ThreeDMatch'
 _C.data.downsample = 0.02 # first downsampling
 _C.data.voxel_size_0 = 0.035 # second downsampling
 _C.data.voxel_size_1 = _C.data.voxel_size_0
@@ -19,15 +19,14 @@ _C.train = edict()
 _C.train.epoch = 10
 _C.train.max_iter = 50000
 _C.train.batch_size = 1
-_C.train.num_workers = 16
+_C.train.num_workers = 0
 _C.train.pos_num = 512
 _C.train.augmentation_noise = 0.001
-_C.train.pretrain_model = ''
+_C.train.pretrain_model = '06132318'
 _C.train.all_stage = ['Ref', 'Desc', 'Keypt', 'Inlier']
 
 # test
 _C.test = edict()
-_C.test.scale = _C.data.voxel_size_0 / _C.data.voxel_size_1 # 'target size / source size'
 _C.test.experiment_id = '06132318'
 _C.test.pose_refine = True
 
