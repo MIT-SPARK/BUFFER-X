@@ -28,7 +28,7 @@ class IndoorTester(Trainer):
         self.model.eval()
         with torch.no_grad():
             for idx in tqdm(range(num_iter)): # loop through this epoch
-                inputs = c_loader_iter.next()
+                inputs = c_loader_iter.__next__()
                 ##################################
                 # load inputs to device.
                 for k, v in inputs.items():  
@@ -77,7 +77,7 @@ class KITTITester(Trainer):
         rot_gt, trans_gt =[],[]
         with torch.no_grad():
             for _ in tqdm(range(num_iter)): # loop through this epoch
-                inputs = c_loader_iter.next()
+                inputs = c_loader_iter.__next__()
                 ###############################################
                 # forward pass
                 for k, v in inputs.items():  
@@ -326,7 +326,7 @@ class ModelnetTester(Trainer):
         self.model.eval()
         with torch.no_grad():
             for idx in tqdm(range(num_iter)): # loop through this epoch
-                inputs = c_loader_iter.next()
+                inputs = c_loader_iter.__next__()
                 try:
                     ##################################
                     # load inputs to device.
@@ -393,7 +393,7 @@ class ModelnetTester(Trainer):
         
         with torch.no_grad():
             for idx in tqdm(range(num_iter)): # loop through this epoch
-                inputs = c_loader_iter.next()
+                inputs = c_loader_iter.__next__()
     
                 batch_size = 1
                 for i_iter in range(pred_transforms.shape[1]):

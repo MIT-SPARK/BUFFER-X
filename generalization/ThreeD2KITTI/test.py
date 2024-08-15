@@ -53,7 +53,7 @@ if __name__ == '__main__':
         data_iter = iter(test_loader)
         for i in range(num_batch):
             data_timer.tic()
-            data_source = data_iter.next()
+            data_source = data_iter.__next__()
 
             data_timer.toc()
             model_timer.tic()

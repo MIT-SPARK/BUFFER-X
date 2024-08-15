@@ -109,7 +109,7 @@ class Trainer(object):
         data_iter = iter(self.train_loader)
         for i in range(num_iter):
             data_timer.tic()
-            data_source = data_iter.next()
+            data_source = data_iter.__next__()
 
             # compute normals
             src_pts, tgt_pts = data_source['src_pcd'], data_source['tgt_pcd']
@@ -234,7 +234,7 @@ class Trainer(object):
             data_iter = iter(self.val_loader)
             for i in range(num_batch):
                 data_timer.tic()
-                data_source = data_iter.next()
+                data_source = data_iter.__next__()
 
                 # compute normals
                 src_pts, tgt_pts = data_source['src_pcd'], data_source['tgt_pcd']
