@@ -183,7 +183,7 @@ class KITTIDataset(Data.Dataset):
                 'relt_pose': relt_pose,
                 'src_sds_pts': src_kpt,  # second downsampling
                 'tgt_sds_pts': tgt_kpt,
-                'voxel_size': self.config.data.downsample,
+                'voxel_size': ds_size,
                 'dataset_name': self.config.data.dataset}
 
     def apply_transform(self, pts, trans):

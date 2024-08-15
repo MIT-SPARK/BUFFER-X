@@ -160,7 +160,7 @@ class ThreeDMatchDataset(Data.Dataset):
                 'tgt_sds_pts': tgt_kpt,
                 'src_id': src_id,
                 'tgt_id': tgt_id,
-                'voxel_size': self.config.data.downsample,
+                'voxel_size': ds_size,
                 'dataset_name': self.config.data.dataset}
 
     def __len__(self):
