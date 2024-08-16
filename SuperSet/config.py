@@ -12,7 +12,7 @@ _C.data.manual_seed = 123
 
 # training
 _C.train = edict()
-_C.train.epoch = 2
+_C.train.epoch = 25
 _C.train.max_iter = 50000
 _C.train.batch_size = 1
 _C.train.num_workers = 16
@@ -31,8 +31,9 @@ _C.optim.lr = {'Ref': 0.005, 'Desc':0.001, 'Keypt':0.001, 'Inlier':0.001}
 _C.optim.lr_decay = 0.50
 _C.optim.weight_decay = 1e-6
 # ToDo. Support different interval for different dataset?
-# In 3DMatch: _C.optim.scheduler_interval = {'Ref': 1, 'Desc':2, 'Keypt':1, 'Inlier':1}
-_C.optim.scheduler_interval = {'Ref': 5, 'Desc':10, 'Keypt':5, 'Inlier':5}
+# In 3DMatch, _C.optim.scheduler_interval = {'Ref': 1, 'Desc':2, 'Keypt':1, 'Inlier':1}
+# In KITTI, _C.optim.scheduler_interval = {'Ref': 5, 'Desc':10, 'Keypt':5, 'Inlier':5}
+_C.optim.scheduler_interval = {'Ref': 3, 'Desc':5, 'Keypt':3, 'Inlier':3}
 
 # point-wise learner
 _C.point = edict()
