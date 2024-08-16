@@ -10,8 +10,20 @@
 - 알고리즘에서 scale을 쓰는 부분을 모두 제거했음!
 - Superset 관리를 `config["KITTI"]`, `config["ThreeDMatch"]`와 같이 dataset의 이름을 key로 받아서 관리하도록 수정함
 - `config.data.voxel_size_0`의 값을 reference voxel size로 사용함
+- 앞으로는 Docker 내의 주소를 위해 다음과 같이 주소를 통일하시죳!
 
-## 하면 좋은 것 q
+```angular2html
+/opt/project <- BUFFER directory
+/opt/datasets
+├── ETH
+    ├── ...
+├── kitti
+    ├── ...
+├── ThreeDMatch
+    ├── ...
+```
+
+## 하면 좋은 것 
 
 - 현재는 batch를 1밖에 지원안 함...이를 수정하면 더 좋을 것 같음!
 
