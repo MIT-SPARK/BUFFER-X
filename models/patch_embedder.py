@@ -26,7 +26,6 @@ class MiniSpinNet(nn.Module):
         self.ele_n = config.patch.ele_n
         self.delta = config.patch.delta
         self.voxel_sample = config.patch.voxel_sample
-        self.dataset = config.data.dataset
         self.pnt_layer = nn.Sequential(
             nn.Conv2d(3, 16, kernel_size=(1, 1), stride=(1, 1)),
             nn.BatchNorm2d(16),
@@ -51,7 +50,7 @@ class MiniSpinNet(nn.Module):
         init_patch = init_patch.squeeze(0)
 
         # align with reference axis
-        patches, rand_axis, R = self.axis_align(init_patch, self.dataset, z_axis)
+        patches, rand_axis, R = self.axis_align(init_patch, dataset_name, z_axis)
         patches = self.normalize(patches, des_r)
 
         # SO(2) augmentation
