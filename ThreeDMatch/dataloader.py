@@ -7,7 +7,6 @@ import cpp_wrappers.cpp_neighbors.radius_neighbors as cpp_neighbors
 from models.point_learner import architecture
 from models.KPConv.lib.utils import load_config
 from models.KPConv.lib.timer import Timer
-from easydict import EasyDict as edict
 
 num_layer = 1
 for block_i, block in enumerate(architecture):

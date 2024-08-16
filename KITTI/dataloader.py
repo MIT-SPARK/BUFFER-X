@@ -117,7 +117,7 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
     batched_features_list = []
     batched_voxel_size_list = []
     batched_dataset_names = []
-    # = np.ones_like(input_points[0][:, :0]).astype(np.float32)
+
     assert len(list_data) == 1
     list_data = list_data[0]
 

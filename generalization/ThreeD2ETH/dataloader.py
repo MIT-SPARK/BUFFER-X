@@ -5,9 +5,7 @@ from generalization.ThreeD2ETH.dataset import ETHTestset, get_matching_indices
 import cpp_wrappers.cpp_subsampling.grid_subsampling as cpp_subsampling
 import cpp_wrappers.cpp_neighbors.radius_neighbors as cpp_neighbors
 from models.point_learner import architecture
-from models.KPConv.lib.utils import load_config
 from models.KPConv.lib.timer import Timer
-from easydict import EasyDict as edict
 
 num_layer = 1
 for block_i, block in enumerate(architecture):
@@ -115,7 +113,7 @@ def batch_neighbors_kpconv(queries, supports, q_batches, s_batches, radius, max_
 def collate_fn_descriptor(list_data, config, neighborhood_limits):
     batched_points_list = []
     batched_lengths_list = []
-    batched_features_list = []# = np.ones_like(input_points[0][:, :0]).astype(np.float32)
+    batched_features_list = []
     assert len(list_data) == 1
     list_data = list_data[0]
 
