@@ -56,11 +56,9 @@ class Trainer(object):
     def train(self):
         best_loss = 1000000000
         best_reg_recall = 0
-
         for epoch in range(self.epoch):
             gc.collect()
             self.train_epoch(epoch)
-
             if (epoch + 1) % self.evaluate_interval == 0 or epoch == 0:
                 res = self.evaluate()
                 print(f'Evaluation: Epoch {epoch}')
@@ -102,15 +100,16 @@ class Trainer(object):
     def train_epoch(self, epoch):
         print('training start!!')
         self.model.train()
-        data_timer, model_timer = Timer(), Timer()
-
+        data_timer, get_item_timer, compute_normal_timer, model_timer = Timer(), Timer(), Timer(), Timer()
         num_batch = len(self.train_loader)
         num_iter = min(self.cfg.train.max_iter, num_batch)
         data_iter = iter(self.train_loader)
         for i in range(num_iter):
             data_timer.tic()
+            get_item_timer.tic()
             data_source = data_iter.__next__()
-
+            get_item_timer.toc()
+            compute_normal_timer.tic()
             # compute normals
             src_pts, tgt_pts = data_source['src_pcd'], data_source['tgt_pcd']
             src_pcd = make_open3d_point_cloud(src_pts.numpy(), [1, 0.706, 0])
@@ -122,8 +121,9 @@ class Trainer(object):
             tgt_pcd.estimate_normals()
             tgt_pcd.orient_normals_towards_camera_location()
             tgt_normls = np.array(tgt_pcd.normals)
+            compute_normal_timer.toc()
+    
             data_source['features'] = torch.from_numpy(np.concatenate([src_normls, tgt_normls], axis=0)).float()
-
             data_timer.toc()
             model_timer.tic()
 
@@ -217,8 +217,11 @@ class Trainer(object):
                     self.meter_dict[key].update(stats[key])
 
             if (i + 1) % 200 == 0:
-                print(f"Epoch: {epoch + 1} [{i + 1:4d}/{num_iter}] "
-                      f"data_time: {data_timer.avg:.2f}s "
+                print(f"Epoch: {epoch + 1} [{i + 1:4d}/{num_iter}] ")
+                print(f"data_time: {data_timer.avg:.4f}s "
+                      f"get_item_time: {get_item_timer.avg:.4f}s "
+                      f"Compute_normal_time: {compute_normal_timer.avg:.4f}s ")
+                print(f"train_stage: {self.train_modal} "
                       f"model_time: {model_timer.avg:.2f}s ")
                 for key in self.meter_dict.keys():
                     print(f"{key}: {self.meter_dict[key].avg:.6f}")
