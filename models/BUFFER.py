@@ -130,7 +130,7 @@ class buffer(nn.Module):
 
             # find positive correspondences
             gt_trans = data_source['relt_pose']
-            match_inds = self.get_matching_indices(src_pts, tgt_pts, gt_trans, data_source['voxel_size'])
+            match_inds = self.get_matching_indices(src_pts, tgt_pts, gt_trans, data_source['voxel_sizes'][0])
             dataset_name = data_source["dataset_names"][0]
             cfg = self.config[dataset_name]
 
