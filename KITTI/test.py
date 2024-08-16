@@ -3,7 +3,7 @@ import sys
 sys.path.append('../')
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 import math
 import time
 import torch.nn as nn
@@ -55,7 +55,7 @@ if __name__ == '__main__':
 
             data_timer.toc()
             model_timer.tic()
-            trans_est, src_axis, tgt_axis = model(data_source)
+            trans_est, src_axis, tgt_axis, times = model(data_source)
             model_timer.toc()
 
             if trans_est is not None:
@@ -74,9 +74,16 @@ if __name__ == '__main__':
 
             if rte > rte_thresh or rre > rre_thresh:
                 print(f"{i}th fragment fails, RRE：{rre}, RTE：{rte}")
-            print(f"data_time: {data_timer.diff:.2f}s "
-                  f"model_time: {model_timer.diff:.2f}s ")
-
+            print(f"data_time: {data_timer.diff:.4f}s "
+                  f"model_time: {model_timer.diff:.4f}s "
+                  f"ref_time: {times[0]:.4f}s "
+                  f"keypt_time: {times[1]:.4f}s "
+                  f"fps_time: {times[2]:.4f}s "
+                  f"desc_time: {times[3]:.4f}s "
+                  f"mutual_matching_time: {times[4]:.4f}s "
+                  f"inlier_time: {times[5]:.4f}s "
+                  f"correspondence_proposal_time: {times[6]:.4f}s "
+                  f"ransac_time: {times[7]:.4f}s ")
             torch.cuda.empty_cache()
 
     states = np.array(states)
