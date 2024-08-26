@@ -51,7 +51,7 @@ class MiniSpinNet(nn.Module):
         init_patch = init_patch.squeeze(0)
 
         # align with reference axis
-        patches, rand_axis, R = self.axis_align(init_patch, self.dataset, z_axis)
+        patches, rand_axis, R = self.axis_align(init_patch, dataset_name, z_axis)
         patches = self.normalize(patches, des_r)
 
         # SO(2) augmentation
