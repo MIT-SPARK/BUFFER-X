@@ -208,12 +208,12 @@ void batch_ordered_neighbors(vector<PointXYZ>& queries,
 }
 
 
-void batch_nanoflann_neighbors(vector<PointXYZ>& queries,
-                                vector<PointXYZ>& supports,
-                                vector<int>& q_batches,
-                                vector<int>& s_batches,
-                                vector<int>& neighbors_indices,
-                                float radius)
+void batch_nanoflann_neighbors(const vector<PointXYZ>& queries,
+                               const vector<PointXYZ>& supports,
+                               const vector<int>& q_batches,
+                               const  vector<int>& s_batches,
+                               vector<int>& neighbors_indices,
+                               const float radius)
 {
 
 	// Initialize variables
@@ -331,3 +331,137 @@ void batch_nanoflann_neighbors(vector<PointXYZ>& queries,
 	return;
 }
 
+void batch_nanoflanntbb_neighbors(const vector<PointXYZ>& queries,
+                               const vector<PointXYZ>& supports,
+                               const vector<int>& q_batches,
+                               const  vector<int>& s_batches,
+                               vector<int>& neighbors_indices,
+                               const float radius)
+{
+
+	// Initialize variables
+	// ******************
+    int num_queries = queries.size();
+
+	// indices
+	int i0 = 0;
+
+	// Square radius
+	float r2 = radius * radius;
+
+	// Counting vector
+	int max_count = 0; 
+	int empiricall_max_count = 400; // Sufficiently large number
+
+    std::vector<uint32_t> vector_tmp;
+    vector_tmp.reserve(empiricall_max_count);
+    std::vector<std::vector<uint32_t>> all_inds(num_queries, vector_tmp);
+
+
+	// Nanoflann related variables
+	// ***************************
+
+    kiss_matcher::PointCloud cloud_q, cloud_s0, cloud_s1;
+
+    cloud_q.points.resize(num_queries);
+    for (size_t k = 0; k < num_queries; ++k)
+    {
+      const auto &p = queries[k];
+      cloud_q.points[k] = Eigen::Vector4d(p.x, p.y, p.z, 1.0);
+    }
+
+    cloud_s0.points.resize(s_batches[0]);
+    for (size_t i = 0; i < s_batches[0]; ++i)
+    {
+      const auto &p = supports[i];
+      cloud_s0.points[i] = Eigen::Vector4d(p.x, p.y, p.z, 1.0);
+    }
+
+    cloud_s1.points.resize(s_batches[1]);
+    for (size_t j = 0; j < s_batches[1]; ++j)
+    {
+      const auto &p = supports[s_batches[0] + j];
+      cloud_s1.points[j] = Eigen::Vector4d(p.x, p.y, p.z, 1.0);
+    }
+
+
+    MyKdTree kdtree_s0(cloud_s0);
+    MyKdTree kdtree_s1(cloud_s1);
+
+	// Search neigbors indices
+	// ***********************
+
+    // Search params
+    nanoflann::SearchParams search_params;
+    search_params.sorted = true;
+
+    max_count = tbb::parallel_reduce(
+        // range
+        tbb::blocked_range<int>(0, num_queries),
+        // identity
+        0,
+        // 1st lambda 
+        [&](tbb::blocked_range<int> r, int max_num_neighbors) -> int {
+        max_num_neighbors = 0;
+        for (int i0 = r.begin(); i0 < r.end(); ++i0)
+        {
+            std::vector<std::pair<size_t, double> > indices_dists;
+            indices_dists.reserve(1000);
+
+            // Check if we changed batch
+            if (i0 < q_batches[0])
+            {
+                size_t num_results = kdtree_s0.radius_search(cloud_q.point(i0), r2, indices_dists);
+                for (const auto& [idx, sqr_dist]: indices_dists) {
+                    all_inds[i0].emplace_back(idx);
+                }
+                max_num_neighbors = max_num_neighbors > indices_dists.size() ? max_num_neighbors : indices_dists.size();
+
+            } else {
+                size_t num_results = kdtree_s1.radius_search(cloud_q.point(i0), r2, indices_dists);
+                for (const auto& [idx, sqr_dist]: indices_dists) {
+                    all_inds[i0].emplace_back(idx);
+                }
+                max_num_neighbors = max_num_neighbors > indices_dists.size() ? max_num_neighbors : indices_dists.size();
+
+            }
+        }
+        return max_num_neighbors;
+    }, 
+    // 2nd lambda: parallel reduction
+    [](const int a, const int b) -> int {
+
+        return a > b? a : b;
+    });
+
+    // `supports.size()` is a dummy number
+	neighbors_indices.resize(queries.size() * max_count, supports.size());
+
+    tbb::parallel_for(tbb::blocked_range<int>(0, num_queries), [&](tbb::blocked_range<int> r) {
+        for (int i0 = r.begin(); i0 < r.end(); ++i0)
+        {
+            const auto& inds_dists = all_inds[i0];
+            if (i0 < q_batches[0]) {
+                for (int j = 0; j < max_count; j++)
+                {
+                    if (j < inds_dists.size())
+                    {
+                        neighbors_indices[i0 * max_count + j] = inds_dists[j];
+                    }
+
+                }
+            } else {
+                for (int j = 0; j < max_count; j++)
+                {
+                    if (j < inds_dists.size())
+                    {
+                        neighbors_indices[i0 * max_count + j] = inds_dists[j] + s_batches[0];
+                    }
+
+                }
+            }
+        }
+    });
+
+    return;
+}
