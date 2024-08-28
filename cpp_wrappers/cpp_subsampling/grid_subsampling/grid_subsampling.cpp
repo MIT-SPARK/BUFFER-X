@@ -84,7 +84,7 @@ void grid_subsampling(vector<PointXYZ>& original_points,
 		subsampled_classes.reserve(data.size() * ldim);
 	for (auto& v : data)
 	{
-		subsampled_points.push_back(v.second.point * (1.0 / v.second.count));
+		subsampled_points.emplace_back(v.second.point * (1.0 / v.second.count));
 		if (use_feature)
 		{
 		    float count = (float)v.second.count;
@@ -106,13 +106,13 @@ void grid_subsampling(vector<PointXYZ>& original_points,
 }
 
 
-void batch_grid_subsampling(vector<PointXYZ>& original_points,
+void batch_grid_subsampling(const vector<PointXYZ>& original_points,
                               vector<PointXYZ>& subsampled_points,
-                              vector<float>& original_features,
+                            const vector<float>& original_features,
                               vector<float>& subsampled_features,
-                              vector<int>& original_classes,
+                            const  vector<int>& original_classes,
                               vector<int>& subsampled_classes,
-                              vector<int>& original_batches,
+                            const vector<int>& original_batches,
                               vector<int>& subsampled_batches,
                               float sampleDl,
                               int max_p)

@@ -39,7 +39,7 @@ public:
 	}
 
 	// Method Update
-	void update_all(const PointXYZ p, vector<float>::iterator f_begin, vector<int>::iterator l_begin)
+	void update_all(const PointXYZ& p, vector<float>::iterator f_begin, vector<int>::iterator l_begin)
 	{
 		count += 1;
 		point += p;
@@ -52,14 +52,14 @@ public:
 		}
 		return;
 	}
-	void update_features(const PointXYZ p, vector<float>::iterator f_begin)
+	void update_features(const PointXYZ& p, vector<float>::iterator f_begin)
 	{
 		count += 1;
 		point += p;
 		transform (features.begin(), features.end(), f_begin, features.begin(), plus<float>());
 		return;
 	}
-	void update_classes(const PointXYZ p, vector<int>::iterator l_begin)
+	void update_classes(const PointXYZ& p, vector<int>::iterator l_begin)
 	{
 		count += 1;
 		point += p;
@@ -71,7 +71,7 @@ public:
 		}
 		return;
 	}
-	void update_points(const PointXYZ p)
+	void update_points(const PointXYZ& p)
 	{
 		count += 1;
 		point += p;
@@ -88,13 +88,13 @@ void grid_subsampling(vector<PointXYZ>& original_points,
                       float sampleDl,
                       int verbose);
 
-void batch_grid_subsampling(vector<PointXYZ>& original_points,
+void batch_grid_subsampling(const vector<PointXYZ>& original_points,
                             vector<PointXYZ>& subsampled_points,
-                            vector<float>& original_features,
+                            const vector<float>& original_features,
                             vector<float>& subsampled_features,
-                            vector<int>& original_classes,
+                            const vector<int>& original_classes,
                             vector<int>& subsampled_classes,
-                            vector<int>& original_batches,
+                            const vector<int>& original_batches,
                             vector<int>& subsampled_batches,
                             float sampleDl,
                             int max_p);
