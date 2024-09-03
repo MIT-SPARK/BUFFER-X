@@ -338,7 +338,6 @@ void batch_nanoflanntbb_neighbors(const vector<PointXYZ>& queries,
                                vector<int>& neighbors_indices,
                                const float radius)
 {
-
 	// Initialize variables
 	// ******************
     int num_queries = queries.size();
@@ -357,6 +356,11 @@ void batch_nanoflanntbb_neighbors(const vector<PointXYZ>& queries,
     vector_tmp.reserve(empiricall_max_count);
     std::vector<std::vector<uint32_t>> all_inds(num_queries, vector_tmp);
 
+    std::vector<int> q_batches_accum = {0};
+    for (const auto& num_batch: q_batches) {
+        int accum = q_batches_accum.back() + num_batch;
+        q_batches_accum.push_back(accum);
+    }
 
 	// Nanoflann related variables
 	// ***************************
@@ -390,6 +394,15 @@ void batch_nanoflanntbb_neighbors(const vector<PointXYZ>& queries,
 
 	// Search neigbors indices
 	// ***********************
+    auto which_batch = [&](const int idx) {
+        for (int i=1; i < q_batches_accum.size(); ++i) 
+        {
+            if (q_batches_accum[i-1] <= idx && idx < q_batches_accum[i]) 
+            {
+                return i - 1;
+            }
+        }
+    };
 
     // Search params
     nanoflann::SearchParams search_params;
@@ -409,7 +422,7 @@ void batch_nanoflanntbb_neighbors(const vector<PointXYZ>& queries,
             indices_dists.reserve(1000);
 
             // Check if we changed batch
-            if (i0 < q_batches[0])
+            if (which_batch(i0) % 2 == 0)
             {
                 size_t num_results = kdtree_s0.radius_search(cloud_q.point(i0), r2, indices_dists);
                 for (const auto& [idx, sqr_dist]: indices_dists) {
@@ -441,7 +454,7 @@ void batch_nanoflanntbb_neighbors(const vector<PointXYZ>& queries,
         for (int i0 = r.begin(); i0 < r.end(); ++i0)
         {
             const auto& inds_dists = all_inds[i0];
-            if (i0 < q_batches[0]) {
+            if (which_batch(i0) % 2 == 0) {
                 for (int j = 0; j < max_count; j++)
                 {
                     if (j < inds_dists.size())

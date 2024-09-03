@@ -74,8 +74,8 @@ if __name__ == '__main__':
 
             if rte > rte_thresh or rre > rre_thresh:
                 print(f"{i}th fragment fails, RRE：{rre}, RTE：{rte}")
-            print(f"data_time: {data_timer.diff:.2f}s "
-                  f"model_time: {model_timer.diff:.2f}s ")
+            print(f"data_time: {data_timer.diff:.4f}s "
+                  f"model_time: {model_timer.diff:.3f}s ")
 
             torch.cuda.empty_cache()
 

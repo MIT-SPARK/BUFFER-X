@@ -37,6 +37,7 @@ class Args(object):
         left_stage.remove(cfg.stage)
         if cfg.train.pretrain_model != '':
             model_path = '%s/%s/best.pth' % (cfg.train.pretrain_model, cfg.stage)
+            print("\033[1;32m", model_path, "\033[0m")
             state_dict = torch.load(model_path)
             new_dict = {k: v for k, v in state_dict.items() if stage in k}
             model_dict = self.model.state_dict()
