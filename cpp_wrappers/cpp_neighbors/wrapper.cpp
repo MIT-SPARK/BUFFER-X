@@ -160,7 +160,7 @@ static PyObject* batch_neighbors(PyObject* self, PyObject* args, PyObject* keywd
 		PyErr_SetString(PyExc_RuntimeError, "Wrong dimensions : supports_batches.shape is not (B,) ");
 		return NULL;
 	}
-	if ((int)PyArray_DIM(q_batches_array, 0) != (int)PyArray_DIM(s_batches_array, 0))
+	if ((int)PyArray_DIM(q_batches_array, 0) != (int)PyArray_DIM(s_batches_array, 0) && (int)PyArray_DIM(q_batches_array, 0)/2 != (int)PyArray_DIM(s_batches_array, 0) )
 	{
 		Py_XDECREF(queries_array);
 		Py_XDECREF(supports_array);
