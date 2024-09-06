@@ -59,6 +59,7 @@ class Trainer(object):
         for epoch in range(self.epoch):
             gc.collect()
             self.train_epoch(epoch)
+            self.train_loader.dataset.next_split()
             if (epoch + 1) % self.evaluate_interval == 0 or epoch == 0:
                 res = self.evaluate()
                 print(f'Evaluation: Epoch {epoch}')

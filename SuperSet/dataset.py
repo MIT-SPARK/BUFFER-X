@@ -7,6 +7,7 @@ from utils.common import make_open3d_point_cloud
 from KITTI.dataset import *
 from ThreeDMatch.dataset import *
 
+THREEDMATCH_SPLITS = 10
 
 def get_matching_indices(source, target, relt_pose, search_voxel_size):
     source = transform(source, relt_pose)
@@ -22,8 +23,10 @@ class SupersetDataset(Data.Dataset):
     def __init__(self, split, config=None):
         self.datasets = []
         self.lengths = []
+        self.threedmatch_splits = THREEDMATCH_SPLITS
+        self.split_index = 0
         current_length = 0
-
+        
         for subsetdataset in config.data.subsetdatasets:
             if subsetdataset == "KITTI":
                 DatasetClass = KITTIDataset
@@ -35,6 +38,10 @@ class SupersetDataset(Data.Dataset):
                                    config=config[subsetdataset])
             self.datasets.append(dataset)
             dataset_length = len(dataset)
+            
+            if subsetdataset == "3DMatch":
+                dataset_length = dataset_length // self.threedmatch_splits
+                
             self.lengths.append(dataset_length)
             current_length += dataset_length
 
@@ -48,7 +55,14 @@ class SupersetDataset(Data.Dataset):
     def __getitem__(self, index):
         for i, (start, end) in enumerate(zip(self.dataset_intervals[:-1], self.dataset_intervals[1:])):
             if start <= index < end:
-                return self.datasets[i][index - start]
+                if i == 1:
+                    start_index = self.split_index * self.lengths[i]
+                    return self.datasets[i][start_index + index - start]
+                else: 
+                    return self.datasets[i][index - start]
+    
+    def next_split(self):
+        self.split_index = (self.split_index + 1) % self.threedmatch_splits
 
     def reset_seed(self, seed=0):
         self.randg.seed(seed)

@@ -10,6 +10,7 @@ from einops import rearrange
 import kornia.geometry.conversions as Convert
 import open3d as o3d
 from ThreeDMatch.dataset import make_open3d_point_cloud
+from utils.timer import Timer
 
 
 class EquiMatch(nn.Module):
@@ -242,6 +243,8 @@ class buffer(nn.Module):
             dataset_name = data_source["dataset_names"][0]
             cfg = self.config[dataset_name]
 
+            ref_timer = Timer()
+            ref_timer.tic()
             axis, eps, branch = self.Ref(data_source)
             src_axis, tgt_axis = axis[:len_src_f], axis[len_src_f:]
 
@@ -252,7 +255,10 @@ class buffer(nn.Module):
             src_axis = src_axis * (1 - mask) - src_axis * mask
             mask = (torch.sum(-tgt_axis * tgt_pts, dim=1) < 0).float().unsqueeze(1)
             tgt_axis = tgt_axis * (1 - mask) - tgt_axis * mask
+            ref_timer.toc()
 
+            keypt_timer = Timer()
+            keypt_timer.tic()
             det_score = self.Keypt(data_source, branch)
             src_s, tgt_s = det_score[:len_src_f], det_score[len_src_f:]
 
@@ -262,7 +268,10 @@ class buffer(nn.Module):
                 tgt_s > cfg.point.keypts_th)
             src_pts, tgt_pts = src_pts[s_det_idx[0]], tgt_pts[t_det_idx[0]]
             s_axis, t_axis = src_axis[s_det_idx[0]], tgt_axis[t_det_idx[0]]
+            keypt_timer.toc()
             
+            fps_timer = Timer()
+            fps_timer.tic()
             # fps
             s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,
                                                                                                                2).contiguous()
@@ -274,7 +283,10 @@ class buffer(nn.Module):
             kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
             k_axis1 = pnt2.gather_operation(s_axis_flipped, s_fps_idx).transpose(1, 2).contiguous()
             k_axis2 = pnt2.gather_operation(t_axis_flipped, t_fps_idx).transpose(1, 2).contiguous()
-
+            fps_timer.toc()
+            
+            desc_timer = Timer()
+            desc_timer.tic()
             # calculate descriptor
             src = self.Desc(src_pcd_raw[None], kpts1, dataset_name, k_axis1)
             tgt = self.Desc(tgt_pcd_raw[None], kpts2, dataset_name, k_axis2)
@@ -282,7 +294,10 @@ class buffer(nn.Module):
                 'patches']
             tgt_des, tgt_equi, t_rand_axis, t_R, t_patches = tgt['desc'], tgt['equi'], tgt['rand_axis'], tgt['R'], tgt[
                 'patches']
-
+            desc_timer.toc()
+            
+            mutual_matching_timer = Timer()
+            mutual_matching_timer.tic()
             # use equivariant feature maps
             # mutual_matching
             s_mids, t_mids = self.mutual_matching(src_des, tgt_des)
@@ -292,10 +307,16 @@ class buffer(nn.Module):
             tt_kpts = kpts2[0, t_mids]
             tt_equi = tgt_equi[t_mids]
             tt_R = t_R[t_mids]
-
+            mutual_matching_timer.toc()
+            
+            inlier_timer = Timer()
+            inlier_timer.tic()
             ind = self.Inlier(ss_equi[:, :, 1:cfg.patch.ele_n - 1],
                               tt_equi[:, :, 1:cfg.patch.ele_n - 1])
-
+            inlier_timer.toc()
+            
+            correspondence_proposal_timer = Timer()
+            correspondence_proposal_timer.tic()
             # recover pose
             angle = ind * 2 * np.pi / cfg.patch.azi_n + 1e-6
             angle_axis = torch.zeros_like(ss_kpts)
@@ -316,12 +337,15 @@ class buffer(nn.Module):
             inlier_num = torch.sum(sign, dim=-1)
             best_ind = torch.argmax(inlier_num)
             inlier_ind = torch.where(sign[best_ind] == True)[0].detach().cpu().numpy()
+            correspondence_proposal_timer.toc()
 
             # use RANSAC to calculate pose
             pcd0 = make_open3d_point_cloud(ss_kpts.detach().cpu().numpy(), [1, 0.706, 0])
             pcd1 = make_open3d_point_cloud(tt_kpts.detach().cpu().numpy(), [0, 0.651, 0.929])
             corr = o3d.utility.Vector2iVector(np.array([inlier_ind, inlier_ind]).T)
 
+            ransac_timer = Timer()
+            ransac_timer.tic()
             result = o3d.pipelines.registration.registration_ransac_based_on_correspondence(
                 pcd0, pcd1, corr, cfg.match.dist_th,
                 o3d.pipelines.registration.TransformationEstimationPointToPoint(False), 3,
@@ -331,13 +355,24 @@ class buffer(nn.Module):
                                                                      cfg.match.confidence))
 
             init_pose = result.transformation
+            ransac_timer.toc()
+            
             if cfg.test.pose_refine is True:
                 pose = self.post_refinement(torch.FloatTensor(init_pose[None]).cuda(), ss_kpts[None], tt_kpts[None])
                 pose = pose[0].detach().cpu().numpy()
             else:
                 pose = init_pose
-
-            return pose, src_axis, tgt_axis
+            # print(f"ref_time: {ref_timer.diff:.2f}s "
+            #       f"keypt_time: {keypt_timer.diff:.2f}s "
+            #       f"fps_time: {fps_timer.diff:.2f}s "
+            #       f"desc_time: {desc_timer.diff:.2f}s "
+            #       f"mutual_matching_time: {mutual_matching_timer.diff:.2f}s "
+            #       f"inlier_time: {inlier_timer.diff:.2f}s "
+            #       f"correspondence_proposal_time: {correspondence_proposal_timer.diff:.2f}s "
+            #       f"ransac_time: {ransac_timer.diff:.2f}s ")
+            times = [ref_timer.diff, keypt_timer.diff, fps_timer.diff, desc_timer.diff, mutual_matching_timer.diff,
+                        inlier_timer.diff, correspondence_proposal_timer.diff, ransac_timer.diff]
+            return pose, src_axis, tgt_axis, times
 
     def mutual_matching(self, src_des, tgt_des):
         """

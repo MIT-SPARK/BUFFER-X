@@ -197,6 +197,7 @@ def extract_corresponding_trajectors(est_pairs, gt_pairs, gt_traj):
 
 
 if __name__ == '__main__':
+    print("Start testing...")
     cfg = make_cfg()
     cfg[cfg.data.dataset] = cfg.copy()
     cfg.stage = 'test'
@@ -227,6 +228,7 @@ if __name__ == '__main__':
     print("Test set size:", test_loader.dataset.__len__())
     data_timer, model_timer = Timer(), Timer()
 
+    overall_time = np.zeros(10)
     with torch.no_grad():
         states = []
         num_batch = len(test_loader)
@@ -237,7 +239,7 @@ if __name__ == '__main__':
 
             data_timer.toc()
             model_timer.tic()
-            trans_est, src_axis, tgt_axis = model(data_source)
+            trans_est, src_axis, tgt_axis, times = model(data_source)
             model_timer.toc()
 
             if trans_est is not None:
@@ -272,18 +274,22 @@ if __name__ == '__main__':
 
             if rte > rte_thresh or rre > rre_thresh:
                 print(f"{i}th fragment fails, RRE：{rre}, RTE：{rte}")
-            print(f"data_time: {data_timer.avg:.2f}s "
-                  f"model_time: {model_timer.avg:.2f}s ")
-
+            overall_time += np.array([data_timer.diff, model_timer.diff, *times])
             torch.cuda.empty_cache()
+            if (i + 1) % 100 == 0 or i == num_batch - 1:
+                temp_states = np.array(states)
+                temp_recall = temp_states[:, 0].sum() / temp_states.shape[0]
+                temp_te = temp_states[temp_states[:, 0] == 1, 1].mean()
+                temp_re = temp_states[temp_states[:, 0] == 1, 2].mean()
+                print(f"[{i + 1}/{num_batch}] "
+                      f"Registration Recall: {temp_recall:.4f} "
+                      f"RTE: {temp_te:.4f} "
+                      f"RRE: {temp_re:.4f} ")
 
     states = np.array(states)
     Recall = states[:, 0].sum() / states.shape[0]
     TE = states[states[:, 0] == 1, 1].mean()
     RE = states[states[:, 0] == 1, 2].mean()
-    print(f'Recall of DGR: {Recall}')
-    print(f'TE of DGR: {TE}')
-    print(f'RE of DGR: {RE}')
 
     # calculate Registration Recall
     if cfg.data.dataset == '3DMatch':
@@ -305,5 +311,21 @@ if __name__ == '__main__':
                                                                             est_pairs, gt_pairs,
                                                                             gt_traj, gt_traj_cov)
         recall.append(temp_recall)
-
-    print(f'Registration Recall: {np.array(recall).mean()}')
+    print()
+    print("---------------Test Result---------------")
+    print(f'Registration Recall: {Recall:.4f}')
+    print(f'Registration Recall (3DMatch setting): {np.array(recall).mean():.4f}')
+    print(f'RTE: {TE:.4f}')
+    print(f'RRE: {RE:.4f}')
+    
+    average_times = overall_time / num_batch
+    print(f"Average data_time: {average_times[0]:.4f}s "
+        f"Average model_time: {average_times[1]:.4f}s ")
+    print(f"ref_time: {average_times[2]:.4f}s "
+        f"keypt_time: {average_times[3]:.4f}s "
+        f"fps_time: {average_times[4]:.4f}s "
+        f"desc_time: {average_times[5]:.4f}s "
+        f"mutual_matching_time: {average_times[6]:.4f}s "
+        f"inlier_time: {average_times[7]:.4f}s "
+        f"correspondence_proposal_time: {average_times[8]:.4f}s "
+        f"ransac_time: {average_times[9]:.4f}s ")

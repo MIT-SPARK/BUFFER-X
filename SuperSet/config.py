@@ -12,12 +12,13 @@ _C.data.manual_seed = 123
 
 # training
 _C.train = edict()
-_C.train.epoch = 25
+_C.train.epoch = 30
 _C.train.max_iter = 50000
 _C.train.batch_size = 1
 _C.train.num_workers = 16
 _C.train.pos_num = 512
-_C.train.pretrain_model = '../ThreeDMatch/snapshot/06132318'
+_C.train.augmentation_noise = 0.001 # for 3DMatch
+_C.train.pretrain_model = '' # Example '../KITTI/snapshot/06050001'
 _C.train.all_stage = ['Ref', 'Desc', 'Keypt', 'Inlier']
 
 # test
@@ -33,7 +34,8 @@ _C.optim.weight_decay = 1e-6
 # ToDo. Support different interval for different dataset?
 # In 3DMatch, _C.optim.scheduler_interval = {'Ref': 1, 'Desc':2, 'Keypt':1, 'Inlier':1}
 # In KITTI, _C.optim.scheduler_interval = {'Ref': 5, 'Desc':10, 'Keypt':5, 'Inlier':5}
-_C.optim.scheduler_interval = {'Ref': 3, 'Desc':5, 'Keypt':3, 'Inlier':3}
+# _C.optim.scheduler_interval = {'Ref': 3, 'Desc':5, 'Keypt':3, 'Inlier':3}
+_C.optim.scheduler_interval = {'Ref': 5, 'Desc':10, 'Keypt':5, 'Inlier':5}
 
 # point-wise learner
 _C.point = edict()
@@ -41,7 +43,7 @@ _C.point.in_points_dim = 3
 _C.point.in_feats_dim = 3
 _C.point.first_feats_dim = 32
 _C.point.conv_radius = 2.0              # NOTE: this conv_radius is ratio
-_C.point.keypts_th = 0.5                # KITTI: 0.5, 3DMatch: 0.1
+_C.point.keypts_th = 0.5                # KITTI: 0.5, 3DMatch: 0.1, used at inference
 _C.point.num_keypts = 1500
 
 # patch-wise embedder
