@@ -73,7 +73,7 @@ if __name__ == '__main__':
             states.append(np.array([rte < rte_thresh and rre < rre_thresh, rte, rre]))
 
             if rte > rte_thresh or rre > rre_thresh:
-                print(f"{i}th fragment fails, RRE：{rre:.4f}, RTE：{rte:.4f}")
+              print(f"{i}th fragment fails, RRE：{rre:.4f}, RTE：{rte:.4f}")
             overall_time += np.array([data_timer.diff, model_timer.diff, *times])
             torch.cuda.empty_cache()
             if (i + 1) % 100 == 0 or i == num_batch - 1:

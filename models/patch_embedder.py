@@ -26,7 +26,6 @@ class MiniSpinNet(nn.Module):
         self.ele_n = config.patch.ele_n
         self.delta = config.patch.delta
         self.voxel_sample = config.patch.voxel_sample
-        self.dataset = config.data.dataset
         self.pnt_layer = nn.Sequential(
             nn.Conv2d(3, 16, kernel_size=(1, 1), stride=(1, 1)),
             nn.BatchNorm2d(16),
