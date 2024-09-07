@@ -142,9 +142,11 @@ class Trainer(object):
                 # probabilistic cosine loss
                 src_s, tgt_s = output['src_s'], output['tgt_s']
                 eps = (src_s[:, 0] + tgt_s[:, 0]) / 2
-                ref_loss = (torch.log(eps) + err / eps).mean()
-
+                ref_loss = (torch.log(eps + 1e-8) + err / (eps + 1e-8)).mean()
                 loss = ref_loss
+                if torch.isnan(loss):
+                    print(f"{data_source['src_id']} {data_source['tgt_id']} loss is nan, skip")
+                    continue
                 stats = {
                     "ref_loss": float(loss.item()),
                     'ref_error': float(err.mean().item())
@@ -163,6 +165,9 @@ class Trainer(object):
 
                 # refer to RoReg(https://github.com/HpWang-whu/RoReg)
                 loss = 4 * desc_loss + eqv_loss
+                if torch.isnan(loss):
+                    print(f"{data_source['src_id']} {data_source['tgt_id']} loss is nan, skip")
+                    continue
                 stats = {
                     "desc_loss": float(desc_loss.item()),
                     "desc_acc": float(accuracy.item()),
@@ -181,6 +186,9 @@ class Trainer(object):
                 det_loss = torch.mean((1.05 - diff.detach()) * sigma)
 
                 loss = det_loss
+                if torch.isnan(loss):
+                    print(f"{data_source['src_id']} {data_source['tgt_id']} loss is nan, skip")
+                    continue
                 stats = {
                     'det_loss': float(det_loss.item()),
                     "desc_acc": float(accuracy.item()),
@@ -193,6 +201,9 @@ class Trainer(object):
                 match_loss = self.L1_loss(pred_ind, gt_ind)
 
                 loss = match_loss
+                if torch.isnan(loss):
+                    print(f"{data_source['src_id']} {data_source['tgt_id']} loss is nan, skip")
+                    continue
                 stats = {
                     "match_loss": float(match_loss.item()),
                 }
