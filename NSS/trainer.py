@@ -274,6 +274,9 @@ class Trainer(object):
                     src_s, tgt_s = output['src_s'], output['tgt_s']
                     eps = (src_s[:, 0] + tgt_s[:, 0]) / 2
                     ref_loss = (torch.log(eps) + err / eps).mean()
+                    if torch.isnan(ref_loss):
+                        print(f"{data_source['src_id']} {data_source['tgt_id']} loss is nan, skip")
+                        continue
 
                     stats = {
                         "ref_loss": float(ref_loss.item()),
@@ -286,7 +289,12 @@ class Trainer(object):
                     eqv_loss = self.class_loss(output['equi_score'], output['gt_label'])
                     pre_label = torch.argmax(output['equi_score'], dim=1)
                     eqv_acc = (pre_label == output['gt_label']).sum() / pre_label.shape[0]
-
+                    if torch.isnan(desc_loss):
+                        print(f"{data_source['src_id']} {data_source['tgt_id']} loss is nan, skip")
+                        continue
+                    if torch.isnan(eqv_loss):
+                        print(f"{data_source['src_id']} {data_source['tgt_id']} loss is nan, skip")
+                        continue
                     stats = {
                         "desc_loss": float(desc_loss.item()),
                         "desc_acc": float(accuracy.item()),
@@ -303,6 +311,9 @@ class Trainer(object):
                     det_loss = torch.mean((1.05 - diff.detach()) * sigma)
 
                     loss = det_loss
+                    if torch.isnan(det_loss):
+                        print(f"{data_source['src_id']} {data_source['tgt_id']} loss is nan, skip")
+                        continue
                     stats = {
                         'det_loss': float(det_loss.item()),
                         "desc_acc": float(accuracy.item()),
@@ -311,7 +322,9 @@ class Trainer(object):
                 if self.train_modal == 'Inlier':
                     pred_ind, gt_ind = output['pred_ind'], output['gt_ind']
                     match_loss = self.L1_loss(pred_ind, gt_ind)
-
+                    if torch.isnan(match_loss):
+                        print(f"{data_source['src_id']} {data_source['tgt_id']} loss is nan, skip")
+                        continue
                     stats = {
                         "match_loss": float(match_loss.item()),
                     }
