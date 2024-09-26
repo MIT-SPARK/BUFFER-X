@@ -3,7 +3,7 @@ import sys
 sys.path.append('../')
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 import torch
 import time
 import argparse
@@ -31,9 +31,15 @@ class Args(object):
         left_stage = copy.deepcopy(cfg.train.all_stage)
         left_stage.remove(cfg.stage)
         if cfg.train.pretrain_model != '':
-            state_dict = torch.load(cfg.train.pretrain_model)
-            self.model.load_state_dict(state_dict)
-            print(f"Load pretrained model from {cfg.train.pretrain_model}\n")
+            model_path = '%s/%s/best.pth' % (cfg.train.pretrain_model, cfg.stage)
+            print("\033[1;32m", model_path, "\033[0m")
+            state_dict = torch.load(model_path)
+            new_dict = {k: v for k, v in state_dict.items() if stage in k}
+            model_dict = self.model.state_dict()
+            model_dict.update(new_dict)
+            self.model.load_state_dict(model_dict)
+            print("\033[1;32mUsed Pretrained model!}")
+            print(f"Load pretrained model from {cfg.train.pretrain_model}\n\033[0m")
         for modname in left_stage:
             weight_path = cfg.snapshot_root + f'/{modname}/best.pth'
             if os.path.exists(weight_path):
