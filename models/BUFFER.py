@@ -201,11 +201,9 @@ class buffer(nn.Module):
                 # calc matching score of equivariant feature maps
                 equi_score = self.equi_match(src['equi'], tgt['equi'])
 
-                print(src['rand_axis'].shape, tgt['rand_axis'].shape)
-                
                 # if number of patches is less than 2, return None
                 if src['rand_axis'].shape[0] < 2 or tgt['rand_axis'].shape[0] < 2:
-                    print(f"{data_source['src_id']} {data_source['tgt_id']} has not enough patches")
+                    print(f"{data_source['src_id']} {data_source['tgt_id']} don't have enough patches")
                     return None
                 
                 # calculate gt lable in SO(2)
