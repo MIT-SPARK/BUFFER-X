@@ -132,8 +132,12 @@ class buffer(nn.Module):
             # find positive correspondences
             gt_trans = data_source['relt_pose']
             match_inds = self.get_matching_indices(src_pts, tgt_pts, gt_trans, data_source['voxel_sizes'][0])
-            dataset_name = data_source["dataset_names"][0]
-            cfg = self.config[dataset_name]
+            if self.config['data']['dataset'] == 'SuperSet':
+                dataset_name = data_source["dataset_names"][0]
+                cfg = self.config[dataset_name]
+            else: 
+                dataset_name = self.config['data']['dataset']
+                cfg = self.config
 
             #######################
             # training ref axis
@@ -158,13 +162,20 @@ class buffer(nn.Module):
             src_s = src_s[match_inds[:, 0]]
             tgt_axis = tgt_axis[match_inds[:, 1]]
             tgt_s = tgt_s[match_inds[:, 1]]
-
+            
+            if src_axis.shape[0] == 0 or tgt_axis.shape[0] == 0:
+                print(f"{data_source['src_id']} {data_source['tgt_id']} has no axis")
+                return None
             if self.config.stage == 'Ref':
                 return {'src_ref': src_axis,
                         'tgt_ref': tgt_axis,
                         'src_s': src_s,
                         'tgt_s': tgt_s,
                         }
+            
+            if src_s is None or tgt_s is None:
+                print(f"{data_source['src_id']} {data_source['tgt_id']} has no keypts")
+                return None
 
             # randomly sample some positive pairs to speed up the training
             if match_inds.shape[0] > self.config.train.pos_num:
@@ -174,7 +185,10 @@ class buffer(nn.Module):
                 tgt_axis = tgt_axis[rand_ind]
             src_kpt = src_pts[match_inds[:, 0]]
             tgt_kpt = tgt_pts[match_inds[:, 1]]
-
+            
+            if src_kpt.shape[0] == 0 or tgt_kpt.shape[0] == 0:
+                print(f"{data_source['src_id']} {data_source['tgt_id']} has no keypts")
+                return None
             #######################
             # training descriptor
             #######################
@@ -190,6 +204,11 @@ class buffer(nn.Module):
                 # calc matching score of equivariant feature maps
                 equi_score = self.equi_match(src['equi'], tgt['equi'])
 
+                # if number of patches is less than 2, return None
+                if src['rand_axis'].shape[0] < 2 or tgt['rand_axis'].shape[0] < 2:
+                    print(f"{data_source['src_id']} {data_source['tgt_id']} don't have enough patches")
+                    return None
+                
                 # calculate gt lable in SO(2)
                 lable = self.cal_so2_gt(src, tgt, gt_trans)
 
@@ -222,6 +241,10 @@ class buffer(nn.Module):
             #######################
             # predict index of SO(2) rotation
             # only consider part of elements along the elevation to speed up
+            if src['rand_axis'].shape[0] < 2 or tgt['rand_axis'].shape[0] < 2:
+                    print(f"{data_source['src_id']} {data_source['tgt_id']} don't have enough patches")
+                    return None
+                
             pred_ind = self.Inlier(src['equi'][:, :, 1:self.config.patch.ele_n - 1],
                                    tgt['equi'][:, :, 1:self.config.patch.ele_n - 1])
             # calculate gt lable in SO(2)
@@ -240,8 +263,13 @@ class buffer(nn.Module):
             src_pcd_raw, tgt_pcd_raw = data_source['src_pcd_raw'], data_source['tgt_pcd_raw']
             len_src_f = data_source['stack_lengths'][0][0]
             gt_trans = data_source['relt_pose']
-            dataset_name = data_source["dataset_names"][0]
-            cfg = self.config[dataset_name]
+            
+            if self.config['data']['dataset'] == 'SuperSet':
+                dataset_name = data_source["dataset_names"][0]
+                cfg = self.config[dataset_name]
+            else: 
+                dataset_name = self.config['data']['dataset']
+                cfg = self.config
 
             ref_timer = Timer()
             ref_timer.tic()

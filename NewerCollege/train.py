@@ -9,18 +9,9 @@ import time
 import argparse
 import copy
 import numpy as np
-from KITTI.config import make_cfg as kitti_make_cfg
-from SuperSet.dataloader import get_dataloader
-from ThreeDMatch.config import make_cfg as threedmatch_make_cfg
-from Scannetpp_faro.config import make_cfg as scannetpp_faro_make_cfg
-from Scannetpp_iphone.config import make_cfg as scannetpp_iphone_make_cfg
-from WOD.config import make_cfg as wod_make_cfg
-from NewerCollege.config import make_cfg as newercollege_make_cfg
-from KimeraMulti.config import make_cfg as kimeramulti_make_cfg
-
-from SuperSet.config import make_cfg
-from SuperSet.trainer import Trainer
-
+from NewerCollege.config import make_cfg
+from NewerCollege.dataloader import get_dataloader
+from NewerCollege.trainer import Trainer
 from models.BUFFER import buffer
 from torch import optim
 
@@ -40,15 +31,9 @@ class Args(object):
         left_stage = copy.deepcopy(cfg.train.all_stage)
         left_stage.remove(cfg.stage)
         if cfg.train.pretrain_model != '':
-            model_path = '%s/%s/best.pth' % (cfg.train.pretrain_model, cfg.stage)
-            print("\033[1;32m", model_path, "\033[0m")
-            state_dict = torch.load(model_path)
-            new_dict = {k: v for k, v in state_dict.items() if stage in k}
-            model_dict = self.model.state_dict()
-            model_dict.update(new_dict)
-            self.model.load_state_dict(model_dict)
-            print("\033[1;32mUsed Pretrained model!}")
-            print(f"Load pretrained model from {cfg.train.pretrain_model}\n\033[0m")
+            state_dict = torch.load(cfg.train.pretrain_model)
+            self.model.load_state_dict(state_dict)
+            print(f"Load pretrained model from {cfg.train.pretrain_model}\n")
         for modname in left_stage:
             weight_path = cfg.snapshot_root + f'/{modname}/best.pth'
             if os.path.exists(weight_path):
@@ -92,27 +77,8 @@ class Args(object):
 
 
 if __name__ == '__main__':
-
     cfg = make_cfg()
-    for subsetdataset in cfg.data.subsetdatasets:
-        if (subsetdataset == 'KITTI'):
-            cfg_tmp = kitti_make_cfg()
-        elif (subsetdataset == '3DMatch'):
-            cfg_tmp = threedmatch_make_cfg()
-        elif (subsetdataset == 'Scannetpp_faro'):
-            cfg_tmp = scannetpp_faro_make_cfg()
-        elif (subsetdataset == 'Scannetpp_iphone'):
-            cfg_tmp = scannetpp_iphone_make_cfg()
-        elif (subsetdataset == 'WOD'):
-            cfg_tmp = wod_make_cfg()
-        elif (subsetdataset == 'NewerCollege'):
-            cfg_tmp = newercollege_make_cfg()
-        elif (subsetdataset == 'KimeraMulti'):
-            cfg_tmp = kimeramulti_make_cfg()
-        else:
-            raise ValueError("Unsupported dataset name has been given")
-        cfg[subsetdataset] = cfg_tmp
-        print(f"Dataset: {subsetdataset} has been loaded")
+    cfg[cfg.data.dataset] = cfg.copy()
 
     # snapshot
     if cfg.train.pretrain_model == '':
@@ -131,8 +97,6 @@ if __name__ == '__main__':
     # training
     for stage in cfg.train.all_stage:
         cfg.stage = stage
-        for subsetdataset in cfg.data.subsetdatasets:
-            cfg[subsetdataset].stage = stage
         snapshot_root = 'snapshot/%s' % experiment_id
         tensorboard_root = 'tensorboard/%s/%s' % (experiment_id, cfg.stage)
         cfg.snapshot_root = snapshot_root

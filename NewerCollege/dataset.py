@@ -5,8 +5,8 @@ import glob
 from utils.SE3 import *
 from utils.common import make_open3d_point_cloud
 
-kitti_icp_cache = {}
-kitti_cache = {}
+newer_college_icp_cache = {}
+newer_college_cache = {}
 cur_path = os.path.dirname(os.path.realpath(__file__))
 
 
@@ -21,11 +21,11 @@ def get_matching_indices(source, target, relt_pose, search_voxel_size):
     return match_inds
 
 
-class KITTIDataset(Data.Dataset):
+class NewerCollegeDataset(Data.Dataset):
     DATA_FILES = {
-        'train': 'train_kitti.txt',
-        'val': 'val_kitti.txt',
-        'test': 'test_kitti.txt'
+        'train': 'train_newer-college.txt',
+        'val': 'val_newer-college.txt',
+        'test': 'test_newer-college.txt'
     }
 
     def __init__(self,
@@ -33,20 +33,20 @@ class KITTIDataset(Data.Dataset):
                  config=None
                  ):
         self.config = config
-        self.pc_path = config.data.root + '/dataset'
+        self.pc_path = config.data.root 
         self.icp_path = config.data.root + '/icp'
         self.split = split
         self.files = {'train': [], 'val': [], 'test': []}
         self.poses = []
         self.length = 0
 
-        self.prepare_kitti_ply(split=self.split)
+        self.prepare_newer_college_ply(split=self.split)
 
-    def prepare_kitti_ply(self, split='train'):
+    def prepare_newer_college_ply(self, split='train'):
         subset_names = open(os.path.join(cur_path, self.DATA_FILES[split])).read().split()
         for dirname in subset_names:
-            drive_id = int(dirname)
-            fnames = glob.glob(self.pc_path + '/sequences/%02d/velodyne/*.bin' % drive_id)
+            drive_id = str(dirname)
+            fnames = glob.glob(self.pc_path + '/%s/scans/*.pcd' % drive_id)
             assert len(fnames) > 0, f"Make sure that the path {self.pc_path} has data {dirname}"
             inames = sorted([int(os.path.split(fname)[-1][:-4]) for fname in fnames])
 
@@ -55,10 +55,12 @@ class KITTIDataset(Data.Dataset):
             Ts = all_pos[:, :3, 3]
             pdist = (Ts.reshape(1, -1, 3) - Ts.reshape(-1, 1, 3)) ** 2
             pdist = np.sqrt(pdist.sum(-1))
-            more_than_10 = pdist > 10
+            
+            # set valid pair threshold to 3
+            valid_pairs = pdist > 3
             curr_time = inames[0]
             while curr_time in inames:
-                next_time = np.where(more_than_10[curr_time][curr_time:curr_time + 100])[0]
+                next_time = np.where(valid_pairs[curr_time][curr_time:curr_time + 100])[0]
                 if len(next_time) == 0:
                     curr_time += 1
                 else:
@@ -67,10 +69,6 @@ class KITTIDataset(Data.Dataset):
                 if next_time in inames:
                     self.files[split].append((drive_id, curr_time, next_time))
                     curr_time = next_time + 1
-
-        # pair (8, 15, 58) is wrong.
-        if self.split == 'test':
-            self.files[split].remove((8, 15, 58))
 
         self.length = len(self.files[split])
 
@@ -86,15 +84,14 @@ class KITTIDataset(Data.Dataset):
         fname1 = self._get_velodyne_fn(drive, t1)
         
         # XYZ and reflectance
-        xyzr0 = np.fromfile(fname0, dtype=np.float32).reshape(-1, 4)
-        xyzr1 = np.fromfile(fname1, dtype=np.float32).reshape(-1, 4)
+        o3d_cloud0 = o3d.io.read_point_cloud(fname0)
+        o3d_cloud1 = o3d.io.read_point_cloud(fname1)
+        xyz0 = np.asarray(o3d_cloud0.points, dtype=np.float32)
+        xyz1 = np.asarray(o3d_cloud1.points, dtype=np.float32)
 
-        xyz0 = xyzr0[:, :3]
-        xyz1 = xyzr1[:, :3]
-
-        key = '%d_%d_%d' % (drive, t0, t1)
+        key = '%s_%06d_%06d' % (drive, t0, t1)
         filename = self.icp_path + '/' + key + '.npy'
-        if key not in kitti_icp_cache:
+        if key not in newer_college_icp_cache:
             if not os.path.exists(filename):
                 M = (self.velo2cam @ positions[0].T @ np.linalg.inv(positions[1].T)
                      @ np.linalg.inv(self.velo2cam)).T
@@ -111,9 +108,9 @@ class KITTIDataset(Data.Dataset):
                 np.save(filename, M2)
             else:
                 M2 = np.load(filename)
-            kitti_icp_cache[key] = M2
+            newer_college_icp_cache[key] = M2
         else:
-            M2 = kitti_icp_cache[key]
+            M2 = newer_college_icp_cache[key]
         trans = M2
 
         if self.split != 'test':
@@ -184,8 +181,8 @@ class KITTIDataset(Data.Dataset):
                 'src_sds_pts': src_kpt,  # second downsampling
                 'tgt_sds_pts': tgt_kpt,
                 'voxel_size': ds_size,
-                'src_id': '%d_%d' % (drive, t0),
-                'tgt_id': '%d_%d' % (drive, t1),
+                'src_id': '%s_%d' % (drive, t0),
+                'tgt_id': '%s_%d' % (drive, t1),
                 'dataset_name': self.config.data.dataset}
 
     def apply_transform(self, pts, trans):
@@ -209,13 +206,13 @@ class KITTIDataset(Data.Dataset):
         return self._velo2cam
 
     def get_video_odometry(self, drive, indices=None, ext='.txt', return_all=False):
-        data_path = self.pc_path + '/poses/%02d.txt' % drive
-        if data_path not in kitti_cache:
-            kitti_cache[data_path] = np.genfromtxt(data_path)
+        data_path = self.pc_path + '/%s/poses.txt' % drive
+        if data_path not in newer_college_cache:
+            newer_college_cache[data_path] = np.genfromtxt(data_path)
         if return_all:
-            return kitti_cache[data_path]
+            return newer_college_cache[data_path]
         else:
-            return kitti_cache[data_path][indices]
+            return newer_college_cache[data_path][indices]
 
     def odometry_to_positions(self, odometry):
         T_w_cam0 = odometry.reshape(3, 4)
@@ -223,7 +220,7 @@ class KITTIDataset(Data.Dataset):
         return T_w_cam0
 
     def _get_velodyne_fn(self, drive, t):
-        fname = self.pc_path + '/sequences/%02d/velodyne/%06d.bin' % (drive, t)
+        fname = self.pc_path + '/%s/scans/%06d.pcd' % (drive, t)
         return fname
 
     def __len__(self):

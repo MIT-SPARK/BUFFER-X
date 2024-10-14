@@ -92,32 +92,6 @@ def batch_grid_subsampling_kpconv(points, batches_len, features=None, labels=Non
         return torch.from_numpy(s_points), torch.from_numpy(s_len), torch.from_numpy(s_features), torch.from_numpy(
             s_labels)
 
-def batch_grid_subsampling_and_searching_kpconv(points, batches_len, features=None, labels=None, sampleDl=0.1, max_p=0, verbose=0, max_neighbors=15,
-                                  random_grid_orient=True):
-    """
-    CPP wrapper for a grid subsampling (method = barycenter for points and features)
-    For faster speed, finding `up_i` runs together
-    """
-    if (features is None) and (labels is None):
-        s_points, s_len, indices_for_upconv = cpp_subsampling.subsample_and_search_batch(points,
-                                                                     batches_len,
-                                                                     sampleDl=sampleDl,
-                                                                     max_p=max_p,
-                                                                     max_neighbors=max_neighbors,
-                                                                     verbose=verbose)
-        return torch.from_numpy(s_points), torch.from_numpy(s_len), torch.from_numpy(indices_for_upconv)
-
-        # s_points, s_len = cpp_subsampling.subsample_batch(points,
-        #                                                   batches_len,
-        #                                                   sampleDl=sampleDl,
-        #                                                   max_p=max_p,
-        #                                                   verbose=verbose)
-        # return torch.from_numpy(s_points), torch.from_numpy(s_len)
-
-
-    else:
-        raise NotImplementedError("Currently, other options are not supported")
-
 
 def batch_neighbors_kpconv(queries, supports, q_batches, s_batches, radius, max_neighbors):
     """
@@ -140,16 +114,16 @@ def batch_neighbors_kpconv(queries, supports, q_batches, s_batches, radius, max_
 def collate_fn_descriptor(list_data, config, neighborhood_limits):
     batched_points_list = []
     batched_lengths_list = []
-    batched_features_list = []
+    batched_features_list = []# = np.ones_like(input_points[0][:, :0]).astype(np.float32)
     batched_voxel_size_list = []
     batched_dataset_names = []
-
     assert len(list_data) == 1
     list_data = list_data[0]
 
     s_pts, t_pts = list_data['src_fds_pts'], list_data['tgt_fds_pts']
     relt_pose = list_data['relt_pose']
     s_kpt, t_kpt = list_data['src_sds_pts'], list_data['tgt_sds_pts']
+    src_id, tgt_id = list_data['src_id'], list_data['tgt_id']
     src_kpt = s_kpt[:, :3]
     tgt_kpt = t_kpt[:, :3]
     src_f = s_kpt[:, 3:]
@@ -194,66 +168,43 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
             if block_i < len(architecture) - 1 and not ('upsample' in architecture[block_i + 1]):
                 continue
 
-        # print("\033[1;32m" ,block_i, block, "radius: ", r_normal, ", layer: " , layer, "layer_blocks", layer_blocks, "\033[0m")
         # Convolution neighbors indices
         # *****************************
-        # last_display = timer.total_time
 
-        # HT: More tightly optimized              
-        if layer_blocks and ('pool' in block or 'strided' in block):
+        if layer_blocks:
             # Convolutions are done in this layer, compute the neighbors with the good radius
-            # New subsampling length
-            dl = 2 * r_normal / config.point.conv_radius
-
-            # Subsampled points
-            # pool_p, pool_b = batch_grid_subsampling_kpconv(batched_points, batched_lengths, sampleDl=dl)
-            pool_p, pool_b, up_i = batch_grid_subsampling_and_searching_kpconv(batched_points, batched_lengths, sampleDl=dl, max_neighbors=neighborhood_limits[layer])
-
-            r = r_normal
-            # print("\033[1;32mdl:" , dl, "r: ", r, "\033[0m")
-
-            # Originally, it was decoupled
-            # conv_i = batch_neighbors_kpconv(batched_points, batched_points, batched_lengths, batched_lengths, r,
-            #                                 neighborhood_limits[layer])
-            # 
-            # # Subsample indices
-            # pool_i = batch_neighbors_kpconv(pool_p, batched_points, pool_b, batched_lengths, r,
-            #                                 neighborhood_limits[layer])
-
-            # What if fetching neighbors simultaneously? (and It worked)
-            concat_queries= torch.cat((batched_points, pool_p), dim=0)
-            concat_batches= torch.cat((batched_lengths, pool_b), dim=0)
-
-            conv_and_pool_i = batch_neighbors_kpconv(concat_queries, batched_points, concat_batches, batched_lengths, r,
-                                            neighborhood_limits[layer])
-
-            len_conv_i = batched_lengths[0] + batched_lengths[1]
-
-            conv_i = conv_and_pool_i[:len_conv_i, :]
-            pool_i = conv_and_pool_i[len_conv_i:, :]
-
-            # Upsample indices (with the radius of the next layer to keep wanted density)
-            # up_i = batch_neighbors_kpconv(batched_points, pool_p, batched_lengths, pool_b, 2 * r,
-            #                               neighborhood_limits[layer])
-            # print(neighborhood_limits[layer])
-            # print("up_i shape:", up_i.shape)
-            # print("batch_points shape:", batched_points.shape)
-
-        elif layer_blocks:
             r = r_normal
             conv_i = batch_neighbors_kpconv(batched_points, batched_points, batched_lengths, batched_lengths, r,
                                             neighborhood_limits[layer])
 
-            # No pooling in the end of this layer, no pooling indices required
-            pool_i = torch.zeros((0, 1), dtype=torch.int64)
-            pool_p = torch.zeros((0, 3), dtype=torch.float32)
-            pool_b = torch.zeros((0,), dtype=torch.int64)
-            up_i = torch.zeros((0, 1), dtype=torch.int64)
-
-
         else:
             # This layer only perform pooling, no neighbors required
             conv_i = torch.zeros((0, 1), dtype=torch.int64)
+
+        # Pooling neighbors indices
+        # *************************
+
+        # If end of layer is a pooling operation
+        if 'pool' in block or 'strided' in block:
+
+            # New subsampling length
+            dl = 2 * r_normal / config.point.conv_radius
+
+            # Subsampled points
+            pool_p, pool_b = batch_grid_subsampling_kpconv(batched_points, batched_lengths, sampleDl=dl)
+
+            # Radius of pooled neighbors
+            r = r_normal
+
+            # Subsample indices
+            pool_i = batch_neighbors_kpconv(pool_p, batched_points, pool_b, batched_lengths, r,
+                                            neighborhood_limits[layer])
+
+            # Upsample indices (with the radius of the next layer to keep wanted density)
+            up_i = batch_neighbors_kpconv(batched_points, pool_p, batched_lengths, pool_b, 2 * r,
+                                          neighborhood_limits[layer])
+
+        else:
             # No pooling in the end of this layer, no pooling indices required
             pool_i = torch.zeros((0, 1), dtype=torch.int64)
             pool_p = torch.zeros((0, 3), dtype=torch.float32)
@@ -290,6 +241,8 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
         'tgt_pcd_raw': torch.from_numpy(t_pts).float(),
         'src_pcd': torch.from_numpy(src_kpt).float(),
         'tgt_pcd': torch.from_numpy(tgt_kpt).float(),
+        'src_id': src_id,
+        'tgt_id': tgt_id,
         'relt_pose': torch.from_numpy(relt_pose).float(),
         'voxel_sizes': batched_voxel_sizes,
         'dataset_names': batched_dataset_names,

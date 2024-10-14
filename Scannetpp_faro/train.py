@@ -9,18 +9,9 @@ import time
 import argparse
 import copy
 import numpy as np
-from KITTI.config import make_cfg as kitti_make_cfg
-from SuperSet.dataloader import get_dataloader
-from ThreeDMatch.config import make_cfg as threedmatch_make_cfg
-from Scannetpp_faro.config import make_cfg as scannetpp_faro_make_cfg
-from Scannetpp_iphone.config import make_cfg as scannetpp_iphone_make_cfg
-from WOD.config import make_cfg as wod_make_cfg
-from NewerCollege.config import make_cfg as newercollege_make_cfg
-from KimeraMulti.config import make_cfg as kimeramulti_make_cfg
-
-from SuperSet.config import make_cfg
-from SuperSet.trainer import Trainer
-
+from Scannetpp_faro.config import make_cfg
+from Scannetpp_faro.dataloader import get_dataloader
+from Scannetpp_faro.trainer import Trainer
 from models.BUFFER import buffer
 from torch import optim
 
@@ -63,7 +54,8 @@ class Args(object):
 
         # optimizer
         self.optimizer = optim.Adam(self.parameter, lr=cfg.optim.lr[cfg.stage], weight_decay=cfg.optim.weight_decay)
-        self.scheduler = optim.lr_scheduler.ExponentialLR(self.optimizer, gamma=cfg.optim.lr_decay) # training speed related to gamma
+        self.scheduler = optim.lr_scheduler.ExponentialLR(self.optimizer,
+                                                          gamma=cfg.optim.lr_decay)  # training speed related to gamma
         self.scheduler_interval = cfg.optim.scheduler_interval[cfg.stage]
 
         self.model = self.model.cuda()
@@ -92,27 +84,7 @@ class Args(object):
 
 
 if __name__ == '__main__':
-
     cfg = make_cfg()
-    for subsetdataset in cfg.data.subsetdatasets:
-        if (subsetdataset == 'KITTI'):
-            cfg_tmp = kitti_make_cfg()
-        elif (subsetdataset == '3DMatch'):
-            cfg_tmp = threedmatch_make_cfg()
-        elif (subsetdataset == 'Scannetpp_faro'):
-            cfg_tmp = scannetpp_faro_make_cfg()
-        elif (subsetdataset == 'Scannetpp_iphone'):
-            cfg_tmp = scannetpp_iphone_make_cfg()
-        elif (subsetdataset == 'WOD'):
-            cfg_tmp = wod_make_cfg()
-        elif (subsetdataset == 'NewerCollege'):
-            cfg_tmp = newercollege_make_cfg()
-        elif (subsetdataset == 'KimeraMulti'):
-            cfg_tmp = kimeramulti_make_cfg()
-        else:
-            raise ValueError("Unsupported dataset name has been given")
-        cfg[subsetdataset] = cfg_tmp
-        print(f"Dataset: {subsetdataset} has been loaded")
 
     # snapshot
     if cfg.train.pretrain_model == '':
@@ -131,8 +103,6 @@ if __name__ == '__main__':
     # training
     for stage in cfg.train.all_stage:
         cfg.stage = stage
-        for subsetdataset in cfg.data.subsetdatasets:
-            cfg[subsetdataset].stage = stage
         snapshot_root = 'snapshot/%s' % experiment_id
         tensorboard_root = 'tensorboard/%s/%s' % (experiment_id, cfg.stage)
         cfg.snapshot_root = snapshot_root

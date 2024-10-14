@@ -55,11 +55,10 @@ class Trainer(object):
 
     def train(self):
         best_loss = 1000000000
-        best_reg_recall = 0
+
         for epoch in range(self.epoch):
             gc.collect()
             self.train_epoch(epoch)
-            self.train_loader.dataset.next_split()
             if (epoch + 1) % self.evaluate_interval == 0 or epoch == 0:
                 res = self.evaluate()
                 print(f'Evaluation: Epoch {epoch}')
@@ -101,33 +100,29 @@ class Trainer(object):
     def train_epoch(self, epoch):
         print('training start!!')
         self.model.train()
-        data_timer, get_item_timer, compute_normal_timer, model_timer = Timer(), Timer(), Timer(), Timer()
+        data_timer, model_timer = Timer(), Timer()
+
         num_batch = len(self.train_loader)
         num_iter = min(self.cfg.train.max_iter, num_batch)
         data_iter = iter(self.train_loader)
         for i in range(num_iter):
             data_timer.tic()
-            get_item_timer.tic()
             data_source = data_iter.__next__()
-            get_item_timer.toc()
-            compute_normal_timer.tic()
+
             # compute normals
             src_pts, tgt_pts = data_source['src_pcd'], data_source['tgt_pcd']
             src_pcd = make_open3d_point_cloud(src_pts.numpy(), [1, 0.706, 0])
             src_pcd.estimate_normals()
             src_pcd.orient_normals_towards_camera_location()
             src_normls = np.array(src_pcd.normals)
-
             tgt_pcd = make_open3d_point_cloud(tgt_pts.numpy(), [0, 0.651, 0.929])
             tgt_pcd.estimate_normals()
             tgt_pcd.orient_normals_towards_camera_location()
             tgt_normls = np.array(tgt_pcd.normals)
-            compute_normal_timer.toc()
-    
             data_source['features'] = torch.from_numpy(np.concatenate([src_normls, tgt_normls], axis=0)).float()
+
             data_timer.toc()
             model_timer.tic()
-
             # forward
             self.optimizer.zero_grad()
             output = self.model(data_source)
@@ -148,13 +143,15 @@ class Trainer(object):
                 ref_loss = (torch.log(eps) + err / eps).mean()
 
                 loss = ref_loss
+                if torch.isnan(loss):
+                    print(f"{data_source['src_id']} {data_source['tgt_id']} loss is nan, skip")
+                    continue
                 stats = {
                     "ref_loss": float(loss.item()),
                     'ref_error': float(err.mean().item())
                 }
 
             if self.train_modal == 'Desc':
-
                 # descriptor loss
                 tgt_kpt, src_des, tgt_des = output['tgt_kpt'], output['src_des'], output['tgt_des']
                 desc_loss, diff, accuracy = self.desc_loss(src_des, tgt_des, cdist(tgt_kpt, tgt_kpt))
@@ -166,6 +163,9 @@ class Trainer(object):
 
                 # refer to RoReg(https://github.com/HpWang-whu/RoReg)
                 loss = 4 * desc_loss + eqv_loss
+                if torch.isnan(loss):
+                    print(f"{data_source['src_id']} {data_source['tgt_id']} loss is nan, skip")
+                    continue
                 stats = {
                     "desc_loss": float(desc_loss.item()),
                     "desc_acc": float(accuracy.item()),
@@ -181,9 +181,12 @@ class Trainer(object):
 
                 # det loss
                 sigma = (src_s[:, 0] + tgt_s[:, 0]) / 2
-                det_loss = torch.mean((1.0 - diff.detach()) * sigma)
+                det_loss = torch.mean((1.05 - diff.detach()) * sigma)
 
                 loss = det_loss
+                if torch.isnan(loss):
+                    print(f"{data_source['src_id']} {data_source['tgt_id']} loss is nan, skip")
+                    continue
                 stats = {
                     'det_loss': float(det_loss.item()),
                     "desc_acc": float(accuracy.item()),
@@ -196,6 +199,9 @@ class Trainer(object):
                 match_loss = self.L1_loss(pred_ind, gt_ind)
 
                 loss = match_loss
+                if torch.isnan(loss):
+                    print(f"{data_source['src_id']} {data_source['tgt_id']} loss is nan, skip")
+                    continue
                 stats = {
                     "match_loss": float(match_loss.item()),
                 }
@@ -216,13 +222,10 @@ class Trainer(object):
             for key in self.meter_list:
                 if stats.get(key) is not None:
                     self.meter_dict[key].update(stats[key])
-
-            if (i + 1) % 200 == 0 or i == num_iter - 1:
-                print(f"Epoch: {epoch + 1} [{i + 1:4d}/{num_iter}] ")
-                print(f"data_time: {data_timer.avg:.4f}s "
-                      f"get_item_time: {get_item_timer.avg:.4f}s "
-                      f"Compute_normal_time: {compute_normal_timer.avg:.4f}s ")
-                print(f"train_stage: {self.train_modal} "
+               
+            if (i + 1) % 100 == 0:
+                print(f"Epoch: {epoch + 1} [{i + 1:4d}/{num_iter}] "
+                      f"data_time: {data_timer.avg:.2f}s "
                       f"model_time: {model_timer.avg:.2f}s ")
                 for key in self.meter_dict.keys():
                     print(f"{key}: {self.meter_dict[key].avg:.6f}")
@@ -247,7 +250,6 @@ class Trainer(object):
                 src_pcd.estimate_normals()
                 src_pcd.orient_normals_towards_camera_location()
                 src_normls = np.array(src_pcd.normals)
-
                 tgt_pcd = make_open3d_point_cloud(tgt_pts.numpy(), [0.7, 0.8, 0.9])
                 tgt_pcd.estimate_normals()
                 tgt_pcd.orient_normals_towards_camera_location()
@@ -262,13 +264,11 @@ class Trainer(object):
                     continue
 
                 if self.train_modal == 'Ref':
-                    # angle errors between src and tgt
                     src_axis, tgt_axis = output['src_ref'], output['tgt_ref']
                     gt_trans = data_source['relt_pose'].to(src_axis.device)
                     src_axis = src_axis @ gt_trans[:3, :3].transpose(-1, -2)
                     err = 1 - torch.cosine_similarity(src_axis, tgt_axis).abs()
 
-                    # probabilistic cosine loss
                     src_s, tgt_s = output['src_s'], output['tgt_s']
                     eps = (src_s[:, 0] + tgt_s[:, 0]) / 2
                     ref_loss = (torch.log(eps) + err / eps).mean()
@@ -279,12 +279,8 @@ class Trainer(object):
                     }
 
                 if self.train_modal == 'Desc':
-
-                    # descriptor loss
                     src_kpt, src_des, tgt_des = output['src_kpt'], output['src_des'], output['tgt_des']
                     desc_loss, diff, accuracy = self.desc_loss(src_des, tgt_des, cdist(src_kpt, src_kpt))
-
-                    # equivariant loss to make two cylindrical maps similar
                     eqv_loss = self.class_loss(output['equi_score'], output['gt_label'])
                     pre_label = torch.argmax(output['equi_score'], dim=1)
                     eqv_acc = (pre_label == output['gt_label']).sum() / pre_label.shape[0]
@@ -297,23 +293,20 @@ class Trainer(object):
                     }
 
                 if self.train_modal == 'Keypt':
-
                     src_s, tgt_s = output['src_s'], output['tgt_s']
                     src_kpt, src_des, tgt_des = output['src_kpt'], output['src_des'], output['tgt_des']
                     desc_loss, diff, accuracy = self.desc_loss(src_des, tgt_des, cdist(src_kpt, src_kpt))
 
-                    # det score
                     sigma = (src_s[:, 0] + tgt_s[:, 0]) / 2
-                    det_loss = torch.mean((1.0 - diff.detach()) * sigma)
+                    det_loss = torch.mean((1.05 - diff.detach()) * sigma)
 
+                    loss = det_loss
                     stats = {
                         'det_loss': float(det_loss.item()),
                         "desc_acc": float(accuracy.item()),
                     }
 
                 if self.train_modal == 'Inlier':
-
-                    # L1 loss
                     pred_ind, gt_ind = output['pred_ind'], output['gt_ind']
                     match_loss = self.L1_loss(pred_ind, gt_ind)
 
