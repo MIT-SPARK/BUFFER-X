@@ -6,7 +6,7 @@ _C = edict()
 _C.data = edict()
 _C.data.dataset = 'SuperSet'
 # Note: It should be equal to the `_C.data.dataset` in KITTI and ThreeDMatch config file
-_C.data.subsetdatasets = ['KITTI', '3DMatch']
+_C.data.subsetdatasets = ['KITTI', '3DMatch', 'Scannetpp_faro', 'Scannetpp_iphone', 'WOD']
 _C.data.voxel_size_0 = 0.035 # Criteria: ThreeDMatch
 _C.data.manual_seed = 123
 
@@ -34,8 +34,8 @@ _C.optim.weight_decay = 1e-6
 # ToDo. Support different interval for different dataset?
 # In 3DMatch, _C.optim.scheduler_interval = {'Ref': 1, 'Desc':2, 'Keypt':1, 'Inlier':1}
 # In KITTI, _C.optim.scheduler_interval = {'Ref': 5, 'Desc':10, 'Keypt':5, 'Inlier':5}
-# _C.optim.scheduler_interval = {'Ref': 3, 'Desc':5, 'Keypt':3, 'Inlier':3}
-_C.optim.scheduler_interval = {'Ref': 5, 'Desc':10, 'Keypt':5, 'Inlier':5}
+_C.optim.scheduler_interval = {'Ref': 3, 'Desc':6, 'Keypt':3, 'Inlier':3}
+# _C.optim.scheduler_interval = {'Ref': 5, 'Desc':10, 'Keypt':5, 'Inlier':5}
 
 # point-wise learner
 _C.point = edict()

@@ -11,8 +11,10 @@ import copy
 import numpy as np
 from KITTI.config import make_cfg as kitti_make_cfg
 from SuperSet.dataloader import get_dataloader
-from KITTI.trainer import Trainer as KITTITrainer
 from ThreeDMatch.config import make_cfg as threedmatch_make_cfg
+from Scannetpp_faro.config import make_cfg as scannetpp_faro_make_cfg
+from Scannetpp_iphone.config import make_cfg as scannetpp_iphone_make_cfg
+from WOD.config import make_cfg as wod_make_cfg
 
 from SuperSet.config import make_cfg
 from SuperSet.trainer import Trainer
@@ -90,12 +92,17 @@ class Args(object):
 if __name__ == '__main__':
 
     cfg = make_cfg()
-
     for subsetdataset in cfg.data.subsetdatasets:
         if (subsetdataset == 'KITTI'):
             cfg_tmp = kitti_make_cfg()
         elif (subsetdataset == '3DMatch'):
             cfg_tmp = threedmatch_make_cfg()
+        elif (subsetdataset == 'Scannetpp_faro'):
+            cfg_tmp = scannetpp_faro_make_cfg()
+        elif (subsetdataset == 'Scannetpp_iphone'):
+            cfg_tmp = scannetpp_iphone_make_cfg()
+        elif (subsetdataset == 'WOD'):
+            cfg_tmp = wod_make_cfg()
         else:
             raise ValueError("Unsupported dataset name has been given")
         cfg[subsetdataset] = cfg_tmp
