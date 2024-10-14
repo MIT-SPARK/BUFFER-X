@@ -12,8 +12,8 @@ def save_folder_names_to_txt(directory_path, output_txt_file):
     print(f"폴더 목록이 {output_txt_file}에 저장되었습니다.")
 
 # 경로와 출력 파일 지정
-directory_path = '/root/dataset/WOD/train/sequences'  # 폴더들이 있는 경로
-output_txt_file = 'train_wod.txt'  # 출력될 텍스트 파일 이름
+directory_path = '/root/dataset/WOD/validation/sequences'  # 폴더들이 있는 경로
+output_txt_file = 'val_wod.txt'  # 출력될 텍스트 파일 이름
 
 # 함수 실행
 save_folder_names_to_txt(directory_path, output_txt_file)

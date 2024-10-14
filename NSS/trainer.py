@@ -225,7 +225,7 @@ class Trainer(object):
                 if stats.get(key) is not None:
                     self.meter_dict[key].update(stats[key])
 
-            if (i + 1) % 200 == 0 or i == num_iter - 1:
+            if (i + 1) % 200 == 0:
                 print(f"Epoch: {epoch + 1} [{i + 1:4d}/{num_iter}] "
                       f"data_time: {data_timer.avg:.2f}s "
                       f"model_time: {model_timer.avg:.2f}s ")

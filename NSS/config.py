@@ -8,15 +8,15 @@ _C = edict()
 _C.data = edict()
 _C.data.dataset = 'NSS'
 _C.data.root = '../../datasets/NSS'
-_C.data.downsample = 0.02 # first downsampling
-_C.data.voxel_size_0 = 0.035 # second downsampling
+_C.data.downsample = 0.05 # first downsampling
+_C.data.voxel_size_0 = 0.1 # second downsampling
 _C.data.voxel_size_1 = _C.data.voxel_size_0
-_C.data.max_numPts = 10000
+_C.data.max_numPts = 30000
 _C.data.manual_seed = 123
 
 # training
 _C.train = edict()
-_C.train.epoch = 2
+_C.train.epoch = 10
 _C.train.max_iter = 50000
 _C.train.batch_size = 1
 _C.train.num_workers = 0
@@ -27,7 +27,7 @@ _C.train.all_stage = ['Ref', 'Desc', 'Keypt', 'Inlier']
 
 # test
 _C.test = edict()
-_C.test.experiment_id = '06132318'
+_C.test.experiment_id = ''
 _C.test.pose_refine = False
 
 # optim

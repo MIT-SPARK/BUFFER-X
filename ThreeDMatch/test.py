@@ -3,7 +3,7 @@ import sys
 sys.path.append('../')
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import math
 import time
 import torch.nn as nn
