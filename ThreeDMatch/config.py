@@ -27,7 +27,7 @@ _C.train.all_stage = ['Ref', 'Desc', 'Keypt', 'Inlier']
 
 # test
 _C.test = edict()
-_C.test.experiment_id = '06132318'
+_C.test.experiment_id = 'twenty_split_40epoch'
 _C.test.pose_refine = True
 
 # optim

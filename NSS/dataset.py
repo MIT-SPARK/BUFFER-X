@@ -38,7 +38,7 @@ class NSSDataset(Data.Dataset):
         
         self.graph_root = os.path.join(self.root, 'pose_graphs/original')
         self.pcd_root = os.path.join(self.root, 'point_cloud')
-        pose_graph_path = os.path.join(self.graph_root, f'{split}.pose_graph.json')
+        pose_graph_path = os.path.join(self.graph_root, f'{split}.pose_mini_graph.json')
         
          # Load pose graph JSON file
         with open(pose_graph_path, 'r') as file:
@@ -55,11 +55,7 @@ class NSSDataset(Data.Dataset):
                 src_id = edge['source']
                 tgt_id = edge['target']
                 relt_pose = np.array(edge['tsfm'])
-                if np.isnan(relt_pose).any(): 
-                    print(f"Error: relt_pose is nan")
-                    breakpoint()
-                    continue  # Skip this pair if pose is nan
-               # Check if the source and target IDs exist in the node mapping
+                # Check if the source and target IDs exist in the node mapping
                 if src_id not in node_id_to_index or tgt_id not in node_id_to_index:
                     print(f"Error: src_id {src_id} or tgt_id {tgt_id} is out of range for nodes with available IDs: {list(node_id_to_index.keys())}")
                     breakpoint()
