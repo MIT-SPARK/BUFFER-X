@@ -84,7 +84,7 @@ class KITTIDataset(Data.Dataset):
         positions = [self.odometry_to_positions(odometry) for odometry in all_odometry]
         fname0 = self._get_velodyne_fn(drive, t0)
         fname1 = self._get_velodyne_fn(drive, t1)
-
+        
         # XYZ and reflectance
         xyzr0 = np.fromfile(fname0, dtype=np.float32).reshape(-1, 4)
         xyzr1 = np.fromfile(fname1, dtype=np.float32).reshape(-1, 4)
@@ -184,6 +184,8 @@ class KITTIDataset(Data.Dataset):
                 'src_sds_pts': src_kpt,  # second downsampling
                 'tgt_sds_pts': tgt_kpt,
                 'voxel_size': ds_size,
+                'src_id': '%d_%d' % (drive, t0),
+                'tgt_id': '%d_%d' % (drive, t1),
                 'dataset_name': self.config.data.dataset}
 
     def apply_transform(self, pts, trans):
