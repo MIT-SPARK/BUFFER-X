@@ -6,13 +6,13 @@ _C = edict()
 _C.data = edict()
 _C.data.dataset = 'SuperSet'
 # Note: It should be equal to the `_C.data.dataset` in KITTI and ThreeDMatch config file
-_C.data.subsetdatasets = ['KITTI', '3DMatch', 'Scannetpp_faro', 'Scannetpp_iphone', 'WOD']
+_C.data.subsetdatasets = ['KITTI', '3DMatch', 'Scannetpp_faro', 'Scannetpp_iphone', 'WOD', 'NewerCollege', 'KimeraMulti']
 _C.data.voxel_size_0 = 0.035 # Criteria: ThreeDMatch
 _C.data.manual_seed = 123
 
 # training
 _C.train = edict()
-_C.train.epoch = 30
+_C.train.epoch = 50
 _C.train.max_iter = 50000
 _C.train.batch_size = 1
 _C.train.num_workers = 16

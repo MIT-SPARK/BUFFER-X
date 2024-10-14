@@ -9,12 +9,16 @@ from ThreeDMatch.dataset import *
 from Scannetpp_faro.dataset import *
 from Scannetpp_iphone.dataset import *
 from WOD.dataset import *
+from NewerCollege.dataset import *
+from KimeraMulti.dataset import *
 
 THREEDMATCH_SPLITS = 30
 KITTI_SPLITS = 3
 FARO_SPLITS = 3
 IPHONE_SPLITS = 30
 WOD_SPLITS = 30
+KIMERA_SPLITS = 3
+NEWERCOLLEGE_SPLITS = 3
 
 def get_matching_indices(source, target, relt_pose, search_voxel_size):
     source = transform(source, relt_pose)
@@ -44,6 +48,10 @@ class SupersetDataset(Data.Dataset):
                 DatasetClass = ScannetppIphoneDataset
             elif subsetdataset == "WOD":
                 DatasetClass = WODDataset
+            elif subsetdataset == "NewerCollege":
+                DatasetClass = NewerCollegeDataset
+            elif subsetdataset == "KimeraMulti":
+                DatasetClass = KimeraMultiDataset
             else:
                 raise ValueError("Unsupported dataset class has been given")
             dataset = DatasetClass(split=split,
@@ -61,6 +69,10 @@ class SupersetDataset(Data.Dataset):
                 dataset_length = dataset_length // IPHONE_SPLITS
             elif subsetdataset == "WOD":
                 dataset_length = dataset_length // WOD_SPLITS
+            elif subsetdataset == "NewerCollege":
+                dataset_length = dataset_length // NEWERCOLLEGE_SPLITS
+            elif subsetdataset == "KimeraMulti":
+                dataset_length = dataset_length // KIMERA_SPLITS
                 
             self.lengths.append(dataset_length)
             self.split_indices.append(0)
@@ -94,6 +106,10 @@ class SupersetDataset(Data.Dataset):
                 split = IPHONE_SPLITS
             elif isinstance(dataset, WODDataset):
                 split = WOD_SPLITS
+            elif isinstance(dataset, NewerCollegeDataset):
+                split = NEWERCOLLEGE_SPLITS
+            elif isinstance(dataset, KimeraMultiDataset):
+                split = KIMERA_SPLITS
             else:
                 continue
             # 해당 데이터셋에 대해 split_index를 업데이트

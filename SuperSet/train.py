@@ -15,6 +15,8 @@ from ThreeDMatch.config import make_cfg as threedmatch_make_cfg
 from Scannetpp_faro.config import make_cfg as scannetpp_faro_make_cfg
 from Scannetpp_iphone.config import make_cfg as scannetpp_iphone_make_cfg
 from WOD.config import make_cfg as wod_make_cfg
+from NewerCollege.config import make_cfg as newercollege_make_cfg
+from KimeraMulti.config import make_cfg as kimeramulti_make_cfg
 
 from SuperSet.config import make_cfg
 from SuperSet.trainer import Trainer
@@ -103,9 +105,14 @@ if __name__ == '__main__':
             cfg_tmp = scannetpp_iphone_make_cfg()
         elif (subsetdataset == 'WOD'):
             cfg_tmp = wod_make_cfg()
+        elif (subsetdataset == 'NewerCollege'):
+            cfg_tmp = newercollege_make_cfg()
+        elif (subsetdataset == 'KimeraMulti'):
+            cfg_tmp = kimeramulti_make_cfg()
         else:
             raise ValueError("Unsupported dataset name has been given")
         cfg[subsetdataset] = cfg_tmp
+        print(f"Dataset: {subsetdataset} has been loaded")
 
     # snapshot
     if cfg.train.pretrain_model == '':
