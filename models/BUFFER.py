@@ -162,7 +162,10 @@ class buffer(nn.Module):
             src_s = src_s[match_inds[:, 0]]
             tgt_axis = tgt_axis[match_inds[:, 1]]
             tgt_s = tgt_s[match_inds[:, 1]]
-
+            
+            if src_axis.shape[0] == 0 or tgt_axis.shape[0] == 0:
+                print(f"{data_source['src_id']} {data_source['tgt_id']} has no axis")
+                return None
             if self.config.stage == 'Ref':
                 return {'src_ref': src_axis,
                         'tgt_ref': tgt_axis,
@@ -238,6 +241,10 @@ class buffer(nn.Module):
             #######################
             # predict index of SO(2) rotation
             # only consider part of elements along the elevation to speed up
+            if src['rand_axis'].shape[0] < 2 or tgt['rand_axis'].shape[0] < 2:
+                    print(f"{data_source['src_id']} {data_source['tgt_id']} don't have enough patches")
+                    return None
+                
             pred_ind = self.Inlier(src['equi'][:, :, 1:self.config.patch.ele_n - 1],
                                    tgt['equi'][:, :, 1:self.config.patch.ele_n - 1])
             # calculate gt lable in SO(2)
