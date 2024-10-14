@@ -184,6 +184,8 @@ class WODDataset(Data.Dataset):
                 'relt_pose': relt_pose,
                 'src_sds_pts': src_kpt,  # second downsampling
                 'tgt_sds_pts': tgt_kpt,
+                'src_id': '%s_%d' % (drive, t0),
+                'tgt_id': '%s_%d' % (drive, t1),
                 'voxel_size': ds_size,
                 'dataset_name': self.config.data.dataset}
 

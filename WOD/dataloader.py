@@ -123,6 +123,7 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
     s_pts, t_pts = list_data['src_fds_pts'], list_data['tgt_fds_pts']
     relt_pose = list_data['relt_pose']
     s_kpt, t_kpt = list_data['src_sds_pts'], list_data['tgt_sds_pts']
+    src_id, tgt_id = list_data['src_id'], list_data['tgt_id']
     src_kpt = s_kpt[:, :3]
     tgt_kpt = t_kpt[:, :3]
     src_f = s_kpt[:, 3:]
@@ -238,6 +239,8 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
         'stack_lengths': input_batches_len,
         'src_pcd_raw': torch.from_numpy(s_pts).float(),
         'tgt_pcd_raw': torch.from_numpy(t_pts).float(),
+        'src_id': src_id,
+        'tgt_id': tgt_id,
         'src_pcd': torch.from_numpy(src_kpt).float(),
         'tgt_pcd': torch.from_numpy(tgt_kpt).float(),
         'relt_pose': torch.from_numpy(relt_pose).float(),
