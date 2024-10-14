@@ -164,8 +164,11 @@ class MiniSpinNet(nn.Module):
     def axis_align(self, input, dataset, z_axis=None):
         center = input[:, -1, :3]
         delta_x = input[:, :, :3] - center.unsqueeze(1)  # (B, npoint, 3), normalized coordinates
-
-        if dataset == '3DMatch' or dataset == '3DLoMatch' or dataset == 'NSS' or dataset == 'Scannetpp_iphone' or dataset == 'Scannetpp_faro':
+        
+        z_axis_datasets = {'3DMatch', '3DLoMatch', 'NSS', 'Scannetpp_iphone', 'Scannetpp_faro'}
+        rand_axis_datasets = {'KITTI', 'ETH', 'WOD', 'NewerCollege', 'KimeraMulti'}
+        
+        if dataset in z_axis_datasets:
             if z_axis is None:
                 z_axis = utils.common.cal_Z_axis(delta_x, ref_point=center)
                 z_axis = utils.common.l2_norm(z_axis, axis=1)
@@ -181,7 +184,7 @@ class MiniSpinNet(nn.Module):
             rand_axis = torch.cross(z_axis, rand_axis)
             rand_axis = F.normalize(rand_axis, p=2, dim=-1)
 
-        elif dataset == 'KITTI' or dataset == 'ETH' or dataset == 'WOD':
+        else:
             rand_axis = torch.zeros_like(center)
             rand_axis[:, 0] = 1
             R = torch.eye(3).to(center.device)
