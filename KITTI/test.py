@@ -55,7 +55,7 @@ if __name__ == '__main__':
 
             data_timer.toc()
             model_timer.tic()
-            trans_est, src_axis, tgt_axis, times = model(data_source)
+            trans_est, times = model(data_source)
             model_timer.toc()
 
             if trans_est is not None:
@@ -74,7 +74,7 @@ if __name__ == '__main__':
 
             if rte > rte_thresh or rre > rre_thresh:
               print(f"{i}th fragment fails, RRE：{rre:.4f}, RTE：{rte:.4f}")
-            overall_time += np.array([data_timer.diff, model_timer.diff, *times])
+            # overall_time += np.array([data_timer.diff, model_timer.diff, *times])
             torch.cuda.empty_cache()
             if (i + 1) % 100 == 0 or i == num_batch - 1:
                 temp_states = np.array(states)
@@ -95,15 +95,15 @@ if __name__ == '__main__':
     print(f'RTE: {TE:.4f}')
     print(f'RRE: {RE:.4f}')
     
-    average_times = overall_time / num_batch
-    print(f"Average data_time: {average_times[0]:.4f}s "
-        f"Average model_time: {average_times[1]:.4f}s ")
-    print(f"ref_time: {average_times[2]:.4f}s "
-        f"keypt_time: {average_times[3]:.4f}s "
-        f"fps_time: {average_times[4]:.4f}s "
-        f"desc_time: {average_times[5]:.4f}s "
-        f"mutual_matching_time: {average_times[6]:.4f}s "
-        f"inlier_time: {average_times[7]:.4f}s "
-        f"correspondence_proposal_time: {average_times[8]:.4f}s "
-        f"ransac_time: {average_times[9]:.4f}s ")
+    # average_times = overall_time / num_batch
+    # print(f"Average data_time: {average_times[0]:.4f}s "
+    #     f"Average model_time: {average_times[1]:.4f}s ")
+    # print(f"ref_time: {average_times[2]:.4f}s "
+    #     f"keypt_time: {average_times[3]:.4f}s "
+    #     f"fps_time: {average_times[4]:.4f}s "
+    #     f"desc_time: {average_times[5]:.4f}s "
+    #     f"mutual_matching_time: {average_times[6]:.4f}s "
+    #     f"inlier_time: {average_times[7]:.4f}s "
+    #     f"correspondence_proposal_time: {average_times[8]:.4f}s "
+    #     f"ransac_time: {average_times[9]:.4f}s ")
 

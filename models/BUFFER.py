@@ -273,51 +273,53 @@ class buffer(nn.Module):
 
             ref_timer = Timer()
             ref_timer.tic()
-            axis, eps, branch = self.Ref(data_source)
-            src_axis, tgt_axis = axis[:len_src_f], axis[len_src_f:]
+            # axis, eps, branch = self.Ref(data_source)
+            # src_axis, tgt_axis = axis[:len_src_f], axis[len_src_f:]
 
-            # normalized and oriented axis
-            src_axis = F.normalize(src_axis, p=2, dim=1)
-            tgt_axis = F.normalize(tgt_axis, p=2, dim=1)
-            mask = (torch.sum(-src_axis * src_pts, dim=1) < 0).float().unsqueeze(1)
-            src_axis = src_axis * (1 - mask) - src_axis * mask
-            mask = (torch.sum(-tgt_axis * tgt_pts, dim=1) < 0).float().unsqueeze(1)
-            tgt_axis = tgt_axis * (1 - mask) - tgt_axis * mask
-            ref_timer.toc()
+            # # normalized and oriented axis
+            # src_axis = F.normalize(src_axis, p=2, dim=1)
+            # tgt_axis = F.normalize(tgt_axis, p=2, dim=1)
+            # mask = (torch.sum(-src_axis * src_pts, dim=1) < 0).float().unsqueeze(1)
+            # src_axis = src_axis * (1 - mask) - src_axis * mask
+            # mask = (torch.sum(-tgt_axis * tgt_pts, dim=1) < 0).float().unsqueeze(1)
+            # tgt_axis = tgt_axis * (1 - mask) - tgt_axis * mask
+            # ref_timer.toc()
 
-            keypt_timer = Timer()
-            keypt_timer.tic()
-            det_score = self.Keypt(data_source, branch)
-            src_s, tgt_s = det_score[:len_src_f], det_score[len_src_f:]
+            # keypt_timer = Timer()
+            # keypt_timer.tic()
+            # det_score = self.Keypt(data_source, branch)
+            # src_s, tgt_s = det_score[:len_src_f], det_score[len_src_f:]
 
-            # select keypts by detection scores
-            src_s, tgt_s = src_s[:, 0], tgt_s[:, 0]
-            s_det_idx, t_det_idx = torch.where(src_s > cfg.point.keypts_th), torch.where(
-                tgt_s > cfg.point.keypts_th)
-            src_pts, tgt_pts = src_pts[s_det_idx[0]], tgt_pts[t_det_idx[0]]
-            s_axis, t_axis = src_axis[s_det_idx[0]], tgt_axis[t_det_idx[0]]
-            keypt_timer.toc()
+            # # select keypts by detection scores
+            # src_s, tgt_s = src_s[:, 0], tgt_s[:, 0]
+            # s_det_idx, t_det_idx = torch.where(src_s > cfg.point.keypts_th), torch.where(
+            #     tgt_s > cfg.point.keypts_th)
+            # src_pts, tgt_pts = src_pts[s_det_idx[0]], tgt_pts[t_det_idx[0]]
+            # s_axis, t_axis = src_axis[s_det_idx[0]], tgt_axis[t_det_idx[0]]
+            # keypt_timer.toc()
             
-            fps_timer = Timer()
-            fps_timer.tic()
+            # fps_timer = Timer()
+            # fps_timer.tic()
             # fps
             s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,
                                                                                                                2).contiguous()
-            s_axis_flipped, t_axis_flipped = s_axis[None].transpose(1, 2).contiguous(), t_axis[None].transpose(1,
-                                                                                                               2).contiguous()
+            # s_axis_flipped, t_axis_flipped = s_axis[None].transpose(1, 2).contiguous(), t_axis[None].transpose(1,
+            #                                                                                                    2).contiguous()
             s_fps_idx = pnt2.furthest_point_sample(src_pts[None], cfg.point.num_keypts)
             t_fps_idx = pnt2.furthest_point_sample(tgt_pts[None], cfg.point.num_keypts)
             kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
             kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
-            k_axis1 = pnt2.gather_operation(s_axis_flipped, s_fps_idx).transpose(1, 2).contiguous()
-            k_axis2 = pnt2.gather_operation(t_axis_flipped, t_fps_idx).transpose(1, 2).contiguous()
-            fps_timer.toc()
+            # k_axis1 = pnt2.gather_operation(s_axis_flipped, s_fps_idx).transpose(1, 2).contiguous()
+            # k_axis2 = pnt2.gather_operation(t_axis_flipped, t_fps_idx).transpose(1, 2).contiguous()
+            # fps_timer.toc()
             
             desc_timer = Timer()
             desc_timer.tic()
             # calculate descriptor
-            src = self.Desc(src_pcd_raw[None], kpts1, dataset_name, k_axis1)
-            tgt = self.Desc(tgt_pcd_raw[None], kpts2, dataset_name, k_axis2)
+            # src = self.Desc(src_pcd_raw[None], kpts1, dataset_name, k_axis1)
+            # tgt = self.Desc(tgt_pcd_raw[None], kpts2, dataset_name, k_axis2)
+            src = self.Desc(src_pcd_raw[None], kpts1, dataset_name)
+            tgt = self.Desc(tgt_pcd_raw[None], kpts2, dataset_name)
             src_des, src_equi, s_rand_axis, s_R, s_patches = src['desc'], src['equi'], src['rand_axis'], src['R'], src[
                 'patches']
             tgt_des, tgt_equi, t_rand_axis, t_R, t_patches = tgt['desc'], tgt['equi'], tgt['rand_axis'], tgt['R'], tgt[
@@ -398,9 +400,9 @@ class buffer(nn.Module):
             #       f"inlier_time: {inlier_timer.diff:.2f}s "
             #       f"correspondence_proposal_time: {correspondence_proposal_timer.diff:.2f}s "
             #       f"ransac_time: {ransac_timer.diff:.2f}s ")
-            times = [ref_timer.diff, keypt_timer.diff, fps_timer.diff, desc_timer.diff, mutual_matching_timer.diff,
+            times = [ref_timer.diff, desc_timer.diff, mutual_matching_timer.diff,
                         inlier_timer.diff, correspondence_proposal_timer.diff, ransac_timer.diff]
-            return pose, src_axis, tgt_axis, times
+            return pose, times
 
     def mutual_matching(self, src_des, tgt_des):
         """
