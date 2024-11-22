@@ -326,8 +326,10 @@ class buffer(nn.Module):
             final_ss_kpts = None  # Stores the final source keypoints
             final_tt_kpts = None  # Stores the final target keypoints
 
-            des_r_list = [0.15, 0.3, 0.45]
-            des_r_list = [0.3]
+            # Put mid 
+            des_r_list = [0.15, 0.45, 0.3]
+            R_list = []
+            t_list = []
             for des_r in des_r_list:
                 # Compute descriptors
                 src = self.Desc(src_pcd_raw[None], kpts1, des_r, dataset_name)
@@ -363,30 +365,36 @@ class buffer(nn.Module):
                 angle_axis[:, -1] = 1
                 angle_axis = angle_axis * angle[:, None]
                 azi_R = Convert.axis_angle_to_rotation_matrix(angle_axis)
+                
                 R = tt_R @ azi_R @ ss_R.transpose(-1, -2)
                 t = tt_kpts - (R @ ss_kpts.unsqueeze(-1)).squeeze()
+                R_list.append(R)
+                t_list.append(t)
+                
+            R = torch.cat(R_list, dim=0)
+            t = torch.cat(t_list, dim=0)
+            
+            # Find the best R and t
+            tss_kpts = ss_kpts[None] @ R.transpose(-1, -2) + t[:, None]
+            diffs = torch.sqrt(torch.sum((tss_kpts - tt_kpts[None]) ** 2, dim=-1))
+            thr = torch.sqrt(torch.sum(ss_kpts ** 2, dim=-1)) * np.pi / cfg.patch.azi_n * cfg.match.inlier_th
+            sign = diffs < thr[None]
+            inlier_num = torch.sum(sign, dim=-1)  # Number of inliers for the current des_r
+            best_ind = torch.argmax(inlier_num)
+            inlier_ind = torch.where(sign[best_ind] == True)[0].detach().cpu().numpy()
+            correspondence_proposal_timer.toc()
 
-                # Find the best R and t
-                tss_kpts = ss_kpts[None] @ R.transpose(-1, -2) + t[:, None]
-                diffs = torch.sqrt(torch.sum((tss_kpts - tt_kpts[None]) ** 2, dim=-1))
-                thr = torch.sqrt(torch.sum(ss_kpts ** 2, dim=-1)) * np.pi / cfg.patch.azi_n * cfg.match.inlier_th
-                sign = diffs < thr[None]
-                inlier_num = torch.sum(sign, dim=-1)  # Number of inliers for the current des_r
-                best_ind = torch.argmax(inlier_num)
-                inlier_ind = torch.where(sign[best_ind] == True)[0].detach().cpu().numpy()
-                correspondence_proposal_timer.toc()
-
-                # Update inlier_num and corresponding variables if the current des_r has more inliers
-                if inlier_num[best_ind] > best_inlier_num:
-                    best_inlier_num = inlier_num[best_ind]
-                    final_inlier_ind = inlier_ind  # Store the indices of the best inliers
-                    final_ss_kpts = ss_kpts
-                    final_tt_kpts = tt_kpts
+            # # Update inlier_num and corresponding variables if the current des_r has more inliers
+            # if inlier_num[best_ind] > best_inlier_num:
+            #     best_inlier_num = inlier_num[best_ind]
+            #     final_inlier_ind = inlier_ind  # Store the indices of the best inliers
+            #     final_ss_kpts = ss_kpts
+            #     final_tt_kpts = tt_kpts
 
             # use RANSAC to calculate pose
-            pcd0 = make_open3d_point_cloud(final_ss_kpts.detach().cpu().numpy(), [1, 0.706, 0])
-            pcd1 = make_open3d_point_cloud(final_tt_kpts.detach().cpu().numpy(), [0, 0.651, 0.929])
-            corr = o3d.utility.Vector2iVector(np.array([final_inlier_ind, final_inlier_ind]).T)
+            pcd0 = make_open3d_point_cloud(ss_kpts.detach().cpu().numpy(), [1, 0.706, 0])
+            pcd1 = make_open3d_point_cloud(tt_kpts.detach().cpu().numpy(), [0, 0.651, 0.929])
+            corr = o3d.utility.Vector2iVector(np.array([inlier_ind, inlier_ind]).T)
 
             ransac_timer = Timer()
             ransac_timer.tic()
@@ -402,7 +410,7 @@ class buffer(nn.Module):
             ransac_timer.toc()
             
             if cfg.test.pose_refine is True:
-                pose = self.post_refinement(torch.FloatTensor(init_pose[None]).cuda(), final_ss_kpts[None], final_tt_kpts[None])
+                pose = self.post_refinement(torch.FloatTensor(init_pose[None]).cuda(), ss_kpts[None], tt_kpts[None])
                 pose = pose[0].detach().cpu().numpy()
             else:
                 pose = init_pose
