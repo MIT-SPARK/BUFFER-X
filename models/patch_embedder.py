@@ -43,13 +43,13 @@ class MiniSpinNet(nn.Module):
 
         self.conv_net = pn.Cylindrical_Net(inchan=16, dim=32)
 
-    def forward(self, pts, kpts, dataset_name, z_axis=None, is_aug=False):
+    def forward(self, pts, kpts, des_r, dataset_name, z_axis=None, is_aug=False):
         
         # if superset dataset
-        des_r = self.config[dataset_name].patch.des_r
+        # des_r = self.config[dataset_name].patch.des_r
         
         # if single dataset
-        # des_r = self.des_r
+        # des_r = self.des_rs
         
         # extract patches
         init_patch = self.select_patches(pts, kpts, vicinity=des_r, patch_sample=self.patch_sample)
