@@ -142,47 +142,47 @@ class buffer(nn.Module):
             #######################
             # training ref axis
             #######################
-            axis, eps, branch = self.Ref(data_source)
+            # axis, eps, branch = self.Ref(data_source)
 
-            # split into src and tgt
-            src_axis = axis[:len_src_f]
-            tgt_axis = axis[len_src_f:]
-            src_s = eps[:len_src_f]
-            tgt_s = eps[len_src_f:]
+            # # split into src and tgt
+            # src_axis = axis[:len_src_f]
+            # tgt_axis = axis[len_src_f:]
+            # src_s = eps[:len_src_f]
+            # tgt_s = eps[len_src_f:]
 
             # normalized and oriented axis
-            src_axis = F.normalize(src_axis, p=2, dim=1)
-            tgt_axis = F.normalize(tgt_axis, p=2, dim=1)
-            mask = (torch.sum(-src_axis * src_pts, dim=1) < 0).float().unsqueeze(1)
-            src_axis = src_axis * (1 - mask) - src_axis * mask
-            mask = (torch.sum(-tgt_axis * tgt_pts, dim=1) < 0).float().unsqueeze(1)
-            tgt_axis = tgt_axis * (1 - mask) - tgt_axis * mask
+            # src_axis = F.normalize(src_axis, p=2, dim=1)
+            # tgt_axis = F.normalize(tgt_axis, p=2, dim=1)
+            # mask = (torch.sum(-src_axis * src_pts, dim=1) < 0).float().unsqueeze(1)
+            # src_axis = src_axis * (1 - mask) - src_axis * mask
+            # mask = (torch.sum(-tgt_axis * tgt_pts, dim=1) < 0).float().unsqueeze(1)
+            # tgt_axis = tgt_axis * (1 - mask) - tgt_axis * mask
 
-            src_axis = src_axis[match_inds[:, 0]]
-            src_s = src_s[match_inds[:, 0]]
-            tgt_axis = tgt_axis[match_inds[:, 1]]
-            tgt_s = tgt_s[match_inds[:, 1]]
+            # src_axis = src_axis[match_inds[:, 0]]
+            # src_s = src_s[match_inds[:, 0]]
+            # tgt_axis = tgt_axis[match_inds[:, 1]]
+            # tgt_s = tgt_s[match_inds[:, 1]]
             
-            if src_axis.shape[0] == 0 or tgt_axis.shape[0] == 0:
-                print(f"{data_source['src_id']} {data_source['tgt_id']} has no axis")
-                return None
-            if self.config.stage == 'Ref':
-                return {'src_ref': src_axis,
-                        'tgt_ref': tgt_axis,
-                        'src_s': src_s,
-                        'tgt_s': tgt_s,
-                        }
+            # if src_axis.shape[0] == 0 or tgt_axis.shape[0] == 0:
+            #     print(f"{data_source['src_id']} {data_source['tgt_id']} has no axis")
+            #     return None
+            # if self.config.stage == 'Ref':
+            #     return {'src_ref': src_axis,
+            #             'tgt_ref': tgt_axis,
+            #             'src_s': src_s,
+            #             'tgt_s': tgt_s,
+            #             }
             
-            if src_s is None or tgt_s is None:
-                print(f"{data_source['src_id']} {data_source['tgt_id']} has no keypts")
-                return None
+            # if src_s is None or tgt_s is None:
+            #     print(f"{data_source['src_id']} {data_source['tgt_id']} has no keypts")
+            #     return None
 
             # randomly sample some positive pairs to speed up the training
             if match_inds.shape[0] > self.config.train.pos_num:
                 rand_ind = np.random.choice(range(match_inds.shape[0]), self.config.train.pos_num, replace=False)
                 match_inds = match_inds[rand_ind]
-                src_axis = src_axis[rand_ind]
-                tgt_axis = tgt_axis[rand_ind]
+                # src_axis = src_axis[rand_ind]
+                # tgt_axis = tgt_axis[rand_ind]
             src_kpt = src_pts[match_inds[:, 0]]
             tgt_kpt = tgt_pts[match_inds[:, 1]]
             
@@ -193,12 +193,13 @@ class buffer(nn.Module):
             # training descriptor
             #######################
             # calculate feature descriptor
-            src = self.Desc(src_pcd_raw[None], src_kpt[None], dataset_name, src_axis[None])
+            # src = self.Desc(src_pcd_raw[None], src_kpt[None], dataset_name, src_axis[None])
+            src = self.Desc(src_pcd_raw[None], src_kpt[None], dataset_name)
             if self.config.stage == 'Inlier':
                 # SO(2) augmentation
-                tgt = self.Desc(tgt_pcd_raw[None], tgt_kpt[None], dataset_name, tgt_axis[None], True)
+                tgt = self.Desc(tgt_pcd_raw[None], tgt_kpt[None], dataset_name, None, True)
             else:
-                tgt = self.Desc(tgt_pcd_raw[None], tgt_kpt[None], dataset_name, tgt_axis[None])
+                tgt = self.Desc(tgt_pcd_raw[None], tgt_kpt[None], dataset_name, None)
 
             if self.config.stage == 'Desc':
                 # calc matching score of equivariant feature maps
@@ -223,18 +224,18 @@ class buffer(nn.Module):
             #######################
             # training detector
             #######################
-            if self.config.stage == 'Keypt':
-                det_score = self.Keypt(data_source, branch)
+            # if self.config.stage == 'Keypt':
+            #     det_score = self.Keypt(data_source, branch)
 
-                src_s, tgt_s = det_score[:len_src_f], det_score[len_src_f:]
-                src_s, tgt_s = src_s[match_inds[:, 0]], tgt_s[match_inds[:, 1]]
+            #     src_s, tgt_s = det_score[:len_src_f], det_score[len_src_f:]
+            #     src_s, tgt_s = src_s[match_inds[:, 0]], tgt_s[match_inds[:, 1]]
 
-                return {'src_kpt': src_kpt,
-                        'src_s': src_s,
-                        'tgt_s': tgt_s,
-                        'src_des': src['desc'],
-                        'tgt_des': tgt['desc'],
-                        }
+            #     return {'src_kpt': src_kpt,
+            #             'src_s': src_s,
+            #             'tgt_s': tgt_s,
+            #             'src_des': src['desc'],
+            #             'tgt_des': tgt['desc'],
+            #             }
 
             #######################
             # training matching
@@ -300,6 +301,7 @@ class buffer(nn.Module):
             
             # fps_timer = Timer()
             # fps_timer.tic()
+            
             # fps
             s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,
                                                                                                                2).contiguous()
@@ -318,61 +320,73 @@ class buffer(nn.Module):
             # calculate descriptor
             # src = self.Desc(src_pcd_raw[None], kpts1, dataset_name, k_axis1)
             # tgt = self.Desc(tgt_pcd_raw[None], kpts2, dataset_name, k_axis2)
-            src = self.Desc(src_pcd_raw[None], kpts1, dataset_name)
-            tgt = self.Desc(tgt_pcd_raw[None], kpts2, dataset_name)
-            src_des, src_equi, s_rand_axis, s_R, s_patches = src['desc'], src['equi'], src['rand_axis'], src['R'], src[
-                'patches']
-            tgt_des, tgt_equi, t_rand_axis, t_R, t_patches = tgt['desc'], tgt['equi'], tgt['rand_axis'], tgt['R'], tgt[
-                'patches']
-            desc_timer.toc()
             
-            mutual_matching_timer = Timer()
-            mutual_matching_timer.tic()
-            # use equivariant feature maps
-            # mutual_matching
-            s_mids, t_mids = self.mutual_matching(src_des, tgt_des)
-            ss_kpts = kpts1[0, s_mids]
-            ss_equi = src_equi[s_mids]
-            ss_R = s_R[s_mids]
-            tt_kpts = kpts2[0, t_mids]
-            tt_equi = tgt_equi[t_mids]
-            tt_R = t_R[t_mids]
-            mutual_matching_timer.toc()
-            
-            inlier_timer = Timer()
-            inlier_timer.tic()
-            ind = self.Inlier(ss_equi[:, :, 1:cfg.patch.ele_n - 1],
-                              tt_equi[:, :, 1:cfg.patch.ele_n - 1])
-            inlier_timer.toc()
-            
-            correspondence_proposal_timer = Timer()
-            correspondence_proposal_timer.tic()
-            # recover pose
-            angle = ind * 2 * np.pi / cfg.patch.azi_n + 1e-6
-            angle_axis = torch.zeros_like(ss_kpts)
-            angle_axis[:, -1] = 1
-            angle_axis = angle_axis * angle[:, None]
-            # By Hyungtae: To resolve warning message about kornia 0.7.0
-            # azi_R = Convert.angle_axis_to_rotation_matrix(angle_axis)
-            azi_R = Convert.axis_angle_to_rotation_matrix(angle_axis)
-            R = tt_R @ azi_R @ ss_R.transpose(-1, -2)
-            t = tt_kpts - (R @ ss_kpts.unsqueeze(-1)).squeeze()
+            best_inlier_num = -1
+            final_inlier_ind = None  # Stores the final selected inlier indices
+            final_ss_kpts = None  # Stores the final source keypoints
+            final_tt_kpts = None  # Stores the final target keypoints
 
-            # find the best R, t
-            tss_kpts = ss_kpts[None] @ R.transpose(-1, -2) + t[:, None]
-            diffs = torch.sqrt(torch.sum((tss_kpts - tt_kpts[None]) ** 2, dim=-1))
-            thr = torch.sqrt(
-                torch.sum(ss_kpts ** 2, dim=-1)) * np.pi / cfg.patch.azi_n * cfg.match.inlier_th
-            sign = diffs < thr[None]
-            inlier_num = torch.sum(sign, dim=-1)
-            best_ind = torch.argmax(inlier_num)
-            inlier_ind = torch.where(sign[best_ind] == True)[0].detach().cpu().numpy()
-            correspondence_proposal_timer.toc()
+            des_r_list = [0.15, 0.3, 0.45]
+            des_r_list = [0.3]
+            for des_r in des_r_list:
+                # Compute descriptors
+                src = self.Desc(src_pcd_raw[None], kpts1, des_r, dataset_name)
+                tgt = self.Desc(tgt_pcd_raw[None], kpts2, des_r, dataset_name)
+                src_des, src_equi, s_rand_axis, s_R, s_patches = src['desc'], src['equi'], src['rand_axis'], src['R'], src['patches']
+                tgt_des, tgt_equi, t_rand_axis, t_R, t_patches = tgt['desc'], tgt['equi'], tgt['rand_axis'], tgt['R'], tgt['patches']
+                desc_timer.toc()
+
+                mutual_matching_timer = Timer()
+                mutual_matching_timer.tic()
+                # Perform mutual matching using equivariant feature maps
+                s_mids, t_mids = self.mutual_matching(src_des, tgt_des)
+                ss_kpts = kpts1[0, s_mids]
+                ss_equi = src_equi[s_mids]
+                ss_R = s_R[s_mids]
+                tt_kpts = kpts2[0, t_mids]
+                tt_equi = tgt_equi[t_mids]
+                tt_R = t_R[t_mids]
+                mutual_matching_timer.toc()
+
+                inlier_timer = Timer()
+                inlier_timer.tic()
+                # Calculate inliers
+                ind = self.Inlier(ss_equi[:, :, 1:cfg.patch.ele_n - 1],
+                                tt_equi[:, :, 1:cfg.patch.ele_n - 1])
+                inlier_timer.toc()
+
+                correspondence_proposal_timer = Timer()
+                correspondence_proposal_timer.tic()
+                # Recover pose
+                angle = ind * 2 * np.pi / cfg.patch.azi_n + 1e-6
+                angle_axis = torch.zeros_like(ss_kpts)
+                angle_axis[:, -1] = 1
+                angle_axis = angle_axis * angle[:, None]
+                azi_R = Convert.axis_angle_to_rotation_matrix(angle_axis)
+                R = tt_R @ azi_R @ ss_R.transpose(-1, -2)
+                t = tt_kpts - (R @ ss_kpts.unsqueeze(-1)).squeeze()
+
+                # Find the best R and t
+                tss_kpts = ss_kpts[None] @ R.transpose(-1, -2) + t[:, None]
+                diffs = torch.sqrt(torch.sum((tss_kpts - tt_kpts[None]) ** 2, dim=-1))
+                thr = torch.sqrt(torch.sum(ss_kpts ** 2, dim=-1)) * np.pi / cfg.patch.azi_n * cfg.match.inlier_th
+                sign = diffs < thr[None]
+                inlier_num = torch.sum(sign, dim=-1)  # Number of inliers for the current des_r
+                best_ind = torch.argmax(inlier_num)
+                inlier_ind = torch.where(sign[best_ind] == True)[0].detach().cpu().numpy()
+                correspondence_proposal_timer.toc()
+
+                # Update inlier_num and corresponding variables if the current des_r has more inliers
+                if inlier_num[best_ind] > best_inlier_num:
+                    best_inlier_num = inlier_num[best_ind]
+                    final_inlier_ind = inlier_ind  # Store the indices of the best inliers
+                    final_ss_kpts = ss_kpts
+                    final_tt_kpts = tt_kpts
 
             # use RANSAC to calculate pose
-            pcd0 = make_open3d_point_cloud(ss_kpts.detach().cpu().numpy(), [1, 0.706, 0])
-            pcd1 = make_open3d_point_cloud(tt_kpts.detach().cpu().numpy(), [0, 0.651, 0.929])
-            corr = o3d.utility.Vector2iVector(np.array([inlier_ind, inlier_ind]).T)
+            pcd0 = make_open3d_point_cloud(final_ss_kpts.detach().cpu().numpy(), [1, 0.706, 0])
+            pcd1 = make_open3d_point_cloud(final_tt_kpts.detach().cpu().numpy(), [0, 0.651, 0.929])
+            corr = o3d.utility.Vector2iVector(np.array([final_inlier_ind, final_inlier_ind]).T)
 
             ransac_timer = Timer()
             ransac_timer.tic()
@@ -388,7 +402,7 @@ class buffer(nn.Module):
             ransac_timer.toc()
             
             if cfg.test.pose_refine is True:
-                pose = self.post_refinement(torch.FloatTensor(init_pose[None]).cuda(), ss_kpts[None], tt_kpts[None])
+                pose = self.post_refinement(torch.FloatTensor(init_pose[None]).cuda(), final_ss_kpts[None], final_tt_kpts[None])
                 pose = pose[0].detach().cpu().numpy()
             else:
                 pose = init_pose
