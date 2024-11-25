@@ -194,12 +194,13 @@ class buffer(nn.Module):
             #######################
             # calculate feature descriptor
             # src = self.Desc(src_pcd_raw[None], src_kpt[None], dataset_name, src_axis[None])
-            src = self.Desc(src_pcd_raw[None], src_kpt[None], dataset_name)
+            des_r = cfg.patch.des_r
+            src = self.Desc(src_pcd_raw[None], src_kpt[None], des_r, dataset_name)
             if self.config.stage == 'Inlier':
                 # SO(2) augmentation
-                tgt = self.Desc(tgt_pcd_raw[None], tgt_kpt[None], dataset_name, None, True)
+                tgt = self.Desc(tgt_pcd_raw[None], tgt_kpt[None], des_r, dataset_name, None, True)
             else:
-                tgt = self.Desc(tgt_pcd_raw[None], tgt_kpt[None], dataset_name, None)
+                tgt = self.Desc(tgt_pcd_raw[None], tgt_kpt[None], des_r, dataset_name, None)
 
             if self.config.stage == 'Desc':
                 # calc matching score of equivariant feature maps
@@ -328,6 +329,7 @@ class buffer(nn.Module):
 
             # Put mid 
             des_r_list = [0.15, 0.45, 0.3]
+            des_r_list = [0.3]
             R_list = []
             t_list = []
             for des_r in des_r_list:
