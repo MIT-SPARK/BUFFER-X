@@ -139,50 +139,10 @@ class buffer(nn.Module):
                 dataset_name = self.config['data']['dataset']
                 cfg = self.config
 
-            #######################
-            # training ref axis
-            #######################
-            # axis, eps, branch = self.Ref(data_source)
-
-            # # split into src and tgt
-            # src_axis = axis[:len_src_f]
-            # tgt_axis = axis[len_src_f:]
-            # src_s = eps[:len_src_f]
-            # tgt_s = eps[len_src_f:]
-
-            # normalized and oriented axis
-            # src_axis = F.normalize(src_axis, p=2, dim=1)
-            # tgt_axis = F.normalize(tgt_axis, p=2, dim=1)
-            # mask = (torch.sum(-src_axis * src_pts, dim=1) < 0).float().unsqueeze(1)
-            # src_axis = src_axis * (1 - mask) - src_axis * mask
-            # mask = (torch.sum(-tgt_axis * tgt_pts, dim=1) < 0).float().unsqueeze(1)
-            # tgt_axis = tgt_axis * (1 - mask) - tgt_axis * mask
-
-            # src_axis = src_axis[match_inds[:, 0]]
-            # src_s = src_s[match_inds[:, 0]]
-            # tgt_axis = tgt_axis[match_inds[:, 1]]
-            # tgt_s = tgt_s[match_inds[:, 1]]
-            
-            # if src_axis.shape[0] == 0 or tgt_axis.shape[0] == 0:
-            #     print(f"{data_source['src_id']} {data_source['tgt_id']} has no axis")
-            #     return None
-            # if self.config.stage == 'Ref':
-            #     return {'src_ref': src_axis,
-            #             'tgt_ref': tgt_axis,
-            #             'src_s': src_s,
-            #             'tgt_s': tgt_s,
-            #             }
-            
-            # if src_s is None or tgt_s is None:
-            #     print(f"{data_source['src_id']} {data_source['tgt_id']} has no keypts")
-            #     return None
-
             # randomly sample some positive pairs to speed up the training
             if match_inds.shape[0] > self.config.train.pos_num:
                 rand_ind = np.random.choice(range(match_inds.shape[0]), self.config.train.pos_num, replace=False)
                 match_inds = match_inds[rand_ind]
-                # src_axis = src_axis[rand_ind]
-                # tgt_axis = tgt_axis[rand_ind]
             src_kpt = src_pts[match_inds[:, 0]]
             tgt_kpt = tgt_pts[match_inds[:, 1]]
             
@@ -223,22 +183,6 @@ class buffer(nn.Module):
                         }
 
             #######################
-            # training detector
-            #######################
-            # if self.config.stage == 'Keypt':
-            #     det_score = self.Keypt(data_source, branch)
-
-            #     src_s, tgt_s = det_score[:len_src_f], det_score[len_src_f:]
-            #     src_s, tgt_s = src_s[match_inds[:, 0]], tgt_s[match_inds[:, 1]]
-
-            #     return {'src_kpt': src_kpt,
-            #             'src_s': src_s,
-            #             'tgt_s': tgt_s,
-            #             'src_des': src['desc'],
-            #             'tgt_des': tgt['desc'],
-            #             }
-
-            #######################
             # training matching
             #######################
             # predict index of SO(2) rotation
@@ -261,8 +205,11 @@ class buffer(nn.Module):
             #######################
             # inference
             ######################
-            src_pts, tgt_pts = data_source['src_pcd'], data_source['tgt_pcd']
+            # src_pts, tgt_pts = data_source['src_pcd'], data_source['tgt_pcd']
+            src_pts, tgt_pts = data_source['src_pcd_raw'], data_source['tgt_pcd_raw']
             src_pcd_raw, tgt_pcd_raw = data_source['src_pcd_raw'], data_source['tgt_pcd_raw']
+            
+            
             len_src_f = data_source['stack_lengths'][0][0]
             gt_trans = data_source['relt_pose']
             
@@ -273,72 +220,62 @@ class buffer(nn.Module):
                 dataset_name = self.config['data']['dataset']
                 cfg = self.config
 
-            ref_timer = Timer()
-            ref_timer.tic()
-            # axis, eps, branch = self.Ref(data_source)
-            # src_axis, tgt_axis = axis[:len_src_f], axis[len_src_f:]
-
-            # # normalized and oriented axis
-            # src_axis = F.normalize(src_axis, p=2, dim=1)
-            # tgt_axis = F.normalize(tgt_axis, p=2, dim=1)
-            # mask = (torch.sum(-src_axis * src_pts, dim=1) < 0).float().unsqueeze(1)
-            # src_axis = src_axis * (1 - mask) - src_axis * mask
-            # mask = (torch.sum(-tgt_axis * tgt_pts, dim=1) < 0).float().unsqueeze(1)
-            # tgt_axis = tgt_axis * (1 - mask) - tgt_axis * mask
-            # ref_timer.toc()
-
-            # keypt_timer = Timer()
-            # keypt_timer.tic()
-            # det_score = self.Keypt(data_source, branch)
-            # src_s, tgt_s = det_score[:len_src_f], det_score[len_src_f:]
-
-            # # select keypts by detection scores
-            # src_s, tgt_s = src_s[:, 0], tgt_s[:, 0]
-            # s_det_idx, t_det_idx = torch.where(src_s > cfg.point.keypts_th), torch.where(
-            #     tgt_s > cfg.point.keypts_th)
-            # src_pts, tgt_pts = src_pts[s_det_idx[0]], tgt_pts[t_det_idx[0]]
-            # s_axis, t_axis = src_axis[s_det_idx[0]], tgt_axis[t_det_idx[0]]
-            # keypt_timer.toc()
-            
             # fps_timer = Timer()
             # fps_timer.tic()
             
-            # fps
-            s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,
-                                                                                                               2).contiguous()
-            # s_axis_flipped, t_axis_flipped = s_axis[None].transpose(1, 2).contiguous(), t_axis[None].transpose(1,
-            #                                                                                                    2).contiguous()
-            s_fps_idx = pnt2.furthest_point_sample(src_pts[None], cfg.point.num_keypts)
-            t_fps_idx = pnt2.furthest_point_sample(tgt_pts[None], cfg.point.num_keypts)
-            kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
-            kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
+            # # fps
+            # s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
+            # # s_axis_flipped, t_axis_flipped = s_axis[None].transpose(1, 2).contiguous(), t_axis[None].transpose(1,
+            # #                                                                                                    2).contiguous()
+            # s_fps_idx = pnt2.furthest_point_sample(src_pts[None], cfg.point.num_keypts)
+            # t_fps_idx = pnt2.furthest_point_sample(tgt_pts[None], cfg.point.num_keypts)
+            # kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
+            # kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
+            
             # k_axis1 = pnt2.gather_operation(s_axis_flipped, s_fps_idx).transpose(1, 2).contiguous()
             # k_axis2 = pnt2.gather_operation(t_axis_flipped, t_fps_idx).transpose(1, 2).contiguous()
             # fps_timer.toc()
             
-            desc_timer = Timer()
-            desc_timer.tic()
+            
             # calculate descriptor
             # src = self.Desc(src_pcd_raw[None], kpts1, dataset_name, k_axis1)
             # tgt = self.Desc(tgt_pcd_raw[None], kpts2, dataset_name, k_axis2)
-            
-            best_inlier_num = -1
-            final_inlier_ind = None  # Stores the final selected inlier indices
-            final_ss_kpts = None  # Stores the final source keypoints
-            final_tt_kpts = None  # Stores the final target keypoints
 
-            # Put mid 
-            des_r_list = [0.15, 0.45, 0.3]
-            des_r_list = [0.3]
+            # src_scale, tgt_scale = data_source['src_scale'], data_source['tgt_scale']
+            # min_scale = min(src_scale, tgt_scale)
+            # des_r_list = [round(min_scale * factor, 2) for factor in [0.05, 0.10, 0.15]]
+            
+            des_r_list = [2.0, 3.0, 4.0]
+            # des_r_list = [0.15, 0.3, 0.45]
+            num_keypts_list = [2000, 1500, 1000]
+            # des_r_list = [0.3]
             R_list = []
             t_list = []
-            for des_r in des_r_list:
+            ss_kpts_list = []
+            tt_kpts_list = []
+            
+            desc_timer = Timer()
+            desc_timer.tic()
+            for i, des_r in enumerate(des_r_list):
+                cfg.point.num_keypts = num_keypts_list[i]
+                s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
+                s_fps_idx = pnt2.furthest_point_sample(src_pts[None], cfg.point.num_keypts)
+                t_fps_idx = pnt2.furthest_point_sample(tgt_pts[None], cfg.point.num_keypts)
+                kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
+                kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
+                
+                # Calculate the percentage of points within des_r for src_pts
+                src_dists = torch.cdist(kpts1.squeeze(0), src_pts)  # Distance from keypoints to all points
+                src_points_within_radius = (src_dists < des_r).sum(dim=1)  # Count points within des_r for each keypoint
+                src_percentage = src_points_within_radius.sum().item() / (src_pts.shape[0] * cfg.point.num_keypts)* 100  # Total percentage for src_pts
+                print(f"Percentage of points within des_r for src_pts: {src_percentage:.2f}%")
+                
+                
                 # Compute descriptors
                 src = self.Desc(src_pcd_raw[None], kpts1, des_r, dataset_name)
                 tgt = self.Desc(tgt_pcd_raw[None], kpts2, des_r, dataset_name)
                 src_des, src_equi, s_rand_axis, s_R, s_patches = src['desc'], src['equi'], src['rand_axis'], src['R'], src['patches']
                 tgt_des, tgt_equi, t_rand_axis, t_R, t_patches = tgt['desc'], tgt['equi'], tgt['rand_axis'], tgt['R'], tgt['patches']
-                desc_timer.toc()
 
                 mutual_matching_timer = Timer()
                 mutual_matching_timer.tic()
@@ -372,26 +309,23 @@ class buffer(nn.Module):
                 t = tt_kpts - (R @ ss_kpts.unsqueeze(-1)).squeeze()
                 R_list.append(R)
                 t_list.append(t)
-                
+                ss_kpts_list.append(ss_kpts)
+                tt_kpts_list.append(tt_kpts)    
+            desc_timer.toc()
             R = torch.cat(R_list, dim=0)
             t = torch.cat(t_list, dim=0)
+            ss_kpts = torch.cat(ss_kpts_list, dim=0)
+            tt_kpts = torch.cat(tt_kpts_list, dim=0)
             
             # Find the best R and t
             tss_kpts = ss_kpts[None] @ R.transpose(-1, -2) + t[:, None]
             diffs = torch.sqrt(torch.sum((tss_kpts - tt_kpts[None]) ** 2, dim=-1))
             thr = torch.sqrt(torch.sum(ss_kpts ** 2, dim=-1)) * np.pi / cfg.patch.azi_n * cfg.match.inlier_th
             sign = diffs < thr[None]
-            inlier_num = torch.sum(sign, dim=-1)  # Number of inliers for the current des_r
+            inlier_num = torch.sum(sign, dim=-1)  # Number of inliers for the current des_r (instead inlier num maximum, ratio maximum?)
             best_ind = torch.argmax(inlier_num)
             inlier_ind = torch.where(sign[best_ind] == True)[0].detach().cpu().numpy()
             correspondence_proposal_timer.toc()
-
-            # # Update inlier_num and corresponding variables if the current des_r has more inliers
-            # if inlier_num[best_ind] > best_inlier_num:
-            #     best_inlier_num = inlier_num[best_ind]
-            #     final_inlier_ind = inlier_ind  # Store the indices of the best inliers
-            #     final_ss_kpts = ss_kpts
-            #     final_tt_kpts = tt_kpts
 
             # use RANSAC to calculate pose
             pcd0 = make_open3d_point_cloud(ss_kpts.detach().cpu().numpy(), [1, 0.706, 0])
@@ -416,15 +350,7 @@ class buffer(nn.Module):
                 pose = pose[0].detach().cpu().numpy()
             else:
                 pose = init_pose
-            # print(f"ref_time: {ref_timer.diff:.2f}s "
-            #       f"keypt_time: {keypt_timer.diff:.2f}s "
-            #       f"fps_time: {fps_timer.diff:.2f}s "
-            #       f"desc_time: {desc_timer.diff:.2f}s "
-            #       f"mutual_matching_time: {mutual_matching_timer.diff:.2f}s "
-            #       f"inlier_time: {inlier_timer.diff:.2f}s "
-            #       f"correspondence_proposal_time: {correspondence_proposal_timer.diff:.2f}s "
-            #       f"ransac_time: {ransac_timer.diff:.2f}s ")
-            times = [ref_timer.diff, desc_timer.diff, mutual_matching_timer.diff,
+            times = [desc_timer.diff, mutual_matching_timer.diff,
                         inlier_timer.diff, correspondence_proposal_timer.diff, ransac_timer.diff]
             return pose, times
 
@@ -558,3 +484,77 @@ def rigid_transform_3d(A, B, weights=None, weight_threshold=0):
     # warp_A = transform(A, integrate_trans(R,t))
     # RMSE = torch.sum( (warp_A - B) ** 2, dim=-1).mean()
     return integrate_trans(R, t)
+
+
+# TODO
+# Modify this functions for calculating des_r
+
+def determine_des_r(src_pts, tgt_pts, des_r_candidates):
+    """
+    Determine the optimal des_r based on the proportion of points within the radius.
+
+    Args:
+        src_pts (torch.Tensor): Source points of shape (N, 3).
+        tgt_pts (torch.Tensor): Target points of shape (M, 3).
+        des_r_candidates (list): List of des_r values to evaluate.
+
+    Returns:
+        list: Optimal des_r values for source and target.
+    """
+    optimal_des_r = None
+    optimal_proportion = -1  # To track the best proportion
+
+    for des_r in des_r_candidates:
+        # Calculate distances for source points
+        src_dists = torch.cdist(src_pts, src_pts)  # Pairwise distances
+        src_within_radius = (src_dists < des_r).sum(dim=1).float() / src_pts.shape[0]
+
+        # Calculate distances for target points
+        tgt_dists = torch.cdist(tgt_pts, tgt_pts)
+        tgt_within_radius = (tgt_dists < des_r).sum(dim=1).float() / tgt_pts.shape[0]
+
+        # Average proportion of points within radius
+        avg_proportion = (src_within_radius.mean() + tgt_within_radius.mean()) / 2
+
+        print(f"des_r: {des_r}, avg_proportion: {avg_proportion:.4f}")
+
+        # Update optimal des_r based on proportion
+        if avg_proportion > optimal_proportion:
+            optimal_des_r = des_r
+            optimal_proportion = avg_proportion
+
+    return optimal_des_r, optimal_proportion
+
+def find_des_r(src_pts, kpts, target_percentages):
+    """
+    Finds the des_r values corresponding to the given target percentages of points within the radius.
+
+    Args:
+        src_pts (torch.Tensor): Source points of shape (N, 3).
+        kpts (torch.Tensor): Keypoints of shape (num_keypts, 3).
+        target_percentages (list of float): Target percentages [0.5, 1, 5].
+        
+    Returns:
+        list: The calculated des_r values for the given percentages.
+    """
+    des_r_values = []
+    for target_percentage in target_percentages:
+        low, high = 0., 5.0  # Start with a wide search range for des_r
+        tolerance = 0.01  # Percentage tolerance
+        des_r = 0.0
+
+        while high - low > 1e-3:  # Precision threshold
+            des_r = (low + high) / 2.0
+            src_dists = torch.cdist(kpts, src_pts)  # Calculate distances
+            src_points_within_radius = (src_dists < des_r).sum(dim=1)  # Points within radius for each keypoint
+            src_percentage = src_points_within_radius.sum().item() / src_pts.shape[0] * 100  # Percentage
+            
+            if src_percentage < target_percentage - tolerance:
+                low = des_r  # Increase des_r to capture more points
+            elif src_percentage > target_percentage + tolerance:
+                high = des_r  # Decrease des_r to capture fewer points
+            else:
+                break  # Close enough to the target percentage
+
+        des_r_values.append(round(des_r, 2))  # Round to 2 decimal places for consistency
+    return des_r_values
