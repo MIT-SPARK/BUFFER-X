@@ -238,6 +238,9 @@ class buffer(nn.Module):
             
             
             # calculate descriptor
+            # TODO
+            # Implement radius selection module
+            
             # src = self.Desc(src_pcd_raw[None], kpts1, dataset_name, k_axis1)
             # tgt = self.Desc(tgt_pcd_raw[None], kpts2, dataset_name, k_axis2)
 
@@ -268,8 +271,7 @@ class buffer(nn.Module):
                 src_dists = torch.cdist(kpts1.squeeze(0), src_pts)  # Distance from keypoints to all points
                 src_points_within_radius = (src_dists < des_r).sum(dim=1)  # Count points within des_r for each keypoint
                 src_percentage = src_points_within_radius.sum().item() / (src_pts.shape[0] * cfg.point.num_keypts)* 100  # Total percentage for src_pts
-                print(f"Percentage of points within des_r for src_pts: {src_percentage:.2f}%")
-                
+                # print(f"Percentage of points within des_r for src_pts: {src_percentage:.2f}%")
                 
                 # Compute descriptors
                 src = self.Desc(src_pcd_raw[None], kpts1, des_r, dataset_name)
