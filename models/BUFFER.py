@@ -219,11 +219,9 @@ class buffer(nn.Module):
             else: 
                 dataset_name = self.config['data']['dataset']
                 cfg = self.config
-
-            # fps_timer = Timer()
-            # fps_timer.tic()
             
-            # # fps
+            # Origianl implementation
+            
             # s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
             # # s_axis_flipped, t_axis_flipped = s_axis[None].transpose(1, 2).contiguous(), t_axis[None].transpose(1,
             # #                                                                                                    2).contiguous()
@@ -248,10 +246,16 @@ class buffer(nn.Module):
             # min_scale = min(src_scale, tgt_scale)
             # des_r_list = [round(min_scale * factor, 2) for factor in [0.05, 0.10, 0.15]]
             
-            des_r_list = [2.0, 3.0, 4.0]
-            # des_r_list = [0.15, 0.3, 0.45]
+            indoor_datasets = {'3DMatch', '3DLoMatch', 'NSS', 'Scannetpp_iphone', 'Scannetpp_faro'}
+            outdoor_datasets = {'KITTI', 'ETH', 'WOD', 'NewerCollege', 'KimeraMulti'}
+            
+            # Naive implementation (need to modify)
+            if dataset_name in indoor_datasets:
+                des_r_list = [0.15, 0.3, 0.45]
+            else:
+                des_r_list = [2.0, 3.0, 4.0]
+                
             num_keypts_list = [2000, 1500, 1000]
-            # des_r_list = [0.3]
             R_list = []
             t_list = []
             ss_kpts_list = []
@@ -312,7 +316,8 @@ class buffer(nn.Module):
                 R_list.append(R)
                 t_list.append(t)
                 ss_kpts_list.append(ss_kpts)
-                tt_kpts_list.append(tt_kpts)    
+                tt_kpts_list.append(tt_kpts) 
+                   
             desc_timer.toc()
             R = torch.cat(R_list, dim=0)
             t = torch.cat(t_list, dim=0)
