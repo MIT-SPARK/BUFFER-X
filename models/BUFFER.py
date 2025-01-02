@@ -222,19 +222,12 @@ class buffer(nn.Module):
             
             # Origianl implementation
             
-            # s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
-            # # s_axis_flipped, t_axis_flipped = s_axis[None].transpose(1, 2).contiguous(), t_axis[None].transpose(1,
-            # #                                                                                                    2).contiguous()
-            # s_fps_idx = pnt2.furthest_point_sample(src_pts[None], cfg.point.num_keypts)
-            # t_fps_idx = pnt2.furthest_point_sample(tgt_pts[None], cfg.point.num_keypts)
-            # kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
-            # kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
-            
-            # k_axis1 = pnt2.gather_operation(s_axis_flipped, s_fps_idx).transpose(1, 2).contiguous()
-            # k_axis2 = pnt2.gather_operation(t_axis_flipped, t_fps_idx).transpose(1, 2).contiguous()
-            # fps_timer.toc()
-            
-            
+            s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
+            s_fps_idx = pnt2.furthest_point_sample(src_pts[None], cfg.point.num_keypts)
+            t_fps_idx = pnt2.furthest_point_sample(tgt_pts[None], cfg.point.num_keypts)
+            kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
+            kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
+ 
             # calculate descriptor
             # TODO
             # Implement radius selection module
@@ -246,21 +239,22 @@ class buffer(nn.Module):
             # min_scale = min(src_scale, tgt_scale)
             # des_r_list = [round(min_scale * factor, 2) for factor in [0.05, 0.10, 0.15]]
             
-            indoor_datasets = {'3DMatch', '3DLoMatch', 'NSS', 'Scannetpp_iphone', 'Scannetpp_faro'}
-            outdoor_datasets = {'KITTI', 'ETH', 'WOD', 'NewerCollege', 'KimeraMulti'}
+            # indoor_datasets = {'3DMatch', '3DLoMatch', 'NSS', 'Scannetpp_iphone', 'Scannetpp_faro'}
+            # outdoor_datasets = {'KITTI', 'ETH', 'WOD', 'NewerCollege', 'KimeraMulti'}
             
-            # Naive implementation (need to modify)
-            if dataset_name in indoor_datasets:
-                des_r_list = [0.15, 0.3, 0.45]
-            else:
-                des_r_list = [2.0, 3.0, 4.0]
-                
+            # # Naive implementation (need to modify)
+            # if dataset_name in indoor_datasets:
+            #     des_r_list = [0.15, 0.3, 0.45]
+            # else:
+            #     des_r_list = [2.0, 3.0, 4.0]
+            
+            des_r_list = find_des_r(src_pcd_raw, kpts1, tgt_pcd_raw, kpts2)
+    
             num_keypts_list = [2000, 1500, 1000]
             R_list = []
             t_list = []
             ss_kpts_list = []
-            tt_kpts_list = []
-            
+            tt_kpts_list = []        
             desc_timer = Timer()
             desc_timer.tic()
             for i, des_r in enumerate(des_r_list):
@@ -496,72 +490,54 @@ def rigid_transform_3d(A, B, weights=None, weight_threshold=0):
 # TODO
 # Modify this functions for calculating des_r
 
-def determine_des_r(src_pts, tgt_pts, des_r_candidates):
-    """
-    Determine the optimal des_r based on the proportion of points within the radius.
-
-    Args:
-        src_pts (torch.Tensor): Source points of shape (N, 3).
-        tgt_pts (torch.Tensor): Target points of shape (M, 3).
-        des_r_candidates (list): List of des_r values to evaluate.
-
-    Returns:
-        list: Optimal des_r values for source and target.
-    """
-    optimal_des_r = None
-    optimal_proportion = -1  # To track the best proportion
-
-    for des_r in des_r_candidates:
-        # Calculate distances for source points
-        src_dists = torch.cdist(src_pts, src_pts)  # Pairwise distances
-        src_within_radius = (src_dists < des_r).sum(dim=1).float() / src_pts.shape[0]
-
-        # Calculate distances for target points
-        tgt_dists = torch.cdist(tgt_pts, tgt_pts)
-        tgt_within_radius = (tgt_dists < des_r).sum(dim=1).float() / tgt_pts.shape[0]
-
-        # Average proportion of points within radius
-        avg_proportion = (src_within_radius.mean() + tgt_within_radius.mean()) / 2
-
-        print(f"des_r: {des_r}, avg_proportion: {avg_proportion:.4f}")
-
-        # Update optimal des_r based on proportion
-        if avg_proportion > optimal_proportion:
-            optimal_des_r = des_r
-            optimal_proportion = avg_proportion
-
-    return optimal_des_r, optimal_proportion
-
-def find_des_r(src_pts, kpts, target_percentages):
+def find_des_r(src_pts, src_kpts, tgt_pts, tgt_kpts):
     """
     Finds the des_r values corresponding to the given target percentages of points within the radius.
 
     Args:
         src_pts (torch.Tensor): Source points of shape (N, 3).
-        kpts (torch.Tensor): Keypoints of shape (num_keypts, 3).
-        target_percentages (list of float): Target percentages [0.5, 1, 5].
+        src_kpts (torch.Tensor): Keypoints of shape (num_keypts, 3).
         
     Returns:
         list: The calculated des_r values for the given percentages.
     """
+    # breakpoint()
+    thresholds = [0.5, 2, 5]  # percentage thresholds
     des_r_values = []
-    for target_percentage in target_percentages:
+    for threshold in thresholds:
         low, high = 0., 5.0  # Start with a wide search range for des_r
-        tolerance = 0.01  # Percentage tolerance
-        des_r = 0.0
+        tolerance = 0.01  # threshold tolerance
+        des_r, src_des_r, tgt_des_r = 0.0, 0.0, 0.0
 
         while high - low > 1e-3:  # Precision threshold
-            des_r = (low + high) / 2.0
-            src_dists = torch.cdist(kpts, src_pts)  # Calculate distances
-            src_points_within_radius = (src_dists < des_r).sum(dim=1)  # Points within radius for each keypoint
-            src_percentage = src_points_within_radius.sum().item() / src_pts.shape[0] * 100  # Percentage
+            src_des_r = (low + high) / 2.0
+            src_dists = torch.cdist(src_kpts, src_pts)  # Calculate distances
+            src_points_within_radius = (src_dists < src_des_r).int()  # Binary mask for points within radius
+            src_percentage = src_points_within_radius.sum(dim=-1).float() / src_pts.shape[0] * 100  # Percentage per keypoint
+            src_percentage = src_percentage.mean().item()  # Average percentage across keypoints
             
-            if src_percentage < target_percentage - tolerance:
-                low = des_r  # Increase des_r to capture more points
-            elif src_percentage > target_percentage + tolerance:
-                high = des_r  # Decrease des_r to capture fewer points
+            if src_percentage < threshold - tolerance:
+                low = src_des_r  # Increase src_des_r to capture more points
+            elif src_percentage > threshold + tolerance:
+                high = src_des_r  # Decrease src_des_r to capture fewer points
             else:
-                break  # Close enough to the target percentage
-
+                break  # Close enough to the percentage
+        
+        low, high = 0., 5.0
+        while high - low > 1e-3:
+            tgt_des_r = (low + high) / 2.0
+            tgt_dists = torch.cdist(tgt_kpts, tgt_pts)
+            tgt_points_within_radius = (tgt_dists < tgt_des_r).int()
+            tgt_percentage = tgt_points_within_radius.sum(dim=-1).float() / tgt_pts.shape[0] * 100
+            tgt_percentage = tgt_percentage.mean().item()
+            
+            if tgt_percentage < threshold - tolerance:
+                low = tgt_des_r
+            elif tgt_percentage > threshold + tolerance:
+                high = tgt_des_r
+            else:
+                break
+        
+        des_r = min(src_des_r, tgt_des_r)
         des_r_values.append(round(des_r, 2))  # Round to 2 decimal places for consistency
     return des_r_values
