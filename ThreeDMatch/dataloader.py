@@ -129,6 +129,7 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
     tgt_kpt = t_kpt[:, :3]
     src_f = s_kpt[:, 3:]
     tgt_f = t_kpt[:, 3:]
+    src_scale, tgt_scale = list_data['src_scale'], list_data['tgt_scale']
     batched_points_list.append(src_kpt)
     batched_points_list.append(tgt_kpt)
     batched_features_list.append(src_f)
@@ -137,12 +138,10 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
     batched_lengths_list.append(len(tgt_kpt))
     batched_voxel_size_list.append(list_data['voxel_size'])
     batched_dataset_names.append(list_data['dataset_name'])
-
     batched_points = torch.from_numpy(np.concatenate(batched_points_list, axis=0))
     batched_features = torch.from_numpy(np.concatenate(batched_features_list, axis=0))
     batched_lengths = torch.from_numpy(np.array(batched_lengths_list)).int()
     batched_voxel_sizes = torch.from_numpy(np.array(batched_voxel_size_list))
-
     # Starting radius of convolutions
     r_normal = config.data.voxel_size_0 * config.point.conv_radius
 
@@ -242,6 +241,8 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
         'tgt_pcd_raw': torch.from_numpy(t_pts).float(),
         'src_pcd': torch.from_numpy(src_kpt).float(),
         'tgt_pcd': torch.from_numpy(tgt_kpt).float(),
+        'src_scale': src_scale,
+        'tgt_scale': tgt_scale,
         'relt_pose': torch.from_numpy(relt_pose).float(),
         'src_id': src_id,
         'tgt_id': tgt_id,
