@@ -125,10 +125,28 @@ class KITTIDataset(Data.Dataset):
         src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample)
         src_pts = np.array(src_pcd.points)
         np.random.shuffle(src_pts)
+        
+        # src_pts = np.asarray(src_pcd.points)
+        # src_indices = np.arange(src_pts.shape[0])
+        # np.random.shuffle(src_indices)
+        # src_pts = src_pts[src_indices]
+        # src_pcd = make_open3d_point_cloud(src_pts)
+        # src_pcd.paint_uniform_color([1, 0.706, 0])
+        # src_pcd = o3d.geometry.PointCloud.uniform_down_sample(src_pcd, 5)
+        # src_pts = np.array(src_pcd.points)
 
         tgt_pcd = make_open3d_point_cloud(xyz1, [0, 0.651, 0.929])
         tgt_pcd = o3d.geometry.PointCloud.voxel_down_sample(tgt_pcd, voxel_size=self.config.data.downsample)
-
+        tgt_pts = np.asarray(tgt_pcd.points)
+        
+        # tgt_indices = np.arange(tgt_pts.shape[0])
+        # np.random.shuffle(tgt_indices)
+        # tgt_pts = tgt_pts[tgt_indices]
+        # tgt_pcd = make_open3d_point_cloud(tgt_pts)
+        # tgt_pcd.paint_uniform_color([0, 0.651, 0.929])
+        # tgt_pcd = o3d.geometry.PointCloud.uniform_down_sample(tgt_pcd, 5)
+        # tgt_pts = np.array(tgt_pcd.points)
+        
         if self.split != 'test':
             if self.config.stage == 'Ref':
                 # SO(3) augmentation
