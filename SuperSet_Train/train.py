@@ -10,7 +10,7 @@ import argparse
 import copy
 import numpy as np
 from KITTI.config import make_cfg as kitti_make_cfg
-from SuperSet.dataloader import get_dataloader
+from SuperSet_Train.dataloader import get_dataloader
 from ThreeDMatch.config import make_cfg as threedmatch_make_cfg
 from Scannetpp_faro.config import make_cfg as scannetpp_faro_make_cfg
 from Scannetpp_iphone.config import make_cfg as scannetpp_iphone_make_cfg
@@ -18,8 +18,8 @@ from WOD.config import make_cfg as wod_make_cfg
 from NewerCollege.config import make_cfg as newercollege_make_cfg
 from KimeraMulti.config import make_cfg as kimeramulti_make_cfg
 
-from SuperSet.config import make_cfg
-from SuperSet.trainer import Trainer
+from SuperSet_Train.config import make_cfg
+from SuperSet_Train.trainer import Trainer
 
 from models.BUFFER import buffer
 from torch import optim

@@ -1,5 +1,5 @@
 from functools import partial
-from SuperSet.dataset import SupersetDataset
+from SuperSet_Train.dataset import SupersetDataset
 import torch
 import numpy as np
 import cpp_wrappers.cpp_subsampling.grid_subsampling as cpp_subsampling
