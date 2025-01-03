@@ -538,6 +538,6 @@ def find_des_r(src_pts, src_kpts, tgt_pts, tgt_kpts):
             else:
                 break
         
-        des_r = min(src_des_r, tgt_des_r)
+        des_r = tgt_des_r
         des_r_values.append(round(des_r, 2))  # Round to 2 decimal places for consistency
     return des_r_values
