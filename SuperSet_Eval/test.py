@@ -83,8 +83,6 @@ if __name__ == '__main__':
     
     for subsetdataset in cfg.data.subsetdatasets:
         print(f"Start testing {subsetdataset}...")
-        # if subsetdataset == '3DMatch':
-        #     breakpoint()
         cfg[subsetdataset].stage = 'test'
         test_loader = get_dataloader(split='test',
                                      config=cfg,
@@ -165,14 +163,35 @@ if __name__ == '__main__':
             f"correspondence_proposal_time: {average_times[5]:.4f}s "
             f"ransac_time: {average_times[6]:.4f}s ")
     
-    print("---------------Overall Test Result---------------")
+    max_length = max(len(subsetdataset) for subsetdataset in cfg.data.subsetdatasets) + 30  # Adjust padding
+    print("------------ Overall Test Result -------------")
     for i, subsetdataset in enumerate(cfg.data.subsetdatasets):
-        print(f"---------------{subsetdataset} Test Result---------------")
+        title = f" {subsetdataset} Test Result "
+        print(f"{title.center(max_length, '-')}")
         print(f'Registration Recall: {recall_list[i]:.4f}')
         print(f'RTE: {rte_list[i]:.4f}')
         print(f'RRE: {rre_list[i]:.4f}')
     print(f'Overall Registration Recall: {np.mean(recall_list):.4f}')
-
     
+    result_path = f"results/{experiment_id}"
+    if not os.path.exists(result_path):
+        os.makedirs(result_path)
+    with open(f"{result_path}/result.txt", 'w') as f:
+        # Overall Test Result
+        f.write(f"{' Overall Test Result '.center(max_length, '-')}\n")
+        
+        # Subset Test Results
+        for i, subsetdataset in enumerate(cfg.data.subsetdatasets):
+            title = f" {subsetdataset} Test Result "
+            f.write(f"{title.center(max_length, '-')}\n")
+            f.write(f'Registration Recall: {recall_list[i]:.4f}\n')
+            f.write(f'RTE: {rte_list[i]:.4f}\n')
+            f.write(f'RRE: {rre_list[i]:.4f}\n')
+
+        # Overall Registration Recall
+        f.write(f"{' Overall Registration Recall '.ljust(max_length, '-')} {np.mean(recall_list):.4f}\n")
+        
+
+        
 
 
