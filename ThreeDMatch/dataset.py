@@ -9,6 +9,8 @@ from utils.tools import get_pcd, get_keypts, loadlog
 from utils.common import make_open3d_point_cloud
 import copy
 import gc
+import pointnet2_ops.pointnet2_utils as pnt2
+
 
 
 def get_matching_indices(source, target, relt_pose, search_voxel_size):
@@ -21,6 +23,28 @@ def get_matching_indices(source, target, relt_pose, search_voxel_size):
 
     return match_inds
 
+def calculate_scale_with_percentile(pcd, low_percentile=2, high_percentile=98):
+    """
+    Calculate the scale of a point cloud using percentiles to exclude outliers.
+    
+    Args:
+        pcd (numpy.ndarray): Point cloud array of shape (N, 3).
+        low_percentile (float): Lower percentile for excluding outliers.
+        high_percentile (float): Upper percentile for excluding outliers.
+        
+    Returns:
+        float: The calculated scale of the point cloud.
+    """
+    # Compute the minimum and maximum coordinates within the percentile range
+    min_coords = np.percentile(pcd, low_percentile, axis=0)
+    max_coords = np.percentile(pcd, high_percentile, axis=0)
+    
+    # Compute the bounding box size
+    bounding_box_size = max_coords - min_coords
+    
+    # Calculate the scale as the norm of the bounding box size
+    scale = np.linalg.norm(bounding_box_size)
+    return scale
 
 class ThreeDMatchDataset(Data.Dataset):
     def __init__(self,
@@ -85,7 +109,7 @@ class ThreeDMatchDataset(Data.Dataset):
         if self.split != 'test':
             if random.random() > 0.5:
                 src_id, tgt_id = tgt_id, src_id
-
+        
         # load src fragment
         src_path = os.path.join(self.root, src_id)
         src_pcd = o3d.io.read_point_cloud(src_path + '.ply')
@@ -100,6 +124,33 @@ class ThreeDMatchDataset(Data.Dataset):
         tgt_pcd.paint_uniform_color([0, 0.651, 0.929])
         tgt_pcd = o3d.geometry.PointCloud.voxel_down_sample(tgt_pcd, voxel_size=self.config.data.downsample)
 
+        ## Uniform downsample version
+        # load src fragment
+        # src_path = os.path.join(self.root, src_id)
+        # src_pcd = o3d.io.read_point_cloud(src_path + '.ply')
+    
+        # src_pts = np.asarray(src_pcd.points)
+        # src_indices = np.arange(src_pts.shape[0])
+        # np.random.shuffle(src_indices)
+        # src_pts = src_pts[src_indices]
+        # src_pcd = make_open3d_point_cloud(src_pts)
+        # src_pcd.paint_uniform_color([1, 0.706, 0])
+        # src_pcd = o3d.geometry.PointCloud.uniform_down_sample(src_pcd, 10)
+        # src_pts = np.array(src_pcd.points)
+
+        # # load tgt fragment
+        # tgt_path = os.path.join(self.root, tgt_id)
+        # tgt_pcd = o3d.io.read_point_cloud(tgt_path + '.ply')
+
+        # tgt_pts = np.asarray(tgt_pcd.points)
+        # tgt_indices = np.arange(tgt_pts.shape[0])
+        # np.random.shuffle(tgt_indices)
+        # tgt_pts = tgt_pts[tgt_indices]
+        # tgt_pcd = make_open3d_point_cloud(tgt_pts)
+        # tgt_pcd.paint_uniform_color([0, 0.651, 0.929])
+        # tgt_pcd = o3d.geometry.PointCloud.uniform_down_sample(tgt_pcd, 10)
+        # tgt_pts = np.array(tgt_pcd.points)
+
         if self.split != 'test':
             # SO(3) augmentation
             R = rotation_matrix(3, 1)
@@ -108,6 +159,10 @@ class ThreeDMatchDataset(Data.Dataset):
             tgt_pcd.transform(aug_trans)
         tgt_pts = np.array(tgt_pcd.points)
         np.random.shuffle(tgt_pts)
+        
+        # Calculate scale for source and target point clouds
+        src_scale = calculate_scale_with_percentile(src_pts)
+        tgt_scale = calculate_scale_with_percentile(tgt_pts)
 
         # relative pose
         if self.split != 'test':
@@ -158,6 +213,8 @@ class ThreeDMatchDataset(Data.Dataset):
                 'relt_pose': relt_pose,
                 'src_sds_pts': src_kpt, # second downsampling
                 'tgt_sds_pts': tgt_kpt,
+                'src_scale': src_scale,
+                'tgt_scale': tgt_scale,
                 'src_id': src_id,
                 'tgt_id': tgt_id,
                 'voxel_size': ds_size,

@@ -88,7 +88,7 @@ if __name__ == '__main__':
     print("Test set size:", test_loader.dataset.__len__())
     data_timer, model_timer = Timer(), Timer()
 
-    overall_time = np.zeros(10)
+    overall_time = np.zeros(7)
     with torch.no_grad():
         states = []
         num_batch = len(test_loader)
@@ -100,7 +100,7 @@ if __name__ == '__main__':
 
             data_timer.toc()
             model_timer.tic()
-            trans_est, src_axis, tgt_axis, times = model(data_source)
+            trans_est, times = model(data_source)
             model_timer.toc()
 
             if trans_est is not None:
@@ -127,28 +127,28 @@ if __name__ == '__main__':
             overall_time += np.array([data_timer.diff, model_timer.diff, *times])
             torch.cuda.empty_cache()
             
-            if fail == False and i % 5 == 0:
-                src_pts, tgt_pts = data_source['src_pcd_raw'], data_source['tgt_pcd_raw']
-                src_pcd = o3d.geometry.PointCloud()
-                src_pcd.points = o3d.utility.Vector3dVector(src_pts)
-                src_pcd.paint_uniform_color([1, 0.706, 0])
+            # if fail == False and i % 5 == 0:
+            #     src_pts, tgt_pts = data_source['src_pcd_raw'], data_source['tgt_pcd_raw']
+            #     src_pcd = o3d.geometry.PointCloud()
+            #     src_pcd.points = o3d.utility.Vector3dVector(src_pts)
+            #     src_pcd.paint_uniform_color([1, 0.706, 0])
                 
-                tgt_pcd = o3d.geometry.PointCloud()
-                tgt_pcd.points = o3d.utility.Vector3dVector(tgt_pts)
-                tgt_pcd.paint_uniform_color([0, 0.651, 0.929])
+            #     tgt_pcd = o3d.geometry.PointCloud()
+            #     tgt_pcd.points = o3d.utility.Vector3dVector(tgt_pts)
+            #     tgt_pcd.paint_uniform_color([0, 0.651, 0.929])
                 
-                before_matching = src_pcd + tgt_pcd
-                o3d.io.write_point_cloud(f"results/{i}_before_matching.ply", before_matching)
+            #     before_matching = src_pcd + tgt_pcd
+            #     o3d.io.write_point_cloud(f"results/{i}_before_matching.ply", before_matching)
                 
-                src_pcd.transform(trans)
-                gt_matching = src_pcd + tgt_pcd
-                o3d.io.write_point_cloud(f"results/{i}_gt_matching.ply", gt_matching)
+            #     src_pcd.transform(trans)
+            #     gt_matching = src_pcd + tgt_pcd
+            #     o3d.io.write_point_cloud(f"results/{i}_gt_matching.ply", gt_matching)
                 
-                src_pcd.transform(np.linalg.inv(trans))
-                src_pcd.transform(trans_est)
-                pred_matching = src_pcd + tgt_pcd
-                result = "Fail" if fail else "Success"
-                o3d.io.write_point_cloud(f"results/{i}_{result}_pred_matching.ply", pred_matching)
+            #     src_pcd.transform(np.linalg.inv(trans))
+            #     src_pcd.transform(trans_est)
+            #     pred_matching = src_pcd + tgt_pcd
+            #     result = "Fail" if fail else "Success"
+            #     o3d.io.write_point_cloud(f"results/{i}_{result}_pred_matching.ply", pred_matching)
             
             if (i + 1) % 100 == 0 or i == num_batch - 1:
                 temp_states = np.array(states)
@@ -173,11 +173,8 @@ if __name__ == '__main__':
     average_times = overall_time / num_batch
     print(f"Average data_time: {average_times[0]:.4f}s "
         f"Average model_time: {average_times[1]:.4f}s ")
-    print(f"ref_time: {average_times[2]:.4f}s "
-        f"keypt_time: {average_times[3]:.4f}s "
-        f"fps_time: {average_times[4]:.4f}s "
-        f"desc_time: {average_times[5]:.4f}s "
-        f"mutual_matching_time: {average_times[6]:.4f}s "
-        f"inlier_time: {average_times[7]:.4f}s "
-        f"correspondence_proposal_time: {average_times[8]:.4f}s "
-        f"ransac_time: {average_times[9]:.4f}s ")
+    print(f"desc_time: {average_times[2]:.4f}s "
+        f"mutual_matching_time: {average_times[3]:.4f}s "
+        f"inlier_time: {average_times[4]:.4f}s "
+        f"correspondence_proposal_time: {average_times[5]:.4f}s "
+        f"ransac_time: {average_times[6]:.4f}s ")
