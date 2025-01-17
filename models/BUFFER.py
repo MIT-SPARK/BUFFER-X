@@ -509,19 +509,19 @@ def find_des_r(src_pts, src_kpts, tgt_pts, tgt_kpts):
         tolerance = 0.01  # threshold tolerance
         des_r, src_des_r, tgt_des_r = 0.0, 0.0, 0.0
 
-        while high - low > 1e-3:  # Precision threshold
-            src_des_r = (low + high) / 2.0
-            src_dists = torch.cdist(src_kpts, src_pts)  # Calculate distances
-            src_points_within_radius = (src_dists < src_des_r).int()  # Binary mask for points within radius
-            src_percentage = src_points_within_radius.sum(dim=-1).float() / src_pts.shape[0] * 100  # Percentage per keypoint
-            src_percentage = src_percentage.mean().item()  # Average percentage across keypoints
+        # while high - low > 1e-3:  # Precision threshold
+        #     src_des_r = (low + high) / 2.0
+        #     src_dists = torch.cdist(src_kpts, src_pts)  # Calculate distances
+        #     src_points_within_radius = (src_dists < src_des_r).int()  # Binary mask for points within radius
+        #     src_percentage = src_points_within_radius.sum(dim=-1).float() / src_pts.shape[0] * 100  # Percentage per keypoint
+        #     src_percentage = src_percentage.mean().item()  # Average percentage across keypoints
             
-            if src_percentage < threshold - tolerance:
-                low = src_des_r  # Increase src_des_r to capture more points
-            elif src_percentage > threshold + tolerance:
-                high = src_des_r  # Decrease src_des_r to capture fewer points
-            else:
-                break  # Close enough to the percentage
+        #     if src_percentage < threshold - tolerance:
+        #         low = src_des_r  # Increase src_des_r to capture more points
+        #     elif src_percentage > threshold + tolerance:
+        #         high = src_des_r  # Decrease src_des_r to capture fewer points
+        #     else:
+        #         break  # Close enough to the percentage
         
         low, high = 0., 5.0
         while high - low > 1e-3:
