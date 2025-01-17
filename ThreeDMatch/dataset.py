@@ -5,13 +5,11 @@ import pickle
 import open3d as o3d
 import glob
 from utils.SE3 import *
-from utils.tools import get_pcd, get_keypts, loadlog
+from utils.tools import get_pcd, get_keypts, loadlog, analyze_pointcloud_statistics, find_voxel_size
 from utils.common import make_open3d_point_cloud
 import copy
 import gc
 import pointnet2_ops.pointnet2_utils as pnt2
-
-
 
 def get_matching_indices(source, target, relt_pose, search_voxel_size):
     source = transform(source, relt_pose)
@@ -114,6 +112,11 @@ class ThreeDMatchDataset(Data.Dataset):
         src_path = os.path.join(self.root, src_id)
         src_pcd = o3d.io.read_point_cloud(src_path + '.ply')
         src_pcd.paint_uniform_color([1, 0.706, 0])
+        # results = analyze_pointcloud_statistics(src_pcd, num_sample_points=1000, voxel_size=0.015)
+        results = None
+        
+        self.config.data.downsample = find_voxel_size(src_pcd)
+        
         src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample)
         src_pts = np.array(src_pcd.points)
         np.random.shuffle(src_pts)
@@ -123,7 +126,7 @@ class ThreeDMatchDataset(Data.Dataset):
         tgt_pcd = o3d.io.read_point_cloud(tgt_path + '.ply')
         tgt_pcd.paint_uniform_color([0, 0.651, 0.929])
         tgt_pcd = o3d.geometry.PointCloud.voxel_down_sample(tgt_pcd, voxel_size=self.config.data.downsample)
-
+        
         ## Uniform downsample version
         # load src fragment
         # src_path = os.path.join(self.root, src_id)
@@ -218,7 +221,9 @@ class ThreeDMatchDataset(Data.Dataset):
                 'src_id': src_id,
                 'tgt_id': tgt_id,
                 'voxel_size': ds_size,
-                'dataset_name': self.config.data.dataset}
+                'dataset_name': self.config.data.dataset,
+                'results': results
+                }
 
     def __len__(self):
         return self.length

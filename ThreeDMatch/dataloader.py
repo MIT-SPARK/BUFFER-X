@@ -117,6 +117,7 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
     batched_features_list = []# = np.ones_like(input_points[0][:, :0]).astype(np.float32)
     batched_voxel_size_list = []
     batched_dataset_names = []
+    batched_results = []
 
     assert len(list_data) == 1
     list_data = list_data[0]
@@ -142,6 +143,7 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
     batched_features = torch.from_numpy(np.concatenate(batched_features_list, axis=0))
     batched_lengths = torch.from_numpy(np.array(batched_lengths_list)).int()
     batched_voxel_sizes = torch.from_numpy(np.array(batched_voxel_size_list))
+    batched_results.append(list_data['results'])
     # Starting radius of convolutions
     r_normal = config.data.voxel_size_0 * config.point.conv_radius
 
@@ -248,6 +250,7 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
         'tgt_id': tgt_id,
         'voxel_sizes': batched_voxel_sizes,
         'dataset_names': batched_dataset_names,
+        'results': batched_results
     }
 
     return dict_inputs

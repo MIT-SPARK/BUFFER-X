@@ -5,7 +5,7 @@ import pickle
 import open3d as o3d
 import glob
 from utils.SE3 import *
-from utils.tools import get_pcd, get_keypts, loadlog
+from utils.tools import loadlog, find_voxel_size
 from utils.common import make_open3d_point_cloud
 import copy
 import gc
@@ -66,6 +66,8 @@ class ScannetppIphoneDataset(Data.Dataset):
         src_path = os.path.join(self.root, src_id)
         src_pcd = o3d.io.read_point_cloud(src_path + '.ply')
         src_pcd.paint_uniform_color([1, 0.706, 0])
+        
+        self.config.data.downsample = find_voxel_size(src_pcd)
         src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample)
         src_pts = np.array(src_pcd.points)
         np.random.shuffle(src_pts)

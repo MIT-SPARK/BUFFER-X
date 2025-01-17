@@ -5,7 +5,7 @@ import pickle
 import open3d as o3d
 import glob
 from utils.SE3 import *
-from utils.tools import get_pcd, get_keypts, loadlog
+from utils.tools import loadlog, find_voxel_size
 from utils.common import make_open3d_point_cloud
 import copy
 import gc
@@ -60,6 +60,7 @@ class ScannetppFaroDataset(Data.Dataset):
         src_path = os.path.join(self.root, src_id)
         src_pcd = o3d.io.read_point_cloud(src_path + '.ply')
         src_pcd.paint_uniform_color([1, 0.706, 0])
+        self.config.data.voxel_size_0 = find_voxel_size(src_pcd)
         src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample)
         src_pts = np.array(src_pcd.points)
         np.random.shuffle(src_pts)
@@ -112,7 +113,7 @@ class ScannetppFaroDataset(Data.Dataset):
             src_pcd.orient_normals_towards_camera_location()
             src_noms = np.array(src_pcd.normals)
             src_kpt = np.concatenate([src_kpt, src_noms], axis=-1)
-
+            
             tgt_pcd = make_open3d_point_cloud(tgt_kpt)
             tgt_pcd.estimate_normals()
             tgt_pcd.orient_normals_towards_camera_location()

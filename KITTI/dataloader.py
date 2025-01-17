@@ -117,6 +117,7 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
     batched_features_list = []# = np.ones_like(input_points[0][:, :0]).astype(np.float32)
     batched_voxel_size_list = []
     batched_dataset_names = []
+    batched_results = []
     assert len(list_data) == 1
     list_data = list_data[0]
 
@@ -136,6 +137,7 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
     batched_lengths_list.append(len(tgt_kpt))
     batched_voxel_size_list.append(list_data['voxel_size'])
     batched_dataset_names.append(list_data['dataset_name'])
+    batched_results.append(list_data['results'])
 
     batched_points = torch.from_numpy(np.concatenate(batched_points_list, axis=0))
     batched_features = torch.from_numpy(np.concatenate(batched_features_list, axis=0))
@@ -246,6 +248,7 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
         'relt_pose': torch.from_numpy(relt_pose).float(),
         'voxel_sizes': batched_voxel_sizes,
         'dataset_names': batched_dataset_names,
+        'results': batched_results
     }
 
     return dict_inputs

@@ -4,6 +4,7 @@ import open3d as o3d
 import glob
 from utils.SE3 import *
 from utils.common import make_open3d_point_cloud
+from utils.tools import analyze_pointcloud_statistics, find_voxel_size
 
 kitti_icp_cache = {}
 kitti_cache = {}
@@ -122,7 +123,11 @@ class KITTIDataset(Data.Dataset):
 
         # process point clouds
         src_pcd = make_open3d_point_cloud(xyz0, [1, 0.706, 0])
-        src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample)
+        # results = analyze_pointcloud_statistics(src_pcd, num_sample_points=1000, voxel_size=0.2)
+        results = None
+        self.config.data.downsample = find_voxel_size(src_pcd)
+        
+        src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample) 
         src_pts = np.array(src_pcd.points)
         np.random.shuffle(src_pts)
         
@@ -204,7 +209,9 @@ class KITTIDataset(Data.Dataset):
                 'voxel_size': ds_size,
                 'src_id': '%d_%d' % (drive, t0),
                 'tgt_id': '%d_%d' % (drive, t1),
-                'dataset_name': self.config.data.dataset}
+                'dataset_name': self.config.data.dataset,
+                'results': results
+                }
 
     def apply_transform(self, pts, trans):
         R = trans[:3, :3]
