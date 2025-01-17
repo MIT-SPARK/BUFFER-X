@@ -4,6 +4,7 @@ import open3d as o3d
 import glob
 from utils.SE3 import *
 from utils.common import make_open3d_point_cloud
+from utils.tools import find_voxel_size
 
 kimera_multi_icp_cache = {}
 kimera_multi_cache = {}
@@ -56,8 +57,8 @@ class KimeraMultiDataset(Data.Dataset):
             pdist = (Ts.reshape(1, -1, 3) - Ts.reshape(-1, 1, 3)) ** 2
             pdist = np.sqrt(pdist.sum(-1))
             
-            # set valid pair threshold to 3
-            valid_pairs = pdist > 3
+            # set valid pair threshold to 5
+            valid_pairs = pdist > 5
             curr_time = inames[0]
             while curr_time in inames:
                 next_time = np.where(valid_pairs[curr_time][curr_time:curr_time + 100])[0]
@@ -89,29 +90,34 @@ class KimeraMultiDataset(Data.Dataset):
         xyz0 = np.asarray(o3d_cloud0.points, dtype=np.float32)
         xyz1 = np.asarray(o3d_cloud1.points, dtype=np.float32)
 
-        key = '%s_%06d_%06d' % (drive, t0, t1)
-        filename = self.icp_path + '/' + key + '.npy'
-        if key not in kimera_multi_icp_cache:
-            if not os.path.exists(filename):
-                M = (self.velo2cam @ positions[0].T @ np.linalg.inv(positions[1].T)
-                     @ np.linalg.inv(self.velo2cam)).T
-                xyz0_t = self.apply_transform(xyz0, M)
-                pcd0 = make_open3d_point_cloud(xyz0_t, [0.5, 0.5, 0.5])
-                pcd1 = make_open3d_point_cloud(xyz1, [0, 1, 0])
-                reg = o3d.pipelines.registration.registration_icp(pcd0, pcd1, 0.20, np.eye(4),
-                                                                  o3d.pipelines.registration.TransformationEstimationPointToPoint(),
-                                                                  o3d.pipelines.registration.ICPConvergenceCriteria(
-                                                                      max_iteration=200))
-                pcd0.transform(reg.transformation)
-                M2 = M @ reg.transformation
-                # write to a file
-                np.save(filename, M2)
-            else:
-                M2 = np.load(filename)
-            kimera_multi_icp_cache[key] = M2
-        else:
-            M2 = kimera_multi_icp_cache[key]
-        trans = M2
+        # key = '%s_%06d_%06d' % (drive, t0, t1)
+        # filename = self.icp_path + '/' + key + '.npy'
+        # if key not in kimera_multi_icp_cache:
+        #     if not os.path.exists(filename):
+        #         M = (self.velo2cam @ positions[0].T @ np.linalg.inv(positions[1].T)
+        #              @ np.linalg.inv(self.velo2cam)).T
+        #         xyz0_t = self.apply_transform(xyz0, M)
+        #         pcd0 = make_open3d_point_cloud(xyz0_t, [0.5, 0.5, 0.5])
+        #         pcd1 = make_open3d_point_cloud(xyz1, [0, 1, 0])
+        #         reg = o3d.pipelines.registration.registration_icp(pcd0, pcd1, 0.20, np.eye(4),
+        #                                                           o3d.pipelines.registration.TransformationEstimationPointToPoint(),
+        #                                                           o3d.pipelines.registration.ICPConvergenceCriteria(
+        #                                                               max_iteration=200))
+        #         pcd0.transform(reg.transformation)
+        #         M2 = M @ reg.transformation
+        #         # write to a file
+        #         np.save(filename, M2)
+        #     else:
+        #         M2 = np.load(filename)
+        #     kimera_multi_icp_cache[key] = M2
+        # else:
+        #     M2 = kimera_multi_icp_cache[key]
+        # trans = M2
+        
+        # Note (Minkyun Seo): 
+        # Above code is commented out because it does not work well for the kimera-multi dataset.
+        trans = np.linalg.inv(positions[1]) @ positions[0]
+        # np.save(filename, trans)
 
         if self.split != 'test':
             xyz0 += (np.random.rand(xyz0.shape[0], 3) - 0.5) * self.config.train.augmentation_noise
@@ -119,6 +125,7 @@ class KimeraMultiDataset(Data.Dataset):
 
         # process point clouds
         src_pcd = make_open3d_point_cloud(xyz0, [1, 0.706, 0])
+        self.config.data.downsample = find_voxel_size(src_pcd)
         src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample)
         src_pts = np.array(src_pcd.points)
         np.random.shuffle(src_pts)
