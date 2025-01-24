@@ -11,6 +11,8 @@ from Scannetpp_iphone.dataset import *
 from WOD.dataset import *
 from NewerCollege.dataset import *
 from KimeraMulti.dataset import *
+from Tiers.dataset import *
+from KAIST.dataset import *
 
 class SupersetDataset(Data.Dataset):
     def __init__(self, split, config=None, subsetdataset=None):
@@ -33,6 +35,10 @@ class SupersetDataset(Data.Dataset):
             DatasetClass = NewerCollegeDataset
         elif subsetdataset == "KimeraMulti":
             DatasetClass = KimeraMultiDataset
+        elif subsetdataset == "Tiers":
+            DatasetClass = TiersDataset
+        elif subsetdataset == "KAIST":
+            DatasetClass = KAISTDataset
         else:
             raise ValueError("Unsupported dataset class has been given")
         dataset = DatasetClass(split=split,
