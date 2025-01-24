@@ -123,34 +123,16 @@ class KITTIDataset(Data.Dataset):
 
         # process point clouds
         src_pcd = make_open3d_point_cloud(xyz0, [1, 0.706, 0])
-        # results = analyze_pointcloud_statistics(src_pcd, num_sample_points=1000, voxel_size=0.2)
-        results = None
-        self.config.data.downsample = find_voxel_size(src_pcd)
+        tgt_pcd = make_open3d_point_cloud(xyz1, [0, 0.651, 0.929])
+
+        self.config.data.downsample = find_voxel_size(src_pcd, tgt_pcd)
         
         src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample) 
         src_pts = np.array(src_pcd.points)
         np.random.shuffle(src_pts)
-        
-        # src_pts = np.asarray(src_pcd.points)
-        # src_indices = np.arange(src_pts.shape[0])
-        # np.random.shuffle(src_indices)
-        # src_pts = src_pts[src_indices]
-        # src_pcd = make_open3d_point_cloud(src_pts)
-        # src_pcd.paint_uniform_color([1, 0.706, 0])
-        # src_pcd = o3d.geometry.PointCloud.uniform_down_sample(src_pcd, 5)
-        # src_pts = np.array(src_pcd.points)
 
-        tgt_pcd = make_open3d_point_cloud(xyz1, [0, 0.651, 0.929])
         tgt_pcd = o3d.geometry.PointCloud.voxel_down_sample(tgt_pcd, voxel_size=self.config.data.downsample)
         tgt_pts = np.asarray(tgt_pcd.points)
-        
-        # tgt_indices = np.arange(tgt_pts.shape[0])
-        # np.random.shuffle(tgt_indices)
-        # tgt_pts = tgt_pts[tgt_indices]
-        # tgt_pcd = make_open3d_point_cloud(tgt_pts)
-        # tgt_pcd.paint_uniform_color([0, 0.651, 0.929])
-        # tgt_pcd = o3d.geometry.PointCloud.uniform_down_sample(tgt_pcd, 5)
-        # tgt_pts = np.array(tgt_pcd.points)
         
         if self.split != 'test':
             if self.config.stage == 'Ref':
@@ -188,18 +170,18 @@ class KITTIDataset(Data.Dataset):
             idx = np.random.choice(range(tgt_kpt.shape[0]), self.config.data.max_numPts, replace=False)
             tgt_kpt = tgt_kpt[idx]
 
-        if self.split == 'test':
-            src_pcd = make_open3d_point_cloud(src_kpt, [1, 0.706, 0])
-            src_pcd.estimate_normals()
-            src_pcd.orient_normals_towards_camera_location()
-            src_noms = np.array(src_pcd.normals)
-            src_kpt = np.concatenate([src_kpt, src_noms], axis=-1)
+        # if self.split == 'test':
+        #     src_pcd = make_open3d_point_cloud(src_kpt, [1, 0.706, 0])
+        #     src_pcd.estimate_normals()
+        #     src_pcd.orient_normals_towards_camera_location()
+        #     src_noms = np.array(src_pcd.normals)
+        #     src_kpt = np.concatenate([src_kpt, src_noms], axis=-1)
 
-            tgt_pcd = make_open3d_point_cloud(tgt_kpt, [0, 0.651, 0.929])
-            tgt_pcd.estimate_normals()
-            tgt_pcd.orient_normals_towards_camera_location()
-            tgt_noms = np.array(tgt_pcd.normals)
-            tgt_kpt = np.concatenate([tgt_kpt, tgt_noms], axis=-1)
+        #     tgt_pcd = make_open3d_point_cloud(tgt_kpt, [0, 0.651, 0.929])
+        #     tgt_pcd.estimate_normals()
+        #     tgt_pcd.orient_normals_towards_camera_location()
+        #     tgt_noms = np.array(tgt_pcd.normals)
+        #     tgt_kpt = np.concatenate([tgt_kpt, tgt_noms], axis=-1)
 
         return {'src_fds_pts': src_pts,  # first downsampling
                 'tgt_fds_pts': tgt_pts,
@@ -210,7 +192,6 @@ class KITTIDataset(Data.Dataset):
                 'src_id': '%d_%d' % (drive, t0),
                 'tgt_id': '%d_%d' % (drive, t1),
                 'dataset_name': self.config.data.dataset,
-                'results': results
                 }
 
     def apply_transform(self, pts, trans):
