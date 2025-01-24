@@ -113,8 +113,8 @@ if __name__ == '__main__':
             tgt_id = data_source['tgt_id'].split('/')[-1].split('_')[-1]
 
             ####### calculate the recall of DGR #######
-            rte_thresh = 0.3
-            rre_thresh = 15
+            rte_thresh = 0.3  ## 0.3
+            rre_thresh = 15   ## 15
             trans = data_source['relt_pose'].numpy()
             rte = np.linalg.norm(trans_est[:3, 3] - trans[:3, 3])
             rre = np.arccos(
@@ -126,29 +126,7 @@ if __name__ == '__main__':
                 fail = True
             overall_time += np.array([data_timer.diff, model_timer.diff, *times])
             torch.cuda.empty_cache()
-            
-            if fail == False:
-                src_pts, tgt_pts = data_source['src_pcd_raw'], data_source['tgt_pcd_raw']
-                src_pcd = o3d.geometry.PointCloud()
-                src_pcd.points = o3d.utility.Vector3dVector(src_pts)
-                src_pcd.paint_uniform_color([1, 0.706, 0])
-                
-                tgt_pcd = o3d.geometry.PointCloud()
-                tgt_pcd.points = o3d.utility.Vector3dVector(tgt_pts)
-                tgt_pcd.paint_uniform_color([0, 0.651, 0.929])
-                
-                before_matching = src_pcd + tgt_pcd
-                o3d.io.write_point_cloud(f"results/{i}_before_matching.ply", before_matching)
-                
-                src_pcd.transform(trans)
-                gt_matching = src_pcd + tgt_pcd
-                o3d.io.write_point_cloud(f"results/{i}_gt_matching.ply", gt_matching)
-                
-                src_pcd.transform(np.linalg.inv(trans))
-                src_pcd.transform(trans_est)
-                pred_matching = src_pcd + tgt_pcd
-                result = "Fail" if fail else "Success"
-                o3d.io.write_point_cloud(f"results/{i}_{result}_pred_matching.ply", pred_matching)
+
             
             if (i + 1) % 100 == 0 or i == num_batch - 1:
                 temp_states = np.array(states)
@@ -166,9 +144,9 @@ if __name__ == '__main__':
     RE = states[states[:, 0] == 1, 2].mean()
 
     print("---------------Test Result---------------")
-    print(f'Registration Recall: {Recall:.4f}')
-    print(f'RTE: {TE:.4f}')
-    print(f'RRE: {RE:.4f}')
+    print(f'Registration Recall: {Recall:.8f}')
+    print(f'RTE: {TE*100:.8f}')
+    print(f'RRE: {RE:.8f}')
     
     average_times = overall_time / num_batch
     print(f"Average data_time: {average_times[0]:.4f}s "
