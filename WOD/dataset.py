@@ -125,13 +125,13 @@ class WODDataset(Data.Dataset):
         
         # process point clouds
         src_pcd = make_open3d_point_cloud(xyz0, [1, 0.706, 0])
+        tgt_pcd = make_open3d_point_cloud(xyz1, [0, 0.651, 0.929])
         
-        self.config.data.voxel_size_0 = find_voxel_size(src_pcd)
+        self.config.data.downsample = find_voxel_size(src_pcd, tgt_pcd)
         src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample)
         src_pts = np.array(src_pcd.points)
         np.random.shuffle(src_pts)
 
-        tgt_pcd = make_open3d_point_cloud(xyz1, [0, 0.651, 0.929])
         tgt_pcd = o3d.geometry.PointCloud.voxel_down_sample(tgt_pcd, voxel_size=self.config.data.downsample)
 
         if self.split != 'test':
