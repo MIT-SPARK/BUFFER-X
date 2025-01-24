@@ -74,7 +74,7 @@ if __name__ == '__main__':
 
             if rte > rte_thresh or rre > rre_thresh:
               print(f"{i}th fragment fails, RRE：{rre:.4f}, RTE：{rte:.4f}")
-            # overall_time += np.array([data_timer.diff, model_timer.diff, *times])
+            overall_time += np.array([data_timer.diff, model_timer.diff, *times])
             torch.cuda.empty_cache()
             if (i + 1) % 100 == 0 or i == num_batch - 1:
                 temp_states = np.array(states)
@@ -84,16 +84,18 @@ if __name__ == '__main__':
                 print(f"[{i + 1}/{num_batch}] "
                       f"Registration Recall: {temp_recall:.4f} "
                       f"RTE: {temp_te:.4f} "
-                      f"RRE: {temp_re:.4f} ")
+                      f"RRE: {temp_re:.4f} "
+                      f"Data time: {data_timer.diff:.4f}s "
+                      f"Model time: {model_timer.diff:.4f}s ")
     states = np.array(states)
     Recall = states[:, 0].sum() / states.shape[0]
     TE = states[states[:, 0] == 1, 1].mean()
     RE = states[states[:, 0] == 1, 2].mean()
     print()
     print("---------------Test Result---------------")
-    print(f'Registration Recall: {Recall:.4f}')
-    print(f'RTE: {TE:.4f}')
-    print(f'RRE: {RE:.4f}')
+    print(f'Registration Recall: {Recall:.8f}')
+    print(f'RTE: {TE*100:.8f}')
+    print(f'RRE: {RE:.8f}')
     
     average_times = overall_time / num_batch
     print(f"Average data_time: {average_times[0]:.4f}s "

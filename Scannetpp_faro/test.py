@@ -166,9 +166,9 @@ if __name__ == '__main__':
     RE = states[states[:, 0] == 1, 2].mean()
 
     print("---------------Test Result---------------")
-    print(f'Registration Recall: {Recall:.4f}')
-    print(f'RTE: {TE:.4f}')
-    print(f'RRE: {RE:.4f}')
+    print(f'Registration Recall: {Recall:.8f}')
+    print(f'RTE: {TE*100:.8f}')
+    print(f'RRE: {RE:.8f}')
     
     average_times = overall_time / num_batch
     print(f"Average data_time: {average_times[0]:.4f}s "
