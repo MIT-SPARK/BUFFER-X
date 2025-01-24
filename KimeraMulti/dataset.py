@@ -4,6 +4,7 @@ import open3d as o3d
 import glob
 from utils.SE3 import *
 from utils.common import make_open3d_point_cloud
+from utils.tools import find_voxel_size
 
 kimera_multi_icp_cache = {}
 kimera_multi_cache = {}
@@ -39,7 +40,8 @@ class KimeraMultiDataset(Data.Dataset):
         self.files = {'train': [], 'val': [], 'test': []}
         self.poses = []
         self.length = 0
-
+        # self.pdist = config.data.pdist
+        self.pdist = 5
         self.prepare_kimera_multi_ply(split=self.split)
 
     def prepare_kimera_multi_ply(self, split='train'):
@@ -56,8 +58,8 @@ class KimeraMultiDataset(Data.Dataset):
             pdist = (Ts.reshape(1, -1, 3) - Ts.reshape(-1, 1, 3)) ** 2
             pdist = np.sqrt(pdist.sum(-1))
             
-            # set valid pair threshold to 3
-            valid_pairs = pdist > 3
+            # set valid pair threshold to 5
+            valid_pairs = pdist > self.pdist
             curr_time = inames[0]
             while curr_time in inames:
                 next_time = np.where(valid_pairs[curr_time][curr_time:curr_time + 100])[0]
@@ -88,30 +90,11 @@ class KimeraMultiDataset(Data.Dataset):
         o3d_cloud1 = o3d.io.read_point_cloud(fname1)
         xyz0 = np.asarray(o3d_cloud0.points, dtype=np.float32)
         xyz1 = np.asarray(o3d_cloud1.points, dtype=np.float32)
-
-        key = '%s_%06d_%06d' % (drive, t0, t1)
-        filename = self.icp_path + '/' + key + '.npy'
-        if key not in kimera_multi_icp_cache:
-            if not os.path.exists(filename):
-                M = (self.velo2cam @ positions[0].T @ np.linalg.inv(positions[1].T)
-                     @ np.linalg.inv(self.velo2cam)).T
-                xyz0_t = self.apply_transform(xyz0, M)
-                pcd0 = make_open3d_point_cloud(xyz0_t, [0.5, 0.5, 0.5])
-                pcd1 = make_open3d_point_cloud(xyz1, [0, 1, 0])
-                reg = o3d.pipelines.registration.registration_icp(pcd0, pcd1, 0.20, np.eye(4),
-                                                                  o3d.pipelines.registration.TransformationEstimationPointToPoint(),
-                                                                  o3d.pipelines.registration.ICPConvergenceCriteria(
-                                                                      max_iteration=200))
-                pcd0.transform(reg.transformation)
-                M2 = M @ reg.transformation
-                # write to a file
-                np.save(filename, M2)
-            else:
-                M2 = np.load(filename)
-            kimera_multi_icp_cache[key] = M2
-        else:
-            M2 = kimera_multi_icp_cache[key]
-        trans = M2
+        
+        # Note (Minkyun Seo): 
+        # Above code is commented out because it does not work well for the kimera-multi dataset.
+        trans = np.linalg.inv(positions[1]) @ positions[0]
+        # np.save(filename, trans)
 
         if self.split != 'test':
             xyz0 += (np.random.rand(xyz0.shape[0], 3) - 0.5) * self.config.train.augmentation_noise
@@ -119,11 +102,14 @@ class KimeraMultiDataset(Data.Dataset):
 
         # process point clouds
         src_pcd = make_open3d_point_cloud(xyz0, [1, 0.706, 0])
+        tgt_pcd = make_open3d_point_cloud(xyz1, [0, 0.651, 0.929])
+        
+        self.config.data.downsample = find_voxel_size(src_pcd, tgt_pcd)
+        
         src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample)
         src_pts = np.array(src_pcd.points)
         np.random.shuffle(src_pts)
 
-        tgt_pcd = make_open3d_point_cloud(xyz1, [0, 0.651, 0.929])
         tgt_pcd = o3d.geometry.PointCloud.voxel_down_sample(tgt_pcd, voxel_size=self.config.data.downsample)
 
         if self.split != 'test':
@@ -190,20 +176,6 @@ class KimeraMultiDataset(Data.Dataset):
         T = trans[:3, 3]
         pts = pts @ R.T + T
         return pts
-
-    @property
-    def velo2cam(self):
-        try:
-            velo2cam = self._velo2cam
-        except AttributeError:
-            R = np.array([
-                7.533745e-03, -9.999714e-01, -6.166020e-04, 1.480249e-02, 7.280733e-04,
-                -9.998902e-01, 9.998621e-01, 7.523790e-03, 1.480755e-02
-            ]).reshape(3, 3)
-            T = np.array([-4.069766e-03, -7.631618e-02, -2.717806e-01]).reshape(3, 1)
-            velo2cam = np.hstack([R, T])
-            self._velo2cam = np.vstack((velo2cam, [0, 0, 0, 1])).T
-        return self._velo2cam
 
     def get_video_odometry(self, drive, indices=None, ext='.txt', return_all=False):
         data_path = self.pc_path + '/%s/poses.txt' % drive

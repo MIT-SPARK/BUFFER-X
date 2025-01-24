@@ -19,6 +19,8 @@ from Scannetpp_iphone.config import make_cfg as scannetpp_iphone_make_cfg
 from WOD.config import make_cfg as wod_make_cfg
 from NewerCollege.config import make_cfg as newercollege_make_cfg
 from KimeraMulti.config import make_cfg as kimeramulti_make_cfg
+from Tiers.config import make_cfg as tiers_make_cfg
+from KAIST.config import make_cfg as kaist_make_cfg
 
 from SuperSet_Eval.config import make_cfg
 from utils.timer import Timer
@@ -35,7 +37,7 @@ if __name__ == '__main__':
     print("Start testing...")
     cfg = make_cfg()
     indoor_datasets = ['3DMatch', 'Scannetpp_faro', 'Scannetpp_iphone']
-    outdoor_datasets = ['KITTI', 'WOD', 'NewerCollege', 'KimeraMulti']
+    outdoor_datasets = ['KITTI', 'WOD', 'NewerCollege', 'KimeraMulti', 'Tiers', 'KAIST']
     for subsetdataset in cfg.data.subsetdatasets:
         if (subsetdataset == 'KITTI'):
             cfg_tmp = kitti_make_cfg()
@@ -51,6 +53,10 @@ if __name__ == '__main__':
             cfg_tmp = newercollege_make_cfg()
         elif (subsetdataset == 'KimeraMulti'):
             cfg_tmp = kimeramulti_make_cfg()
+        elif (subsetdataset == 'Tiers'):
+            cfg_tmp = tiers_make_cfg()
+        elif (subsetdataset == 'KAIST'):
+            cfg_tmp = kaist_make_cfg()
         else:
             raise ValueError("Unsupported dataset name has been given")
         cfg_tmp.stage = 'test'
@@ -130,7 +136,7 @@ if __name__ == '__main__':
 
                 if rte > rte_thresh or rre > rre_thresh:
                     print(f"{i}th fragment fails, RRE：{rre:.4f}, RTE：{rte:.4f}")
-                # overall_time += np.array([data_timer.diff, model_timer.diff, *times])
+                overall_time += np.array([data_timer.diff, model_timer.diff, *times])
                 torch.cuda.empty_cache()
                 if (i + 1) % 100 == 0 or i == num_batch - 1:
                     temp_states = np.array(states)
@@ -164,14 +170,15 @@ if __name__ == '__main__':
             f"ransac_time: {average_times[6]:.4f}s ")
     
     max_length = max(len(subsetdataset) for subsetdataset in cfg.data.subsetdatasets) + 30  # Adjust padding
-    print("------------ Overall Test Result -------------")
+    print(f"{' Overall Test Result '.center(max_length, '-')}")
     for i, subsetdataset in enumerate(cfg.data.subsetdatasets):
         title = f" {subsetdataset} Test Result "
         print(f"{title.center(max_length, '-')}")
-        print(f'Registration Recall: {recall_list[i]:.4f}')
-        print(f'RTE: {rte_list[i]:.4f}')
-        print(f'RRE: {rre_list[i]:.4f}')
-    print(f'Overall Registration Recall: {np.mean(recall_list):.4f}')
+        print(f'Registration Recall: {recall_list[i]:.8f}')
+        print(f'RTE: {rte_list[i]*100:.8f}')
+        print(f'RRE: {rre_list[i]:.8f}')
+    print('-' * max_length)
+    print(f'Overall Registration Recall: {np.mean(recall_list):.8f}')
     
     result_path = f"results/{experiment_id}"
     if not os.path.exists(result_path):
@@ -184,12 +191,14 @@ if __name__ == '__main__':
         for i, subsetdataset in enumerate(cfg.data.subsetdatasets):
             title = f" {subsetdataset} Test Result "
             f.write(f"{title.center(max_length, '-')}\n")
-            f.write(f'Registration Recall: {recall_list[i]:.4f}\n')
-            f.write(f'RTE: {rte_list[i]:.4f}\n')
-            f.write(f'RRE: {rre_list[i]:.4f}\n')
+            f.write(f'Registration Recall: {recall_list[i]:.8f}\n')
+            f.write(f'RTE: {rte_list[i]*100:.8f}\n')
+            f.write(f'RRE: {rre_list[i]:.8f}\n')
 
         # Overall Registration Recall
-        f.write(f"{' Overall Registration Recall '.ljust(max_length, '-')} {np.mean(recall_list):.4f}\n")
+        # fill only - until max length
+        f.write('-' * max_length + '\n')
+        f.write(f"{' Overall Registration Recall '} {np.mean(recall_list):.8f}\n")
         
 
         

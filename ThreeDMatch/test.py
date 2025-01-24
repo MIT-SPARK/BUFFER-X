@@ -284,7 +284,9 @@ if __name__ == '__main__':
                 print(f"[{i + 1}/{num_batch}] "
                       f"Registration Recall: {temp_recall:.4f} "
                       f"RTE: {temp_te:.4f} "
-                      f"RRE: {temp_re:.4f} ")
+                      f"RRE: {temp_re:.4f} "
+                      f"data_time: {data_timer.diff:.4f}s "
+                      f"model_time: {model_timer.diff:.4f}s ")
 
     states = np.array(states)
     Recall = states[:, 0].sum() / states.shape[0]
@@ -313,10 +315,10 @@ if __name__ == '__main__':
         recall.append(temp_recall)
     print()
     print("---------------Test Result---------------")
-    print(f'Registration Recall: {Recall:.4f}')
-    print(f'Registration Recall (3DMatch setting): {np.array(recall).mean():.4f}')
-    print(f'RTE: {TE:.4f}')
-    print(f'RRE: {RE:.4f}')
+    print(f'Registration Recall: {Recall:.8f}')
+    print(f'Registration Recall (3DMatch setting): {np.array(recall).mean():.8f}')
+    print(f'RTE: {TE*100:.8f}')
+    print(f'RRE: {RE:.8f}')
     
     average_times = overall_time / num_batch
     print(f"Average data_time: {average_times[0]:.4f}s "

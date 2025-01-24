@@ -11,6 +11,7 @@ import kornia.geometry.conversions as Convert
 import open3d as o3d
 from ThreeDMatch.dataset import make_open3d_point_cloud
 from utils.timer import Timer
+import numpy as np
 
 
 class EquiMatch(nn.Module):
@@ -123,12 +124,13 @@ class buffer(nn.Module):
             -
         """
 
-        src_pts, tgt_pts = data_source['src_pcd'], data_source['tgt_pcd']
+        # src_pts, tgt_pts = data_source['src_pcd'], data_source['tgt_pcd']
         src_pcd_raw, tgt_pcd_raw = data_source['src_pcd_raw'], data_source['tgt_pcd_raw']
-        len_src_f = data_source['stack_lengths'][0][0]
+        # len_src_f = data_source['stack_lengths'][0][0]
 
         if self.config.stage != 'test':
-
+            
+            src_pts, tgt_pts = data_source['src_pcd'], data_source['tgt_pcd']
             # find positive correspondences
             gt_trans = data_source['relt_pose']
             match_inds = self.get_matching_indices(src_pts, tgt_pts, gt_trans, data_source['voxel_sizes'][0])
@@ -210,8 +212,8 @@ class buffer(nn.Module):
             src_pcd_raw, tgt_pcd_raw = data_source['src_pcd_raw'], data_source['tgt_pcd_raw']
             
             
-            len_src_f = data_source['stack_lengths'][0][0]
-            gt_trans = data_source['relt_pose']
+            # len_src_f = data_source['stack_lengths'][0][0]
+            # gt_trans = data_source['relt_pose']
             
             if self.config['data']['dataset'] == 'SuperSet':
                 dataset_name = data_source["dataset_names"][0]
@@ -230,23 +232,6 @@ class buffer(nn.Module):
  
             # calculate descriptor
             # TODO
-            # Implement radius selection module
-            
-            # src = self.Desc(src_pcd_raw[None], kpts1, dataset_name, k_axis1)
-            # tgt = self.Desc(tgt_pcd_raw[None], kpts2, dataset_name, k_axis2)
-
-            # src_scale, tgt_scale = data_source['src_scale'], data_source['tgt_scale']
-            # min_scale = min(src_scale, tgt_scale)
-            # des_r_list = [round(min_scale * factor, 2) for factor in [0.05, 0.10, 0.15]]
-            
-            # indoor_datasets = {'3DMatch', '3DLoMatch', 'NSS', 'Scannetpp_iphone', 'Scannetpp_faro'}
-            # outdoor_datasets = {'KITTI', 'ETH', 'WOD', 'NewerCollege', 'KimeraMulti'}
-            
-            # # Naive implementation (need to modify)
-            # if dataset_name in indoor_datasets:
-            #     des_r_list = [0.15, 0.3, 0.45]
-            # else:
-            #     des_r_list = [2.0, 3.0, 4.0]
             
             des_r_list = find_des_r(src_pcd_raw, kpts1, tgt_pcd_raw, kpts2)
     
@@ -258,7 +243,7 @@ class buffer(nn.Module):
             desc_timer = Timer()
             desc_timer.tic()
             for i, des_r in enumerate(des_r_list):
-                cfg.point.num_keypts = num_keypts_list[i]
+                cfg.point.num_keypts = num_keypts_list[i] 
                 s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
                 s_fps_idx = pnt2.furthest_point_sample(src_pts[None], cfg.point.num_keypts)
                 t_fps_idx = pnt2.furthest_point_sample(tgt_pts[None], cfg.point.num_keypts)
@@ -504,40 +489,38 @@ def find_des_r(src_pts, src_kpts, tgt_pts, tgt_kpts):
     # breakpoint()
     thresholds = [0.5, 2, 5]  # percentage thresholds
     des_r_values = []
+    
+    if src_pts.shape[0] > tgt_pts.shape[0]:
+        pts = src_pts
+        kpts = src_kpts
+    else:
+        pts = tgt_pts    
+        kpts = tgt_kpts
+    
     for threshold in thresholds:
         low, high = 0., 5.0  # Start with a wide search range for des_r
         tolerance = 0.01  # threshold tolerance
-        des_r, src_des_r, tgt_des_r = 0.0, 0.0, 0.0
+        
+        des_r = 0.0
+        
+        if pts.shape[0] > 200000:
+            pts = pts[torch.randint(0, pts.shape[0], (200000,))]
 
         while high - low > 1e-3:  # Precision threshold
-            src_des_r = (low + high) / 2.0
-            src_dists = torch.cdist(src_kpts, src_pts)  # Calculate distances
-            src_points_within_radius = (src_dists < src_des_r).int()  # Binary mask for points within radius
-            src_percentage = src_points_within_radius.sum(dim=-1).float() / src_pts.shape[0] * 100  # Percentage per keypoint
-            src_percentage = src_percentage.mean().item()  # Average percentage across keypoints
+            des_r = (low + high) / 2.0
+            dists = torch.cdist(kpts, pts)  # Calculate distances
+            points_within_radius = (dists < des_r).int()  # Binary mask for points within radius
+            percentage = points_within_radius.sum(dim=-1).float() / pts.shape[0] * 100  # Percentage per keypoint
+            percentage = percentage.mean().item()  # Average percentage across keypoints
             
-            if src_percentage < threshold - tolerance:
-                low = src_des_r  # Increase src_des_r to capture more points
-            elif src_percentage > threshold + tolerance:
-                high = src_des_r  # Decrease src_des_r to capture fewer points
+            if percentage < threshold - tolerance:
+                low = des_r  # Increase des_r to capture more points
+            elif percentage > threshold + tolerance:
+                high = des_r  # Decrease des_r to capture fewer points
             else:
                 break  # Close enough to the percentage
-        
-        low, high = 0., 5.0
-        while high - low > 1e-3:
-            tgt_des_r = (low + high) / 2.0
-            tgt_dists = torch.cdist(tgt_kpts, tgt_pts)
-            tgt_points_within_radius = (tgt_dists < tgt_des_r).int()
-            tgt_percentage = tgt_points_within_radius.sum(dim=-1).float() / tgt_pts.shape[0] * 100
-            tgt_percentage = tgt_percentage.mean().item()
-            
-            if tgt_percentage < threshold - tolerance:
-                low = tgt_des_r
-            elif tgt_percentage > threshold + tolerance:
-                high = tgt_des_r
-            else:
-                break
-        
-        des_r = tgt_des_r
+
         des_r_values.append(round(des_r, 2))  # Round to 2 decimal places for consistency
+        
+        # print(des_r)
     return des_r_values

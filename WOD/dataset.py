@@ -4,6 +4,7 @@ import open3d as o3d
 import glob
 from utils.SE3 import *
 from utils.common import make_open3d_point_cloud
+from utils.tools import find_voxel_size
 
 wod_icp_cache = {}
 wod_cache = {}
@@ -121,13 +122,16 @@ class WODDataset(Data.Dataset):
             xyz0 += (np.random.rand(xyz0.shape[0], 3) - 0.5) * self.config.train.augmentation_noise
             xyz1 += (np.random.rand(xyz1.shape[0], 3) - 0.5) * self.config.train.augmentation_noise
 
+        
         # process point clouds
         src_pcd = make_open3d_point_cloud(xyz0, [1, 0.706, 0])
+        tgt_pcd = make_open3d_point_cloud(xyz1, [0, 0.651, 0.929])
+        
+        self.config.data.downsample = find_voxel_size(src_pcd, tgt_pcd)
         src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample)
         src_pts = np.array(src_pcd.points)
         np.random.shuffle(src_pts)
 
-        tgt_pcd = make_open3d_point_cloud(xyz1, [0, 0.651, 0.929])
         tgt_pcd = o3d.geometry.PointCloud.voxel_down_sample(tgt_pcd, voxel_size=self.config.data.downsample)
 
         if self.split != 'test':
