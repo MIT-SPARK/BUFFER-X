@@ -1,6 +1,19 @@
 [![License CC BY-NC-SA 4.0](https://img.shields.io/badge/license-CC4.0-blue.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode)
 
+## 민균 코멘트
+
+주요 변경점
+- SuperSet_Eval을 통해 한 번에 Eval 가능 (단, 3DMatch의 경우 3DMatch Setting은 따로 해줘야 함)
+- utils/tools.py에 있는 find_voxel_size 함수를 이용하여 voxel size를 정하도록 수정함
+- models/BUFFER.py에 있는 find_des_r 함수를 이용하여 radius를 정하도록 수정함
+- 기존 BUFFER의 point_learner 부분 삭제 (사실 point_learner.py 삭제해도 됨)
+- dataset.py에 있는 second downsample도 test 시점에는 완전히 불필요함. + Normal 계산도 마찬가지
+ 단, 추후 training 과정에서 필요할까봐 남겨둠.
+- snapshot에서 pretrained weight는 3DMatch, KITTI 중 고르면 됨.
+- 현재 유일하게 자동화하지 않은 부분은 RANSAC param. 
+
 테스트 환경
+(민균 기준 BUFFER의 환경 그대로 사용함)
 - Python 3.10 
 - Cuda 11.8 
 - Cudnn 8 
