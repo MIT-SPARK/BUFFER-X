@@ -192,7 +192,7 @@ class NewerCollegeDataset(Data.Dataset):
         return self._velo2cam
 
     def get_video_odometry(self, drive, indices=None, ext='.txt', return_all=False):
-        data_path = self.pc_path + '/%s/poses.txt' % drive
+        data_path = self.pc_path + '/%s/poses_kitti.txt' % drive
         if data_path not in newer_college_cache:
             newer_college_cache[data_path] = np.genfromtxt(data_path)
         if return_all:
