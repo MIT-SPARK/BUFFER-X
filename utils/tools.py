@@ -133,7 +133,7 @@ def analyze_pointcloud_statistics(pcd, num_sample_points=1000, voxel_size=0.05):
         "total_points": total_points,
     }
     
-def find_voxel_size(pcd):
+def find_voxel_size(src_pcd, tgt_pcd):
     """
     Finds the voxel_size corresponding to the given target percentages of points within the radius.
 
@@ -144,7 +144,15 @@ def find_voxel_size(pcd):
     Returns:
         list: The calculated voxel_size for the given percentages.
     """
-    points = np.asarray(pcd.points)
+    src_pts = np.asarray(src_pcd.points)
+    tgt_pts = np.asarray(tgt_pcd.points)
+    
+    if src_pts.shape[0] > tgt_pts.shape[0]:
+        points = src_pts
+    else:
+        points = tgt_pts
+    
+    # points = np.asarray(pcd.points)
     points_num = points.shape[0]
     sample_size = int(points_num / 10)
     sampled_indices = np.random.choice(points_num, size=sample_size, replace=False)
