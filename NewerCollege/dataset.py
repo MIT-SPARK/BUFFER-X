@@ -40,7 +40,8 @@ class NewerCollegeDataset(Data.Dataset):
         self.files = {'train': [], 'val': [], 'test': []}
         self.poses = []
         self.length = 0
-
+        # self.pdist = config.data.pdist
+        self.pdist = 5
         self.prepare_newer_college_ply(split=self.split)
 
     def prepare_newer_college_ply(self, split='train'):
@@ -58,7 +59,7 @@ class NewerCollegeDataset(Data.Dataset):
             pdist = np.sqrt(pdist.sum(-1))
             
             # set valid pair threshold to 3
-            valid_pairs = pdist > 5
+            valid_pairs = pdist > self.pdist
             curr_time = inames[0]
             while curr_time in inames:
                 next_time = np.where(valid_pairs[curr_time][curr_time:curr_time + 100])[0]
@@ -90,30 +91,6 @@ class NewerCollegeDataset(Data.Dataset):
         xyz0 = np.asarray(o3d_cloud0.points, dtype=np.float32)
         xyz1 = np.asarray(o3d_cloud1.points, dtype=np.float32)
 
-        # key = '%s_%06d_%06d' % (drive, t0, t1)
-        # filename = self.icp_path + '/' + key + '.npy'
-        # if key not in newer_college_icp_cache:
-        #     if not os.path.exists(filename):
-        #         M = (self.velo2cam @ positions[0].T @ np.linalg.inv(positions[1].T)
-        #              @ np.linalg.inv(self.velo2cam)).T
-        #         xyz0_t = self.apply_transform(xyz0, M)
-        #         pcd0 = make_open3d_point_cloud(xyz0_t, [0.5, 0.5, 0.5])
-        #         pcd1 = make_open3d_point_cloud(xyz1, [0, 1, 0])
-        #         reg = o3d.pipelines.registration.registration_icp(pcd0, pcd1, 0.20, np.eye(4),
-        #                                                           o3d.pipelines.registration.TransformationEstimationPointToPoint(),
-        #                                                           o3d.pipelines.registration.ICPConvergenceCriteria(
-        #                                                               max_iteration=200))
-        #         pcd0.transform(reg.transformation)
-        #         M2 = M @ reg.transformation
-        #         # write to a file
-        #         np.save(filename, M2)
-        #     else:
-        #         M2 = np.load(filename)
-        #     newer_college_icp_cache[key] = M2
-        # else:
-        #     M2 = newer_college_icp_cache[key]
-        # trans = M2
-        
         # Note (Minkyun Seo): 
         # Above code is commented out because it does not work well for the newer college dataset.
         trans = np.linalg.inv(positions[1]) @ positions[0]
@@ -125,12 +102,14 @@ class NewerCollegeDataset(Data.Dataset):
 
         # process point clouds
         src_pcd = make_open3d_point_cloud(xyz0, [1, 0.706, 0])
-        self.config.data.downsample = find_voxel_size(src_pcd)
+        tgt_pcd = make_open3d_point_cloud(xyz1, [0, 0.651, 0.929])
+
+        self.config.data.downsample = find_voxel_size(src_pcd, tgt_pcd)
+        
         src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample)
         src_pts = np.array(src_pcd.points)
         np.random.shuffle(src_pts)
 
-        tgt_pcd = make_open3d_point_cloud(xyz1, [0, 0.651, 0.929])
         tgt_pcd = o3d.geometry.PointCloud.voxel_down_sample(tgt_pcd, voxel_size=self.config.data.downsample)
 
         if self.split != 'test':
@@ -169,18 +148,18 @@ class NewerCollegeDataset(Data.Dataset):
             idx = np.random.choice(range(tgt_kpt.shape[0]), self.config.data.max_numPts, replace=False)
             tgt_kpt = tgt_kpt[idx]
 
-        if self.split == 'test':
-            src_pcd = make_open3d_point_cloud(src_kpt, [1, 0.706, 0])
-            src_pcd.estimate_normals()
-            src_pcd.orient_normals_towards_camera_location()
-            src_noms = np.array(src_pcd.normals)
-            src_kpt = np.concatenate([src_kpt, src_noms], axis=-1)
+        # if self.split == 'test':
+        #     src_pcd = make_open3d_point_cloud(src_kpt, [1, 0.706, 0])
+        #     src_pcd.estimate_normals()
+        #     src_pcd.orient_normals_towards_camera_location()
+        #     src_noms = np.array(src_pcd.normals)
+        #     src_kpt = np.concatenate([src_kpt, src_noms], axis=-1)
 
-            tgt_pcd = make_open3d_point_cloud(tgt_kpt, [0, 0.651, 0.929])
-            tgt_pcd.estimate_normals()
-            tgt_pcd.orient_normals_towards_camera_location()
-            tgt_noms = np.array(tgt_pcd.normals)
-            tgt_kpt = np.concatenate([tgt_kpt, tgt_noms], axis=-1)
+        #     tgt_pcd = make_open3d_point_cloud(tgt_kpt, [0, 0.651, 0.929])
+        #     tgt_pcd.estimate_normals()
+        #     tgt_pcd.orient_normals_towards_camera_location()
+        #     tgt_noms = np.array(tgt_pcd.normals)
+        #     tgt_kpt = np.concatenate([tgt_kpt, tgt_noms], axis=-1)
 
         return {'src_fds_pts': src_pts,  # first downsampling
                 'tgt_fds_pts': tgt_pts,
