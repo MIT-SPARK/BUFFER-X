@@ -22,8 +22,7 @@ _C.train.batch_size = 1
 _C.train.num_workers = 0
 _C.train.pos_num = 512
 _C.train.augmentation_noise = 0.001
-_C.train.pretrain_model = '06132318'
-# _C.train.all_stage = ['Ref', 'Desc', 'Keypt', 'Inlier']
+_C.train.pretrain_model = ''
 _C.train.all_stage = ['Desc', 'Inlier']
 
 # test
@@ -33,10 +32,10 @@ _C.test.pose_refine = True
 
 # optim
 _C.optim = edict()
-_C.optim.lr = {'Ref': 0.005, 'Desc':0.001, 'Keypt':0.001, 'Inlier':0.001}
+_C.optim.lr = {'Desc':0.001, 'Inlier':0.001}
 _C.optim.lr_decay = 0.50
 _C.optim.weight_decay = 1e-6
-_C.optim.scheduler_interval = {'Ref': 1, 'Desc':2, 'Keypt':1, 'Inlier':1}
+_C.optim.scheduler_interval = {'Desc':2, 'Inlier':1}
 
 # point-wise learner
 _C.point = edict()
