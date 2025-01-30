@@ -7,10 +7,41 @@
 - utils/tools.py에 있는 find_voxel_size 함수를 이용하여 voxel size를 정하도록 수정함
 - models/BUFFER.py에 있는 find_des_r 함수를 이용하여 radius를 정하도록 수정함
 - 기존 BUFFER의 point_learner 부분 삭제 (사실 point_learner.py 삭제해도 됨)
+- 3가지 scale의 radius로 매칭
 - dataset.py에 있는 second downsample도 test 시점에는 완전히 불필요함. + Normal 계산도 마찬가지
  단, 추후 training 과정에서 필요할까봐 남겨둠.
 - snapshot에서 pretrained weight는 3DMatch, KITTI 중 고르면 됨.
-- 현재 유일하게 자동화하지 않은 부분은 RANSAC param. 
+- 현재 유일하게 자동화하지 않은 부분은 RANSAC param.
+
+## Train & Test 
+
+### Training 관련
+
+- Train Dataset에 대한 Prior knowledge는 있다고 판단
+- 따라서, Train Dataset에 대한 Voxel Size, Radius는 지정해준 값을 일단 사용 중 (BUFFER와 동일)
+- 하지만, Train 시점에서부터 Voxel Size, Radius를 동적으로 사용하는 것도 테스트 예정
+  (일종의 augmentation 기대)
+- Training은 3DMatch, KITTI에서만 하는 것으로
+
+### 3DMatch
+
+```
+cd ./ThreeDMatch
+python train.py
+python test.py
+```
+
+### Superset Eval
+
+```
+cd ./SuperSet_eval
+python test.py
+```
+
+### Todo
+- Voxel size 찾는 부분 속도 개선
+- 3 Scale Matching 시간 개선 (병렬화 필요)
+- RANSAC param 자동화
 
 테스트 환경
 (민균 기준 BUFFER의 환경 그대로 사용함)

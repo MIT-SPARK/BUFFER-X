@@ -23,19 +23,19 @@ _C.train.num_workers = 0
 _C.train.pos_num = 512
 _C.train.augmentation_noise = 0.01
 _C.train.pretrain_model = ''
-_C.train.all_stage = ['Ref', 'Desc', 'Keypt', 'Inlier']
+_C.train.all_stage = ['Desc', 'Inlier']
 
 # test
 _C.test = edict()
-_C.test.experiment_id = '06050001'
+_C.test.experiment_id = 'KITTI'
 _C.test.pose_refine = False
 
 # optim
 _C.optim = edict()
-_C.optim.lr = {'Ref': 0.005, 'Desc':0.001, 'Keypt':0.001, 'Inlier':0.001}
+_C.optim.lr = {'Desc':0.001, 'Inlier':0.001}
 _C.optim.lr_decay = 0.50
 _C.optim.weight_decay = 1e-6
-_C.optim.scheduler_interval = {'Ref': 5, 'Desc':10, 'Keypt':5, 'Inlier':5}
+_C.optim.scheduler_interval = {'Desc':10, 'Inlier':5}
 
 # point-wise learner
 _C.point = edict()

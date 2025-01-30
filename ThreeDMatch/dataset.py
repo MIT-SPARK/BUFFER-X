@@ -116,7 +116,8 @@ class ThreeDMatchDataset(Data.Dataset):
         tgt_path = os.path.join(self.root, tgt_id)
         tgt_pcd = o3d.io.read_point_cloud(tgt_path + '.ply')
         
-        self.config.data.downsample = find_voxel_size(src_pcd, tgt_pcd)
+        if self.split == 'test':
+            self.config.data.downsample = find_voxel_size(src_pcd, tgt_pcd)
         
         src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample)
         src_pts = np.array(src_pcd.points)
