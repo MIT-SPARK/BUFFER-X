@@ -126,9 +126,9 @@ class Cylindrical_UNet(nn.Module):
         return nn.Sequential(*layers)
     
     def forward(self, x):
-        x = utils.common.pad_image_3d(x, kernel_size=3)
+        
         # Conv3D Feature Extraction
-        x = self.conv3d(x)
+        x = self.conv3d(utils.common.pad_image_3d(x, kernel_size=3))
         x = x.squeeze(2)  # Squeeze 3D output to 2D
 
         # U-Net Encoder
