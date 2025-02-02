@@ -1,7 +1,7 @@
 import gc
 from utils.SE3 import *
 from utils.timer import Timer, AverageMeter
-from loss.desc_loss import ContrastiveLoss, cdist
+from loss.desc_loss import ContrastiveLoss, cdist, ContrastiveLossWithSOS
 from tensorboardX import SummaryWriter
 from utils.common import make_open3d_point_cloud, ensure_dir
 
@@ -24,7 +24,7 @@ class Trainer(object):
         self.train_loader = args.train_loader
         self.val_loader = args.val_loader
 
-        self.desc_loss = ContrastiveLoss()
+        self.desc_loss = ContrastiveLossWithSOS()
         self.class_loss = torch.nn.CrossEntropyLoss()
         self.L1_loss = torch.nn.L1Loss()
 

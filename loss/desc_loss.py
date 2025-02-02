@@ -55,8 +55,6 @@ def cdist(a, b, metric='euclidean'):
     else:
         raise NotImplementedError(
             'The following metric is not implemented by `cdist` yet: {}'.format(metric))
-
-
 class ContrastiveLoss(nn.Module):
     def __init__(self, pos_margin=0.1, neg_margin=1.4, metric='euclidean', safe_radius=0.10):
         super(ContrastiveLoss, self).__init__()
@@ -108,6 +106,73 @@ class ContrastiveLoss(nn.Module):
 
         return torch.mean(loss), closest_negative / (furthest_positive+1e-6), accuracy #
 
+class ContrastiveLossWithSOS(ContrastiveLoss):
+    def __init__(self, pos_margin=0.1, neg_margin=1.4, metric='euclidean', safe_radius=0.10, sos_weight=0.1):
+        """
+        Contrastive Loss with Second-Order Similarity Regularization (SOS).
+        Inherits from ContrastiveLoss.
+
+        Args:
+            pos_margin (float): Margin for positive pairs.
+            neg_margin (float): Margin for negative pairs.
+            metric (str): Distance metric ('euclidean', 'sqeuclidean', or 'cityblock').
+            safe_radius (float): Radius to filter keypoints.
+            sos_weight (float): Weight for the SOS Regularization term.
+        """
+        super(ContrastiveLossWithSOS, self).__init__(pos_margin, neg_margin, metric, safe_radius)
+        self.sos_weight = sos_weight
+
+    def sos_regularization(self, anchor, positive):
+        """
+        Compute Second-Order Similarity Regularization Loss.
+
+        Args:
+            anchor (torch.Tensor): Anchor descriptors of shape (B, C).
+            positive (torch.Tensor): Positive descriptors of shape (B, C).
+
+        Returns:
+            torch.Tensor: SOS Regularization loss.
+        """
+        # Pairwise distances within anchor and positive
+        d_x = torch.cdist(anchor, anchor, p=2)  # d(x_i, x_j)
+        d_xp = torch.cdist(positive, positive, p=2)  # d(x_i^+, x_j^+)
+
+        # Exclude diagonal elements (j ≠ i)
+        mask = ~torch.eye(d_x.size(0), dtype=torch.bool, device=anchor.device)  # Mask for j ≠ i
+
+        # Compute Second-Order Distance
+        second_order_diff = (d_x - d_xp) ** 2
+        second_order_loss = torch.sqrt(torch.sum(second_order_diff * mask, dim=1))  # Sum over j ≠ i, take sqrt
+
+        # Average over all anchor-positive pairs
+        sos_reg = torch.mean(second_order_loss)
+        return sos_reg
+
+    def forward(self, anchor, positive, dist_keypts, dist=torch.Tensor([])):
+        """
+        Compute the combined Contrastive Loss and SOS Regularization Loss.
+
+        Args:
+            anchor (torch.Tensor): Anchor descriptors of shape (B, C).
+            positive (torch.Tensor): Positive descriptors of shape (B, C).
+            dist_keypts (torch.Tensor): Distance matrix for keypoints of shape (B, B).
+            dist (torch.Tensor): Precomputed distance matrix (optional).
+
+        Returns:
+            torch.Tensor: Total loss (Contrastive Loss + SOS Regularization).
+            torch.Tensor: Contrastive Loss.
+            torch.Tensor: SOS Regularization Loss.
+        """
+        # Contrastive Loss (inherited from parent class)
+        contrastive_loss, diff, accuracy = super().forward(anchor, positive, dist_keypts, dist)
+
+        # Second-Order Similarity Loss
+        sos_loss = self.sos_regularization(anchor, positive)
+
+        # Combine Losses
+        total_loss = contrastive_loss + self.sos_weight * sos_loss
+
+        return total_loss, diff, accuracy
 
 class Hardest_ContrastiveLoss(nn.Module):
     def __init__(self, pos_margin=0.1, neg_margin=1.4, metric='euclidean', safe_radius=0.10):
