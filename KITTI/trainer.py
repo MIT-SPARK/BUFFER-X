@@ -24,9 +24,11 @@ class Trainer(object):
         self.train_loader = args.train_loader
         self.val_loader = args.val_loader
 
-        self.desc_loss = ContrastiveLossWithSOS()
+        self.desc_loss = ContrastiveLoss()
+        # self.desc_loss = ContrastiveLossWithSOS()
         self.class_loss = torch.nn.CrossEntropyLoss()
         self.L1_loss = torch.nn.L1Loss()
+        self.Huber_loss = torch.nn.HuberLoss()
 
         # create meters and timers
         self.meter_list = ['ref_loss', 'ref_error', 'desc_loss', 'desc_acc', 'eqv_loss', 'eqv_acc', 'det_loss',
@@ -192,6 +194,7 @@ class Trainer(object):
                 # L1 loss
                 pred_ind, gt_ind = output['pred_ind'], output['gt_ind']
                 match_loss = self.L1_loss(pred_ind, gt_ind)
+                # match_loss = self.Huber_loss(pred_ind, gt_ind)
 
                 loss = match_loss
                 stats = {
@@ -312,6 +315,7 @@ class Trainer(object):
                     # L1 loss
                     pred_ind, gt_ind = output['pred_ind'], output['gt_ind']
                     match_loss = self.L1_loss(pred_ind, gt_ind)
+                    # match_loss = self.Huber_loss(pred_ind, gt_ind)
 
                     stats = {
                         "match_loss": float(match_loss.item()),
