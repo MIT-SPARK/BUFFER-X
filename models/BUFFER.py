@@ -242,7 +242,7 @@ class buffer(nn.Module):
                 cfg = self.config
             
             # Origianl implementation
-            
+            cfg.point.num_keypts = 5000
             s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
             s_fps_idx = pnt2.furthest_point_sample(src_pts[None], cfg.point.num_keypts)
             t_fps_idx = pnt2.furthest_point_sample(tgt_pts[None], cfg.point.num_keypts)
@@ -262,13 +262,12 @@ class buffer(nn.Module):
             desc_timer = Timer()
             desc_timer.tic()
             for i, des_r in enumerate(des_r_list):
-            # for i, des_r in enumerate(num_keypts_list):
-                cfg.point.num_keypts = num_keypts_list[i] 
-                s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
-                s_fps_idx = pnt2.furthest_point_sample(src_pts[None], cfg.point.num_keypts)
-                t_fps_idx = pnt2.furthest_point_sample(tgt_pts[None], cfg.point.num_keypts)
-                kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
-                kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
+                # cfg.point.num_keypts = num_keypts_list[i] 
+                # s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
+                # s_fps_idx = pnt2.furthest_point_sample(src_pts[None], cfg.point.num_keypts)
+                # t_fps_idx = pnt2.furthest_point_sample(tgt_pts[None], cfg.point.num_keypts)
+                # kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
+                # kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
                 
                 # Calculate the percentage of points within des_r for src_pts
                 # src_dists = torch.cdist(kpts1.squeeze(0), src_pts)  # Distance from keypoints to all points
@@ -288,14 +287,31 @@ class buffer(nn.Module):
                 mutual_matching_timer.tic()
                 # Perform mutual matching using equivariant feature maps
                 s_mids, t_mids = self.mutual_matching(src_des, tgt_des)
+                
+                if i == 0: 
+                    s_mids_tmp = s_mids
+                    t_mids_tmp = t_mids
+                    continue
+                
+                # Extract the intersection of keypoints from two scales
+                # s_common, idx_s1, idx_s2 = np.intersect1d(s_mids, s_mids_tmp, return_indices=True)
+                # t_common, idx_t1, idx_t2 = np.intersect1d(t_mids, t_mids_tmp, return_indices=True)
+                
+                common_pairs = set(zip(s_mids, t_mids)).intersection(set(zip(s_mids_tmp, t_mids_tmp)))
+                s_mids_common = np.array([pair[0] for pair in common_pairs])
+                t_mids_common = np.array([pair[1] for pair in common_pairs])
+                
+                s_mids = s_mids_common
+                t_mids = t_mids_common
+                                
                 ss_kpts = kpts1[0, s_mids]
                 ss_equi = src_equi[s_mids]
                 ss_R = s_R[s_mids]
                 tt_kpts = kpts2[0, t_mids]
                 tt_equi = tgt_equi[t_mids]
                 tt_R = t_R[t_mids]
-                mutual_matching_timer.toc()
-
+                mutual_matching_timer.toc()   
+            
                 inlier_timer = Timer()
                 inlier_timer.tic()
                 # Calculate inliers
@@ -516,8 +532,9 @@ def find_des_r(src_pts, src_kpts, tgt_pts, tgt_kpts):
     # thresholds = [1, 2, 4] # percentage thresholds
     # thresholds = [1, 3, 5]
     
-    thresholds = [2, 5]
-    # thresholds = [0.5, 2]
+    
+    thresholds = [5,2]
+    # thresholds = [2, 0.5]
     
     des_r_values = []
     
