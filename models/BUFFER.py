@@ -260,127 +260,82 @@ class buffer(nn.Module):
             tt_kpts_list = []        
             desc_timer = Timer()
             desc_timer.tic()
-            # cfg.point.num_keypts = num_keypts_list[i] 
-            s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
-            s_fps_idx = pnt2.furthest_point_sample(src_pts[None], cfg.point.num_keypts)
-            t_fps_idx = pnt2.furthest_point_sample(tgt_pts[None], cfg.point.num_keypts)
-            kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
-            kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
-            
-            # Calculate the percentage of points within des_r for src_pts
-            # src_dists = torch.cdist(kpts1.squeeze(0), src_pts)  # Distance from keypoints to all points
-            # src_points_within_radius = (src_dists < des_r).sum(dim=1)  # Count points within des_r for each keypoint
-            # src_percentage = src_points_within_radius.sum().item() / (src_pts.shape[0] * cfg.point.num_keypts)* 100  # Total percentage for src_pts
-            # print(f"Percentage of points within des_r for src_pts: {src_percentage:.2f}%")
-            
-            # des_r = find_des_r_prime(src_pcd_raw, kpts1, tgt_pcd_raw, kpts2, i)
-            # Compute descriptors
-            des_r = des_r_list[0]
+            for i, des_r in enumerate(des_r_list):
+                # cfg.point.num_keypts = num_keypts_list[i] 
+                # s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
+                # s_fps_idx = pnt2.furthest_point_sample(src_pts[None], cfg.point.num_keypts)
+                # t_fps_idx = pnt2.furthest_point_sample(tgt_pts[None], cfg.point.num_keypts)
+                # kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
+                # kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
+                
+                # Calculate the percentage of points within des_r for src_pts
+                # src_dists = torch.cdist(kpts1.squeeze(0), src_pts)  # Distance from keypoints to all points
+                # src_points_within_radius = (src_dists < des_r).sum(dim=1)  # Count points within des_r for each keypoint
+                # src_percentage = src_points_within_radius.sum().item() / (src_pts.shape[0] * cfg.point.num_keypts)* 100  # Total percentage for src_pts
+                # print(f"Percentage of points within des_r for src_pts: {src_percentage:.2f}%")
+                
+                # des_r = find_des_r_prime(src_pcd_raw, kpts1, tgt_pcd_raw, kpts2, i)
+                # Compute descriptors
+                src = self.Desc(src_pcd_raw[None], kpts1, des_r, dataset_name)
+                tgt = self.Desc(tgt_pcd_raw[None], kpts2, des_r, dataset_name)
+                src_des, src_equi, s_rand_axis, s_R, s_patches = src['desc'], src['equi'], src['rand_axis'], src['R'], src['patches']
+                tgt_des, tgt_equi, t_rand_axis, t_R, t_patches = tgt['desc'], tgt['equi'], tgt['rand_axis'], tgt['R'], tgt['patches']
 
-            src = self.Desc(src_pcd_raw[None], kpts1, des_r, dataset_name)
-            tgt = self.Desc(tgt_pcd_raw[None], kpts2, des_r, dataset_name)
-            src_des, src_equi, s_rand_axis, s_R, s_patches = src['desc'], src['equi'], src['rand_axis'], src['R'], src['patches']
-            tgt_des, tgt_equi, t_rand_axis, t_R, t_patches = tgt['desc'], tgt['equi'], tgt['rand_axis'], tgt['R'], tgt['patches']
+                mutual_matching_timer = Timer()
+                mutual_matching_timer.tic()
+                # Perform mutual matching using equivariant feature maps
+                s_mids, t_mids = self.mutual_matching(src_des, tgt_des)
+                                
+                ss_kpts = kpts1[0, s_mids]
+                ss_equi = src_equi[s_mids]
+                ss_R = s_R[s_mids]
+                tt_kpts = kpts2[0, t_mids]
+                tt_equi = tgt_equi[t_mids]
+                tt_R = t_R[t_mids]
+                
+                mutual_matching_timer.toc()   
+                
+                inlier_timer = Timer()
+                inlier_timer.tic()
+                # Calculate inliers
+                ind = self.Inlier(ss_equi[:, :, 1:cfg.patch.ele_n - 1],
+                                tt_equi[:, :, 1:cfg.patch.ele_n - 1])
+                inlier_timer.toc()
 
-            mutual_matching_timer = Timer()
-            mutual_matching_timer.tic()
-            # Perform mutual matching using equivariant feature maps
-            s_mids, t_mids = self.mutual_matching(src_des, tgt_des)
-                            
-            ss_kpts = kpts1[0, s_mids]
-            ss_equi = src_equi[s_mids]
-            ss_R = s_R[s_mids]
-            tt_kpts = kpts2[0, t_mids]
-            tt_equi = tgt_equi[t_mids]
-            tt_R = t_R[t_mids]
-            
-            mutual_matching_timer.toc()   
-            
-            inlier_timer = Timer()
-            inlier_timer.tic()
-            # Calculate inliers
-            ind = self.Inlier(ss_equi[:, :, 1:cfg.patch.ele_n - 1],
-                            tt_equi[:, :, 1:cfg.patch.ele_n - 1])
-            inlier_timer.toc()
+                correspondence_proposal_timer = Timer()
+                correspondence_proposal_timer.tic()
+                # Recover pose
+                angle = ind * 2 * np.pi / cfg.patch.azi_n + 1e-6
+                angle_axis = torch.zeros_like(ss_kpts)
+                angle_axis[:, -1] = 1
+                angle_axis = angle_axis * angle[:, None]
+                azi_R = Convert.axis_angle_to_rotation_matrix(angle_axis)
+                
+                R = tt_R @ azi_R @ ss_R.transpose(-1, -2)
+                t = tt_kpts - (R @ ss_kpts.unsqueeze(-1)).squeeze()
+                R_list.append(R)
+                t_list.append(t)
+                ss_kpts_list.append(ss_kpts)
+                tt_kpts_list.append(tt_kpts) 
 
-            correspondence_proposal_timer = Timer()
-            correspondence_proposal_timer.tic()
-            # Recover pose
-            angle = ind * 2 * np.pi / cfg.patch.azi_n + 1e-6
-            angle_axis = torch.zeros_like(ss_kpts)
-            angle_axis[:, -1] = 1
-            angle_axis = angle_axis * angle[:, None]
-            azi_R = Convert.axis_angle_to_rotation_matrix(angle_axis)
-            
-            R = tt_R @ azi_R @ ss_R.transpose(-1, -2)
-            t = tt_kpts - (R @ ss_kpts.unsqueeze(-1)).squeeze()
-            R_list.append(R)
-            t_list.append(t)
-            ss_kpts_list.append(ss_kpts)
-            tt_kpts_list.append(tt_kpts) 
-            
-            # dist_src = torch.cdist(ss_kpts, src_pts)  # Distance from keypoints to all points
-            # dist_tgt = torch.cdist(tt_kpts, tgt_pts)  # Distance from keypoints to all points
-            
-            # Compute distances from all keypoints to all points in one go
-            all_distances_src = torch.cdist(ss_kpts, src_pts)  # Shape: (num_keypoints, num_src_points)
-            all_distances_tgt = torch.cdist(tt_kpts, tgt_pts)  # Shape: (num_keypoints, num_tgt_points)
+                if i == 0:
+                    # Compute distances from all keypoints to all points in one go
+                    all_distances_src = torch.cdist(ss_kpts, src_pts)  # Shape: (num_keypoints, num_src_points)
+                    all_distances_tgt = torch.cdist(tt_kpts, tgt_pts)  # Shape: (num_keypoints, num_tgt_points)
 
-            # Create masks for points within des_r
-            mask_src = all_distances_src < des_r  # (num_keypoints, num_src_points)
-            mask_tgt = all_distances_tgt < des_r  # (num_keypoints, num_tgt_points)
+                    # Create masks for points within des_r
+                    mask_src = all_distances_src < des_r  # (num_keypoints, num_src_points)
+                    mask_tgt = all_distances_tgt < des_r  # (num_keypoints, num_tgt_points)
 
-            # Generate random indices for each keypoint without loops
-            k = 5
-            sampled_indices_src = torch.multinomial(mask_src.float(), k, replacement=False) # (num_keypoints, k)
-            sampled_indices_tgt = torch.multinomial(mask_tgt.float(), k, replacement=False) # (num_keypoints, k)
+                    # Generate random indices for each keypoint without loops
+                    k = 5
+                    sampled_indices_src = torch.multinomial(mask_src.float(), k, replacement=False) # (num_keypoints, k)
+                    sampled_indices_tgt = torch.multinomial(mask_tgt.float(), k, replacement=False) # (num_keypoints, k)
 
-            # Gather the points based on sampled indices
-            kpts1 = src_pts[sampled_indices_src.flatten()].unsqueeze(0)  # (num_keypoints * k, 3)
-            kpts2 = tgt_pts[sampled_indices_tgt.flatten()].unsqueeze(0)
-            
-            des_r = des_r_list[1]
-            
-            src = self.Desc(src_pcd_raw[None], kpts1, des_r, dataset_name)
-            tgt = self.Desc(tgt_pcd_raw[None], kpts2, des_r, dataset_name)
-            src_des, src_equi, s_rand_axis, s_R, s_patches = src['desc'], src['equi'], src['rand_axis'], src['R'], src['patches']
-            tgt_des, tgt_equi, t_rand_axis, t_R, t_patches = tgt['desc'], tgt['equi'], tgt['rand_axis'], tgt['R'], tgt['patches']
-
-            mutual_matching_timer = Timer()
-            mutual_matching_timer.tic()
-            # Perform mutual matching using equivariant feature maps
-            s_mids, t_mids = self.mutual_matching(src_des, tgt_des)
-                            
-            ss_kpts = kpts1[0, s_mids]
-            ss_equi = src_equi[s_mids]
-            ss_R = s_R[s_mids]
-            tt_kpts = kpts2[0, t_mids]
-            tt_equi = tgt_equi[t_mids]
-            tt_R = t_R[t_mids]
-            
-            inlier_timer = Timer()
-            inlier_timer.tic()
-            # Calculate inliers
-            ind = self.Inlier(ss_equi[:, :, 1:cfg.patch.ele_n - 1],
-                            tt_equi[:, :, 1:cfg.patch.ele_n - 1])
-            inlier_timer.toc()
-
-            correspondence_proposal_timer = Timer()
-            correspondence_proposal_timer.tic()
-            # Recover pose
-            angle = ind * 2 * np.pi / cfg.patch.azi_n + 1e-6
-            angle_axis = torch.zeros_like(ss_kpts)
-            angle_axis[:, -1] = 1
-            angle_axis = angle_axis * angle[:, None]
-            azi_R = Convert.axis_angle_to_rotation_matrix(angle_axis)
-            
-            R = tt_R @ azi_R @ ss_R.transpose(-1, -2)
-            t = tt_kpts - (R @ ss_kpts.unsqueeze(-1)).squeeze()
-            R_list.append(R)
-            t_list.append(t)
-            ss_kpts_list.append(ss_kpts)
-            tt_kpts_list.append(tt_kpts) 
-                   
+                    # Gather the points based on sampled indices
+                    kpts1 = src_pts[sampled_indices_src.flatten()].unsqueeze(0)  # (num_keypoints * k, 3)
+                    kpts2 = tgt_pts[sampled_indices_tgt.flatten()].unsqueeze(0)
+                
             desc_timer.toc()
             R = torch.cat(R_list, dim=0)
             t = torch.cat(t_list, dim=0)
@@ -578,8 +533,8 @@ def find_des_r(src_pts, src_kpts, tgt_pts, tgt_kpts):
     # thresholds = [1, 3, 5]
     
     
-    # thresholds = [5,2]
-    thresholds = [2, 0.5]
+    thresholds = [5,2]
+    # thresholds = [2, 0.5]
     
     des_r_values = []
     
