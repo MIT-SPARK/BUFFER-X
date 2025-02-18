@@ -156,7 +156,26 @@ class buffer(nn.Module):
             #######################
             # calculate feature descriptor
             # src = self.Desc(src_pcd_raw[None], src_kpt[None], dataset_name, src_axis[None])
-            des_r = cfg.patch.des_r
+            
+            # des_r = cfg.patch.des_r
+            center = cfg.patch.des_r
+            # lower_bound = center * 0.5
+            # upper_bound = center * 1.5
+            # std_dev = (upper_bound - lower_bound) / 6
+            # des_r = np.round(np.clip(np.random.normal(center, std_dev, 1), lower_bound, upper_bound), 2)[0]
+            
+            # Define the range of possible values based on the center
+            if center == 3.0:
+                possible_values = [2.0, 2.5, 3.0, 3.5, 4.0]
+            elif center == 0.3:
+                possible_values = [0.2, 0.25, 0.3, 0.35, 0.4]
+
+            # Assign probabilities (optional: uniform probabilities)
+            probabilities = [0.2, 0.2, 0.2, 0.2, 0.2]  # Adjust probabilities as needed
+
+            # Select a value from possible_values based on the probabilities
+            des_r = np.random.choice(possible_values, p=probabilities)
+
             src = self.Desc(src_pcd_raw[None], src_kpt[None], des_r, dataset_name)
             if self.config.stage == 'Inlier':
                 # SO(2) augmentation
@@ -235,7 +254,7 @@ class buffer(nn.Module):
             
             des_r_list = find_des_r(src_pcd_raw, kpts1, tgt_pcd_raw, kpts2)
     
-            num_keypts_list = [2000, 1500, 1000]
+            num_keypts_list = [1500, 1000]
             R_list = []
             t_list = []
             ss_kpts_list = []
@@ -243,6 +262,7 @@ class buffer(nn.Module):
             desc_timer = Timer()
             desc_timer.tic()
             for i, des_r in enumerate(des_r_list):
+            # for i, des_r in enumerate(num_keypts_list):
                 cfg.point.num_keypts = num_keypts_list[i] 
                 s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
                 s_fps_idx = pnt2.furthest_point_sample(src_pts[None], cfg.point.num_keypts)
@@ -251,10 +271,12 @@ class buffer(nn.Module):
                 kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
                 
                 # Calculate the percentage of points within des_r for src_pts
-                src_dists = torch.cdist(kpts1.squeeze(0), src_pts)  # Distance from keypoints to all points
-                src_points_within_radius = (src_dists < des_r).sum(dim=1)  # Count points within des_r for each keypoint
-                src_percentage = src_points_within_radius.sum().item() / (src_pts.shape[0] * cfg.point.num_keypts)* 100  # Total percentage for src_pts
+                # src_dists = torch.cdist(kpts1.squeeze(0), src_pts)  # Distance from keypoints to all points
+                # src_points_within_radius = (src_dists < des_r).sum(dim=1)  # Count points within des_r for each keypoint
+                # src_percentage = src_points_within_radius.sum().item() / (src_pts.shape[0] * cfg.point.num_keypts)* 100  # Total percentage for src_pts
                 # print(f"Percentage of points within des_r for src_pts: {src_percentage:.2f}%")
+                
+                # des_r = find_des_r_prime(src_pcd_raw, kpts1, tgt_pcd_raw, kpts2, i)
                 
                 # Compute descriptors
                 src = self.Desc(src_pcd_raw[None], kpts1, des_r, dataset_name)
@@ -302,6 +324,10 @@ class buffer(nn.Module):
             t = torch.cat(t_list, dim=0)
             ss_kpts = torch.cat(ss_kpts_list, dim=0)
             tt_kpts = torch.cat(tt_kpts_list, dim=0)
+            
+            # What if we sample another new keypoints to eval R, t? 
+            # Then, Initial Correspondence Not used anymore
+            
             
             # Find the best R and t
             tss_kpts = ss_kpts[None] @ R.transpose(-1, -2) + t[:, None]
@@ -486,8 +512,13 @@ def find_des_r(src_pts, src_kpts, tgt_pts, tgt_kpts):
     Returns:
         list: The calculated des_r values for the given percentages.
     """
-    # breakpoint()
-    thresholds = [0.5, 2, 5]  # percentage thresholds
+    # thresholds = [0.5, 2, 5]  # percentage thresholds
+    # thresholds = [1, 2, 4] # percentage thresholds
+    # thresholds = [1, 3, 5]
+    
+    thresholds = [2, 5]
+    # thresholds = [0.5, 2]
+    
     des_r_values = []
     
     if src_pts.shape[0] > tgt_pts.shape[0]:
@@ -496,19 +527,21 @@ def find_des_r(src_pts, src_kpts, tgt_pts, tgt_kpts):
     else:
         pts = tgt_pts    
         kpts = tgt_kpts
+        
+    if pts.shape[0] > 200000:
+            pts = pts[torch.randint(0, pts.shape[0], (200000,))]
+    
+    dists = torch.cdist(kpts, pts)  # Calculate distances
     
     for threshold in thresholds:
         low, high = 0., 5.0  # Start with a wide search range for des_r
         tolerance = 0.01  # threshold tolerance
         
         des_r = 0.0
-        
-        if pts.shape[0] > 200000:
-            pts = pts[torch.randint(0, pts.shape[0], (200000,))]
 
         while high - low > 1e-3:  # Precision threshold
             des_r = (low + high) / 2.0
-            dists = torch.cdist(kpts, pts)  # Calculate distances
+            
             points_within_radius = (dists < des_r).int()  # Binary mask for points within radius
             percentage = points_within_radius.sum(dim=-1).float() / pts.shape[0] * 100  # Percentage per keypoint
             percentage = percentage.mean().item()  # Average percentage across keypoints
@@ -524,3 +557,50 @@ def find_des_r(src_pts, src_kpts, tgt_pts, tgt_kpts):
         
         # print(des_r)
     return des_r_values
+
+def find_des_r_prime(src_pts, src_kpts, tgt_pts, tgt_kpts, i=0):
+    """
+    Finds the des_r values corresponding to the given target percentages of points within the radius.
+
+    Args:
+        src_pts (torch.Tensor): Source points of shape (N, 3).
+        src_kpts (torch.Tensor): Keypoints of shape (num_keypts, 3).
+        
+    Returns:
+        list: The calculated des_r values for the given percentages.
+    """
+    thresholds = [0.5, 2, 5]  # percentage thresholds
+    
+    if src_pts.shape[0] > tgt_pts.shape[0]:
+        pts = src_pts
+        kpts = src_kpts
+    else:
+        pts = tgt_pts    
+        kpts = tgt_kpts
+        
+    if pts.shape[0] > 200000:
+            pts = pts[torch.randint(0, pts.shape[0], (200000,))]
+    
+    dists = torch.cdist(kpts, pts)  # Calculate distances
+    
+    threshold = thresholds[i]
+    low, high = 0., 5.0  # Start with a wide search range for des_r
+    tolerance = 0.01  # threshold tolerance
+    
+    des_r = 0.0
+
+    while high - low > 1e-3:  # Precision threshold
+        des_r = (low + high) / 2.0
+        
+        points_within_radius = (dists < des_r).int()  # Binary mask for points within radius
+        percentage = points_within_radius.sum(dim=-1).float() / pts.shape[0] * 100  # Percentage per keypoint
+        percentage = percentage.mean().item()  # Average percentage across keypoints
+        
+        if percentage < threshold - tolerance:
+            low = des_r  # Increase des_r to capture more points
+        elif percentage > threshold + tolerance:
+            high = des_r  # Decrease des_r to capture fewer points
+        else:
+            break  # Close enough to the percentage
+    
+    return round(des_r, 2)
