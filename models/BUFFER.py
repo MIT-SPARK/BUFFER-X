@@ -240,7 +240,7 @@ class buffer(nn.Module):
             else: 
                 dataset_name = self.config['data']['dataset']
                 cfg = self.config
-            
+                        
             # Origianl implementation
             s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
             s_fps_idx = pnt2.furthest_point_sample(src_pts[None], cfg.point.num_keypts)
@@ -253,21 +253,22 @@ class buffer(nn.Module):
             
             des_r_list = find_des_r(src_pcd_raw, kpts1, tgt_pcd_raw, kpts2)
     
-            num_keypts_list = [1500, 1000]
+            num_keypts_list = [1000, 1500, 2000]
             R_list = []
             t_list = []
             ss_kpts_list = []
             tt_kpts_list = []        
             desc_timer = Timer()
             desc_timer.tic()
+
             for i, des_r in enumerate(des_r_list):
-                # cfg.point.num_keypts = num_keypts_list[i] 
-                # s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
-                # s_fps_idx = pnt2.furthest_point_sample(src_pts[None], cfg.point.num_keypts)
-                # t_fps_idx = pnt2.furthest_point_sample(tgt_pts[None], cfg.point.num_keypts)
-                # kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
-                # kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
-                
+                cfg.point.num_keypts = num_keypts_list[i] 
+                s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
+                s_fps_idx = pnt2.furthest_point_sample(src_pts[None], cfg.point.num_keypts)
+                t_fps_idx = pnt2.furthest_point_sample(tgt_pts[None], cfg.point.num_keypts)
+                kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
+                kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
+
                 # Calculate the percentage of points within des_r for src_pts
                 # src_dists = torch.cdist(kpts1.squeeze(0), src_pts)  # Distance from keypoints to all points
                 # src_points_within_radius = (src_dists < des_r).sum(dim=1)  # Count points within des_r for each keypoint
@@ -318,24 +319,38 @@ class buffer(nn.Module):
                 ss_kpts_list.append(ss_kpts)
                 tt_kpts_list.append(tt_kpts) 
 
-                if i == 0:
-                    # Compute distances from all keypoints to all points in one go
-                    all_distances_src = torch.cdist(ss_kpts, src_pts)  # Shape: (num_keypoints, num_src_points)
-                    all_distances_tgt = torch.cdist(tt_kpts, tgt_pts)  # Shape: (num_keypoints, num_tgt_points)
+                # if i == 1 :
+                #     # Compute distances from all keypoints to all points in one go
+                #     all_distances_src = torch.cdist(ss_kpts, src_pts)  # Shape: (num_keypoints, num_src_points)
+                #     all_distances_tgt = torch.cdist(tt_kpts, tgt_pts)  # Shape: (num_keypoints, num_tgt_points)
 
-                    # Create masks for points within des_r
-                    mask_src = all_distances_src < des_r  # (num_keypoints, num_src_points)
-                    mask_tgt = all_distances_tgt < des_r  # (num_keypoints, num_tgt_points)
+                #     for j in range(1): # 1                       
+                #         # Create masks for points within des_r
+                #         mask_src = all_distances_src < des_r_list[j+1] # (num_keypoints, num_src_points)
+                #         mask_tgt = all_distances_tgt < des_r_list[j+1] # (num_keypoints, num_tgt_points)
+                        
+                #         invalid_rows_src = torch.all(mask_src == False, dim=1)
+                #         valid_mask_src = mask_src[~invalid_rows_src]
+                        
+                #         invalid_rows_tgt = torch.all(mask_tgt == False, dim=1)
+                #         valid_mask_tgt = mask_tgt[~invalid_rows_tgt]
+                        
+                #         # Generate random indices for each keypoint without loops
+                #         k = 5
+                #         # k = 2 * j + 1
+                #         sampled_indices_src = torch.multinomial(valid_mask_src.float(), k, replacement=False)
+                #         sampled_indices_tgt = torch.multinomial(valid_mask_tgt.float(), k, replacement=False)
 
-                    # Generate random indices for each keypoint without loops
-                    k = 5
-                    sampled_indices_src = torch.multinomial(mask_src.float(), k, replacement=False) # (num_keypoints, k)
-                    sampled_indices_tgt = torch.multinomial(mask_tgt.float(), k, replacement=False) # (num_keypoints, k)
-
-                    # Gather the points based on sampled indices
-                    kpts1 = src_pts[sampled_indices_src.flatten()].unsqueeze(0)  # (num_keypoints * k, 3)
-                    kpts2 = tgt_pts[sampled_indices_tgt.flatten()].unsqueeze(0)
-                
+                #         # sampled_indices_src = torch.multinomial(mask_src.float(), k, replacement=False) # (num_keypoints, k)
+                #         # sampled_indices_tgt = torch.multinomial(mask_tgt.float(), k, replacement=False) # (num_keypoints, k)
+                        
+                #         if sampled_indices_src.flatten().shape[0] != 0 and sampled_indices_tgt.flatten().shape[0] != 0:
+                #             # Gather the points based on sampled indices
+                #             # kpts1_list.append(src_pts[sampled_indices_src.flatten()].unsqueeze(0))  # (num_keypoints * k, 3)
+                #             # kpts2_list.append(tgt_pts[sampled_indices_tgt.flatten()].unsqueeze(0))
+                #             kpts1 = src_pts[sampled_indices_src.flatten()].unsqueeze(0)  # (num_keypoints * k, 3)
+                #             kpts2 = tgt_pts[sampled_indices_tgt.flatten()].unsqueeze(0)
+                    
             desc_timer.toc()
             R = torch.cat(R_list, dim=0)
             t = torch.cat(t_list, dim=0)
@@ -529,11 +544,14 @@ def find_des_r(src_pts, src_kpts, tgt_pts, tgt_kpts):
         list: The calculated des_r values for the given percentages.
     """
     # thresholds = [0.5, 2, 5]  # percentage thresholds
-    # thresholds = [1, 2, 4] # percentage thresholds
-    # thresholds = [1, 3, 5]
+
+    # thresholds = [2, 5, 0.5]
     
-    
-    thresholds = [5,2]
+    thresholds = [5, 2, 0.5]
+        
+    # thresholds = [5, 2]
+    # thresholds = [4, 2]
+    # thresholds = [5, 2]
     # thresholds = [2, 0.5]
     
     des_r_values = []
