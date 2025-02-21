@@ -563,9 +563,9 @@ def find_des_r(src_pts, src_kpts, tgt_pts, tgt_kpts, min_r=0.0, max_r=5.0, toler
     
     Args:
         src_pts (torch.Tensor): Source points of shape (N, 3).
-        src_kpts (torch.Tensor): Keypoints of shape (num_keypts, 3).
+        src_kpts (torch.Tensor): Keypoints of shape (b, num_keypts, 3).
         tgt_pts (torch.Tensor): Target points of shape (M, 3).
-        tgt_kpts (torch.Tensor): Keypoints of shape (num_keypts, 3).
+        tgt_kpts (torch.Tensor): Keypoints of shape (b, num_keypts, 3).
         min_r (float): Minimum radius threshold.
         max_r (float): Maximum radius threshold.
     
