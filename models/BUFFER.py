@@ -279,8 +279,8 @@ class buffer(nn.Module):
                 # Compute descriptors
                 src = self.Desc(src_pcd_raw[None], kpts1, des_r, dataset_name)
                 tgt = self.Desc(tgt_pcd_raw[None], kpts2, des_r, dataset_name)
-                src_des, src_equi, s_rand_axis, s_R, s_patches = src['desc'], src['equi'], src['rand_axis'], src['R'], src['patches']
-                tgt_des, tgt_equi, t_rand_axis, t_R, t_patches = tgt['desc'], tgt['equi'], tgt['rand_axis'], tgt['R'], tgt['patches']
+                src_des, src_equi, s_R = src['desc'], src['equi'], src['R']
+                tgt_des, tgt_equi, t_R = tgt['desc'], tgt['equi'], tgt['R']
 
                 mutual_matching_timer = Timer()
                 mutual_matching_timer.tic()
