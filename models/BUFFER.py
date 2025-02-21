@@ -541,6 +541,22 @@ def rigid_transform_3d(A, B, weights=None, weight_threshold=0):
 # TODO
 # Modify this functions for calculating des_r
 
+def squared_cdist(x, y):
+    """
+    Computes the squared Euclidean distance between two sets of points.
+
+    Args:
+        x (torch.Tensor): Tensor of shape (N, D)
+        y (torch.Tensor): Tensor of shape (M, D)
+
+    Returns:
+        torch.Tensor: Squared Euclidean distance matrix of shape (N, M)
+    """
+    x2 = x.pow(2).sum(dim=-1, keepdim=True)  # (N, 1)
+    y2 = y.pow(2).sum(dim=-1, keepdim=True).T  # (1, M)
+    xy = torch.matmul(x, y.T)  # (N, M)
+    return x2 + y2 - 2 * xy  # Squared Euclidean distance
+
 def find_des_r(src_pts, src_kpts, tgt_pts, tgt_kpts, min_r=0.0, max_r=5.0, tolerance=0.01, thresholds =[5, 2, 0.5]):
     """
     Finds the des_r values corresponding to the given target percentages of points within the radius.
@@ -582,18 +598,18 @@ def find_des_r(src_pts, src_kpts, tgt_pts, tgt_kpts, min_r=0.0, max_r=5.0, toler
     if pts.shape[0] > 200000:
             pts = pts[torch.randint(0, pts.shape[0], (200000,))]
     
-    dists = torch.cdist(kpts, pts) 
+    dists_sqr = squared_cdist(kpts, pts) 
 
     # NOTE(hlim): This filtering reduces unnecessary computations by pre-dividing with the maximum possible radius 
-    dists = dists[dists <= max_r]
+
+    dists_sqr = dists_sqr[dists_sqr <= max_r * max_r]
     
     for threshold in thresholds:
         low, high = min_r, max_r  # Start with a wide search range for des_r
         des_r = 0.0
-
         while high - low > 1e-3:  # Precision threshold
             des_r = (low + high) / 2.0
-            points_within_radius = (dists < des_r).int()  # Binary mask for points within radius
+            points_within_radius = (dists_sqr < des_r * des_r).int()  # Binary mask for points within radius
             percentage = points_within_radius.sum().float() / (num_pts * num_kpts) * 100  # Percentage per keypoint
             percentage = percentage.item()
             
