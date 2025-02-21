@@ -242,27 +242,31 @@ class buffer(nn.Module):
                 cfg = self.config
                         
             # Origianl implementation
+            # NOTE(hlim): It only takes < ~ 0.0002 sec, which is negligible
             s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
             s_fps_idx = pnt2.furthest_point_sample(src_pts[None], cfg.point.num_keypts)
             t_fps_idx = pnt2.furthest_point_sample(tgt_pts[None], cfg.point.num_keypts)
             kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
             kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
  
-            # calculate descriptor
-            # TODO
-            
             des_r_list = find_des_r(src_pcd_raw, kpts1, tgt_pcd_raw, kpts2)
     
             num_keypts_list = [1000, 1500, 2000]
             R_list = []
             t_list = []
+
+            ss_kpts_raw_list = []
+            tt_kpts_raw_list = []        
+
             ss_kpts_list = []
             tt_kpts_list = []        
+
             desc_timer = Timer()
             desc_timer.tic()
             mutual_matching_total = 0
             inlier_total = 0
             correspondence_proposal_total = 0
+            # Furthest point sampling 
             for i, des_r in enumerate(des_r_list):
                 cfg.point.num_keypts = num_keypts_list[i] 
                 s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
@@ -271,16 +275,24 @@ class buffer(nn.Module):
                 kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
                 kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
 
-                # Calculate the percentage of points within des_r for src_pts
-                # src_dists = torch.cdist(kpts1.squeeze(0), src_pts)  # Distance from keypoints to all points
-                # src_points_within_radius = (src_dists < des_r).sum(dim=1)  # Count points within des_r for each keypoint
-                # src_percentage = src_points_within_radius.sum().item() / (src_pts.shape[0] * cfg.point.num_keypts)* 100  # Total percentage for src_pts
-                # print(f"Percentage of points within des_r for src_pts: {src_percentage:.2f}%")
-                
-                # des_r = find_des_r_prime(src_pcd_raw, kpts1, tgt_pcd_raw, kpts2, i)
-                # Compute descriptors
-                src = self.Desc(src_pcd_raw[None], kpts1, des_r, dataset_name)
-                tgt = self.Desc(tgt_pcd_raw[None], kpts2, des_r, dataset_name)
+                ss_kpts_raw_list.append(kpts1)
+                tt_kpts_raw_list.append(kpts2)
+
+            ss_des_list = []
+            tt_des_list = []        
+
+            # Compute descriptors
+            for i, des_r in enumerate(des_r_list):
+                src = self.Desc(src_pcd_raw[None], ss_kpts_raw_list[i], des_r, dataset_name)
+                tgt = self.Desc(tgt_pcd_raw[None], tt_kpts_raw_list[i], des_r, dataset_name)
+                ss_des_list.append(src)
+                tt_des_list.append(tgt)
+
+            # Match
+            for src_kpts, src, tgt_kpts, tgt in zip(ss_kpts_raw_list, 
+                                                    ss_des_list,
+                                                    tt_kpts_raw_list,
+                                                    tt_des_list):
                 src_des, src_equi, s_R = src['desc'], src['equi'], src['R']
                 tgt_des, tgt_equi, t_R = tgt['desc'], tgt['equi'], tgt['R']
 
@@ -289,10 +301,10 @@ class buffer(nn.Module):
                 # Perform mutual matching using equivariant feature maps
                 s_mids, t_mids = self.mutual_matching(src_des, tgt_des)
                                 
-                ss_kpts = kpts1[0, s_mids]
+                ss_kpts = src_kpts[0, s_mids]
                 ss_equi = src_equi[s_mids]
                 ss_R = s_R[s_mids]
-                tt_kpts = kpts2[0, t_mids]
+                tt_kpts = tgt_kpts[0, t_mids]
                 tt_equi = tgt_equi[t_mids]
                 tt_R = t_R[t_mids]
                 
