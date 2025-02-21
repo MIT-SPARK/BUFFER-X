@@ -252,14 +252,9 @@ class buffer(nn.Module):
             des_r_list = find_des_r(src_pcd_raw, kpts1, tgt_pcd_raw, kpts2)
     
             num_keypts_list = [1000, 1500, 2000]
-            R_list = []
-            t_list = []
-
-            ss_kpts_raw_list = []
-            tt_kpts_raw_list = []        
-
-            ss_kpts_list = []
-            tt_kpts_list = []        
+            
+            ss_kpts_raw_list = [None] * len(num_keypts_list)
+            tt_kpts_raw_list = [None] * len(num_keypts_list)
 
             desc_timer = Timer()
             desc_timer.tic()
@@ -275,24 +270,27 @@ class buffer(nn.Module):
                 kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
                 kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
 
-                ss_kpts_raw_list.append(kpts1)
-                tt_kpts_raw_list.append(kpts2)
+                ss_kpts_raw_list[i] = kpts1
+                tt_kpts_raw_list[i] = kpts2
 
-            ss_des_list = []
-            tt_des_list = []        
-
+            ss_des_list = [None] * len(num_keypts_list)
+            tt_des_list = [None] * len(num_keypts_list)        
             # Compute descriptors
             for i, des_r in enumerate(des_r_list):
                 src = self.Desc(src_pcd_raw[None], ss_kpts_raw_list[i], des_r, dataset_name)
                 tgt = self.Desc(tgt_pcd_raw[None], tt_kpts_raw_list[i], des_r, dataset_name)
-                ss_des_list.append(src)
-                tt_des_list.append(tgt)
+                ss_des_list[i] = src
+                tt_des_list[i] = tgt
 
+            R_list = [None] * len(num_keypts_list)
+            t_list = [None] * len(num_keypts_list)
+            ss_kpts_list = [None] * len(num_keypts_list)
+            tt_kpts_list = [None] * len(num_keypts_list)
             # Match
-            for src_kpts, src, tgt_kpts, tgt in zip(ss_kpts_raw_list, 
+            for i, (src_kpts, src, tgt_kpts, tgt) in enumerate(zip(ss_kpts_raw_list, 
                                                     ss_des_list,
                                                     tt_kpts_raw_list,
-                                                    tt_des_list):
+                                                    tt_des_list)):
                 src_des, src_equi, s_R = src['desc'], src['equi'], src['R']
                 tgt_des, tgt_equi, t_R = tgt['desc'], tgt['equi'], tgt['R']
 
@@ -330,10 +328,10 @@ class buffer(nn.Module):
                 
                 R = tt_R @ azi_R @ ss_R.transpose(-1, -2)
                 t = tt_kpts - (R @ ss_kpts.unsqueeze(-1)).squeeze()
-                R_list.append(R)
-                t_list.append(t)
-                ss_kpts_list.append(ss_kpts)
-                tt_kpts_list.append(tt_kpts) 
+                R_list[i] = R
+                t_list[i] = t
+                ss_kpts_list[i] = ss_kpts
+                tt_kpts_list[i] = tt_kpts
                 correspondence_proposal_timer.toc()
                 correspondence_proposal_total += correspondence_proposal_timer.diff
 
