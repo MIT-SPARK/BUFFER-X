@@ -260,7 +260,9 @@ class buffer(nn.Module):
             tt_kpts_list = []        
             desc_timer = Timer()
             desc_timer.tic()
-
+            mutual_matching_total = 0
+            inlier_total = 0
+            correspondence_proposal_total = 0
             for i, des_r in enumerate(des_r_list):
                 cfg.point.num_keypts = num_keypts_list[i] 
                 s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
@@ -295,6 +297,7 @@ class buffer(nn.Module):
                 tt_R = t_R[t_mids]
                 
                 mutual_matching_timer.toc()   
+                mutual_matching_total += mutual_matching_timer.diff
                 
                 inlier_timer = Timer()
                 inlier_timer.tic()
@@ -302,6 +305,7 @@ class buffer(nn.Module):
                 ind = self.Inlier(ss_equi[:, :, 1:cfg.patch.ele_n - 1],
                                 tt_equi[:, :, 1:cfg.patch.ele_n - 1])
                 inlier_timer.toc()
+                inlier_total += inlier_timer.diff
 
                 correspondence_proposal_timer = Timer()
                 correspondence_proposal_timer.tic()
@@ -318,6 +322,8 @@ class buffer(nn.Module):
                 t_list.append(t)
                 ss_kpts_list.append(ss_kpts)
                 tt_kpts_list.append(tt_kpts) 
+                correspondence_proposal_timer.toc()
+                correspondence_proposal_total += correspondence_proposal_timer.diff
 
                 # if i == 1 :
                 #     # Compute distances from all keypoints to all points in one go
@@ -352,6 +358,7 @@ class buffer(nn.Module):
                 #             kpts2 = tgt_pts[sampled_indices_tgt.flatten()].unsqueeze(0)
                     
             desc_timer.toc()
+            print("Desc time:", desc_timer.diff)
             R = torch.cat(R_list, dim=0)
             t = torch.cat(t_list, dim=0)
             ss_kpts = torch.cat(ss_kpts_list, dim=0)
@@ -359,7 +366,9 @@ class buffer(nn.Module):
             
             # What if we sample another new keypoints to eval R, t? 
             # Then, Initial Correspondence Not used anymore
-                  
+
+            correspondence_proposal_timer = Timer()
+            correspondence_proposal_timer.tic()     
             # Find the best R and t
             tss_kpts = ss_kpts[None] @ R.transpose(-1, -2) + t[:, None]
             diffs = torch.sqrt(torch.sum((tss_kpts - tt_kpts[None]) ** 2, dim=-1))
@@ -369,12 +378,12 @@ class buffer(nn.Module):
             best_ind = torch.argmax(inlier_num)
             inlier_ind = torch.where(sign[best_ind] == True)[0].detach().cpu().numpy()
             correspondence_proposal_timer.toc()
+            correspondence_proposal_total += correspondence_proposal_timer.diff
 
             # use RANSAC to calculate pose
             pcd0 = make_open3d_point_cloud(ss_kpts.detach().cpu().numpy(), [1, 0.706, 0])
             pcd1 = make_open3d_point_cloud(tt_kpts.detach().cpu().numpy(), [0, 0.651, 0.929])
             corr = o3d.utility.Vector2iVector(np.array([inlier_ind, inlier_ind]).T)
-
             ransac_timer = Timer()
             ransac_timer.tic()
             result = o3d.pipelines.registration.registration_ransac_based_on_correspondence(
@@ -393,8 +402,8 @@ class buffer(nn.Module):
                 pose = pose[0].detach().cpu().numpy()
             else:
                 pose = init_pose
-            times = [desc_timer.diff, mutual_matching_timer.diff,
-                        inlier_timer.diff, correspondence_proposal_timer.diff, ransac_timer.diff]
+            times = [desc_timer.diff, mutual_matching_total,
+                        inlier_total, correspondence_proposal_total, ransac_timer.diff]
             return pose, times
 
     def mutual_matching(self, src_des, tgt_des):
