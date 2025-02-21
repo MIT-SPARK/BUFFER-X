@@ -541,14 +541,18 @@ def rigid_transform_3d(A, B, weights=None, weight_threshold=0):
 # TODO
 # Modify this functions for calculating des_r
 
-def find_des_r(src_pts, src_kpts, tgt_pts, tgt_kpts):
+def find_des_r(src_pts, src_kpts, tgt_pts, tgt_kpts, min_r=0.0, max_r=5.0, tolerance=0.01, thresholds =[5, 2, 0.5]):
     """
     Finds the des_r values corresponding to the given target percentages of points within the radius.
-
+    
     Args:
         src_pts (torch.Tensor): Source points of shape (N, 3).
         src_kpts (torch.Tensor): Keypoints of shape (num_keypts, 3).
-        
+        tgt_pts (torch.Tensor): Target points of shape (M, 3).
+        tgt_kpts (torch.Tensor): Keypoints of shape (num_keypts, 3).
+        min_r (float): Minimum radius threshold.
+        max_r (float): Maximum radius threshold.
+    
     Returns:
         list: The calculated des_r values for the given percentages.
     """
@@ -556,7 +560,7 @@ def find_des_r(src_pts, src_kpts, tgt_pts, tgt_kpts):
 
     # thresholds = [2, 5, 0.5]
     
-    thresholds = [5, 2, 0.5]
+    # thresholds = [5, 2, 0.5]
         
     # thresholds = [5, 2]
     # thresholds = [4, 2]
@@ -571,24 +575,27 @@ def find_des_r(src_pts, src_kpts, tgt_pts, tgt_kpts):
     else:
         pts = tgt_pts    
         kpts = tgt_kpts
+
+    num_pts = pts.shape[0]
+    num_kpts = kpts.shape[1]
         
     if pts.shape[0] > 200000:
             pts = pts[torch.randint(0, pts.shape[0], (200000,))]
     
-    dists = torch.cdist(kpts, pts)  # Calculate distances
+    dists = torch.cdist(kpts, pts) 
+
+    # NOTE(hlim): This filtering reduces unnecessary computations by pre-dividing with the maximum possible radius 
+    dists = dists[dists <= max_r]
     
     for threshold in thresholds:
-        low, high = 0., 5.0  # Start with a wide search range for des_r
-        tolerance = 0.01  # threshold tolerance
-        
+        low, high = min_r, max_r  # Start with a wide search range for des_r
         des_r = 0.0
 
         while high - low > 1e-3:  # Precision threshold
             des_r = (low + high) / 2.0
-            
             points_within_radius = (dists < des_r).int()  # Binary mask for points within radius
-            percentage = points_within_radius.sum(dim=-1).float() / pts.shape[0] * 100  # Percentage per keypoint
-            percentage = percentage.mean().item()  # Average percentage across keypoints
+            percentage = points_within_radius.sum().float() / (num_pts * num_kpts) * 100  # Percentage per keypoint
+            percentage = percentage.item()
             
             if percentage < threshold - tolerance:
                 low = des_r  # Increase des_r to capture more points
