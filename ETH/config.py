@@ -17,9 +17,9 @@ _C.data.manual_seed = 123
 # test
 _C.test = edict()
 _C.test.scale = _C.data.voxel_size_0 / _C.data.voxel_size_1 # 'target size / source size'
-_C.test.experiment_id = '06050001'
+_C.test.experiment_id = '3DMatch'
 _C.test.pose_refine = False
-_C.test.all_stage = ['Ref', 'Desc', 'Keypt', 'Inlier']
+_C.test.all_stage = ['Desc', 'Inlier']
 _C.test.batch_size = 1
 
 # point-wise learner
