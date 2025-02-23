@@ -246,6 +246,7 @@ class buffer(nn.Module):
             s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
             s_fps_idx = pnt2.furthest_point_sample(src_pts[None], cfg.point.num_keypts)
             t_fps_idx = pnt2.furthest_point_sample(tgt_pts[None], cfg.point.num_keypts)
+
             kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
             kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
  
@@ -263,10 +264,10 @@ class buffer(nn.Module):
             correspondence_proposal_total = 0
             # Furthest point sampling 
             for i, des_r in enumerate(des_r_list):
-                cfg.point.num_keypts = num_keypts_list[i] 
+                num_keypt = num_keypts_list[i] 
                 s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
-                s_fps_idx = pnt2.furthest_point_sample(src_pts[None], cfg.point.num_keypts)
-                t_fps_idx = pnt2.furthest_point_sample(tgt_pts[None], cfg.point.num_keypts)
+                s_fps_idx = pnt2.furthest_point_sample(src_pts[None], num_keypt)
+                t_fps_idx = pnt2.furthest_point_sample(tgt_pts[None], num_keypt)
                 kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
                 kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
 
