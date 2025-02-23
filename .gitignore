@@ -7,6 +7,8 @@
 *.pcd
 *.pth
 *.pyc
+*.ply
+*.txt
 
 .idea/
 .vscode/
@@ -20,6 +22,7 @@ _skbuild/
 .gitlab-ci-local/
 .polyscope.ini
 imgui.ini
+events*
 
 cpp/examples/cmake-build-debug*/
 cpp/examples/cmake-build-release*/
