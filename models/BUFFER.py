@@ -241,17 +241,6 @@ class buffer(nn.Module):
                 dataset_name = self.config['data']['dataset']
                 cfg = self.config
                         
-            # Origianl implementation
-            # NOTE(hlim): It only takes < ~ 0.0002 sec, which is negligible
-            s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
-            s_fps_idx = pnt2.furthest_point_sample(src_pts[None], cfg.point.num_keypts)
-            t_fps_idx = pnt2.furthest_point_sample(tgt_pts[None], cfg.point.num_keypts)
-
-            kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
-            kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
- 
-            des_r_list = find_des_r(src_pcd_raw, kpts1, tgt_pcd_raw, kpts2)
-    
             num_keypts_list = [1000, 1500, 2000]
             
             ss_kpts_raw_list = [None] * len(num_keypts_list)
@@ -263,7 +252,7 @@ class buffer(nn.Module):
             inlier_total = 0
             correspondence_proposal_total = 0
             # Furthest point sampling 
-            for i, des_r in enumerate(des_r_list):
+            for i in range(len(num_keypts_list)):
                 num_keypt = num_keypts_list[i] 
                 s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
                 s_fps_idx = pnt2.furthest_point_sample(src_pts[None], num_keypt)
@@ -273,6 +262,9 @@ class buffer(nn.Module):
 
                 ss_kpts_raw_list[i] = kpts1
                 tt_kpts_raw_list[i] = kpts2
+
+            #TODO(mseo): Decide whether using `1` or `-1` 
+            des_r_list = find_des_r(src_pcd_raw, ss_kpts_raw_list[1], tgt_pcd_raw, tt_kpts_raw_list[1])
 
             ss_des_list = [None] * len(num_keypts_list)
             tt_des_list = [None] * len(num_keypts_list)        
