@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch
 import utils.common
 
 
@@ -64,8 +65,6 @@ class Cyclindrical_ConvNet(BaseNet):
             return x
         else:
             return x, mid_feat
-
-
 class Cylindrical_Net (Cyclindrical_ConvNet):
     """
     Compute a 32D descriptor for cylindrical feature maps
@@ -84,6 +83,70 @@ class Cylindrical_Net (Cyclindrical_ConvNet):
         add_conv_2d(32, bn=False, relu=False)
         self.out_dim = dim
 
+class Cylindrical_UNet(nn.Module):
+    """
+    Compute a 32D descriptor for cylindrical feature maps with U-Net-like architecture
+    """
+    def __init__(self, inchan=16, dim=32):
+        super(Cylindrical_UNet, self).__init__()
+        
+       # Initial Conv3D Block
+        self.conv3d = nn.Sequential(
+            nn.Conv3d(inchan, 32, kernel_size=(3, 3, 3), stride=1, dilation=1),
+            nn.BatchNorm3d(32),
+            nn.ReLU(inplace=True),
+        )
+
+        # U-Net Encoder
+        self.encoder1 = self.make_conv_block(32, 32)  # Encoder Level 1
+        self.encoder2 = self.make_conv_block(32, 64)  # Encoder Level 2
+        self.encoder3 = self.make_conv_block(64, 128)  # Encoder Level 3
+
+        # U-Net Bottleneck
+        self.bottleneck = self.make_conv_block(128, 128)
+
+        # U-Net Decoder
+        self.decoder3 = self.make_conv_block(128 + 128, 64)  # Concat with Encoder Level 3
+        self.decoder2 = self.make_conv_block(64 + 64, 32)   # Concat with Encoder Level 2
+        self.decoder1 = self.make_conv_block(32 + 32, 32)   # Concat with Encoder Level 1
+
+        # Final Output Layer
+        self.output_layer = nn.Sequential(
+            nn.Conv2d(32, dim, kernel_size=3, stride=1, dilation=1),
+            nn.BatchNorm2d(dim),
+            nn.ReLU(inplace=True),
+        )
+        
+    def make_conv_block(self, in_channels, out_channels, kernel_size=3, stride=1, dilation=1, bn=True, relu=True):
+        layers = [nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, dilation=dilation)]
+        if bn:
+            layers.append(nn.BatchNorm2d(out_channels))
+        if relu:
+            layers.append(nn.ReLU(inplace=True))
+        return nn.Sequential(*layers)
+    
+    def forward(self, x):
+        
+        # Conv3D Feature Extraction
+        x = self.conv3d(utils.common.pad_image_3d(x, kernel_size=3))
+        x = x.squeeze(2)  # Squeeze 3D output to 2D
+
+        # U-Net Encoder
+        enc1 = self.encoder1(utils.common.pad_image(x, kernel_size=3))  # Level 1
+        enc2 = self.encoder2(utils.common.pad_image(enc1, kernel_size=3))  # Level 2
+        enc3 = self.encoder3(utils.common.pad_image(enc2, kernel_size=3))  # Level 3
+
+        # U-Net Bottleneck
+        bottleneck = self.bottleneck(utils.common.pad_image(enc3, kernel_size=3))
+
+        # U-Net Decoder with Concatenation-based Skip Connections
+        dec3 = self.decoder3(utils.common.pad_image(torch.cat([bottleneck, enc3], dim=1), kernel_size=3))  # Concat with Encoder Level 3
+        dec2 = self.decoder2(utils.common.pad_image(torch.cat([dec3, enc2], dim=1), kernel_size=3))  # Concat with Encoder Level 2
+        dec1 = self.decoder1(utils.common.pad_image(torch.cat([dec2, enc1], dim=1), kernel_size=3))  # Concat with Encoder Level 1
+
+        # Final Output
+        output = self.output_layer(utils.common.pad_image(dec1, kernel_size=3))
+        return output, None
 
 class CostBlock(BaseNet):
     def __init__(self, inchan=32, dilated=True, dilation=1, bn=True, bn_affine=False):

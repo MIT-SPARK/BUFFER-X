@@ -42,6 +42,7 @@ class MiniSpinNet(nn.Module):
         )
 
         self.conv_net = pn.Cylindrical_Net(inchan=16, dim=32)
+        # self.conv_net = pn.Cylindrical_UNet(inchan=16, dim=32)
 
     def forward(self, pts, kpts, des_r, dataset_name, z_axis=None, is_aug=False):
         

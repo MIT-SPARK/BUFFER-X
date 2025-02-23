@@ -2,6 +2,9 @@ import os
 import open3d
 import numpy as np
 import torch
+from sklearn.neighbors import NearestNeighbors
+from sklearn.decomposition import PCA
+import time
 
 def get_pcd(pcdpath, filename):
     return open3d.io.read_point_cloud(os.path.join(pcdpath, filename + '.ply'))
@@ -132,7 +135,7 @@ def analyze_pointcloud_statistics(pcd, num_sample_points=1000, voxel_size=0.05):
         "avg_num_points_within_voxels": avg_num_points_within_voxels,
         "total_points": total_points,
     }
-    
+
 def find_voxel_size(src_pcd, tgt_pcd):
     """
     Finds the voxel_size corresponding to the given target percentages of points within the radius.
@@ -151,35 +154,26 @@ def find_voxel_size(src_pcd, tgt_pcd):
         points = src_pts
     else:
         points = tgt_pts
-    
-    # points = np.asarray(pcd.points)
+        
     points_num = points.shape[0]
     sample_size = int(points_num / 10)
     sampled_indices = np.random.choice(points_num, size=sample_size, replace=False)
     
     sampled_points = points[sampled_indices]
-    sampled_points_num = sampled_points.shape[0]
-    target_percentage = 0.005
-    tolerance = 0.0002
-
-    # Binary search for voxel_size
-    low, high = 0., 0.2
-    while high - low > 1e-4:
-        voxel_size = (low + high) / 2.0
-
-        # Voxelize points
-        voxel_indices = np.floor(sampled_points / voxel_size).astype(int)
-        unique_voxels, counts = np.unique(voxel_indices, axis=0, return_counts=True)
-
-        # Calculate average number of points per voxel
-        avg_points_per_voxel = np.mean(counts)
-        percentage = avg_points_per_voxel / sampled_points_num * 100
-
-        # Adjust range based on the target percentage
-        if percentage < target_percentage - tolerance:
-            low = voxel_size
-        elif percentage > target_percentage + tolerance:
-            high = voxel_size
-        else:
-            break
+    
+    pca = PCA(n_components=3)
+    pca.fit(sampled_points)
+    
+    transformed_points = pca.transform(points)
+    x_range = transformed_points[:, 0].max() - transformed_points[:, 0].min()
+    y_range = transformed_points[:, 1].max() - transformed_points[:, 1].min()
+    z_range = transformed_points[:, 2].max() - transformed_points[:, 2].min()
+    
+    if (x_range > z_range * 3 and y_range > z_range * 3):
+        alpha = 1.5
+    else:
+        alpha = 2.0
+    
+    voxel_size = np.sqrt(z_range) / 100 * alpha
+    
     return round(voxel_size, 4)

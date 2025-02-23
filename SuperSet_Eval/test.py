@@ -3,7 +3,7 @@ import sys
 sys.path.append('../')
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 import torch
 import torch.nn as nn
 import math
@@ -21,6 +21,7 @@ from NewerCollege.config import make_cfg as newercollege_make_cfg
 from KimeraMulti.config import make_cfg as kimeramulti_make_cfg
 from Tiers.config import make_cfg as tiers_make_cfg
 from KAIST.config import make_cfg as kaist_make_cfg
+from ETH.config import make_cfg as eth_make_cfg
 
 from SuperSet_Eval.config import make_cfg
 from utils.timer import Timer
@@ -30,6 +31,8 @@ from models.BUFFER import buffer
 
 from torch import optim
 
+from ThreeDMatch.test import evaluate_registration, read_trajectory, read_trajectory_info
+
 arg_lists = []
 parser = argparse.ArgumentParser()
 
@@ -37,7 +40,7 @@ if __name__ == '__main__':
     print("Start testing...")
     cfg = make_cfg()
     indoor_datasets = ['3DMatch', 'Scannetpp_faro', 'Scannetpp_iphone']
-    outdoor_datasets = ['KITTI', 'WOD', 'NewerCollege', 'KimeraMulti', 'Tiers', 'KAIST']
+    outdoor_datasets = ['KITTI', 'WOD', 'NewerCollege', 'KimeraMulti', 'Tiers', 'KAIST', 'ETH']
     for subsetdataset in cfg.data.subsetdatasets:
         if (subsetdataset == 'KITTI'):
             cfg_tmp = kitti_make_cfg()
@@ -56,6 +59,8 @@ if __name__ == '__main__':
         elif (subsetdataset == 'Tiers'):
             cfg_tmp = tiers_make_cfg()
         elif (subsetdataset == 'KAIST'):
+            cfg_tmp = kaist_make_cfg()
+        elif (subsetdataset == 'ETH'):
             cfg_tmp = kaist_make_cfg()
         else:
             raise ValueError("Unsupported dataset name has been given")
@@ -86,6 +91,8 @@ if __name__ == '__main__':
     recall_list = []
     rte_list = []
     rre_list = []
+    
+    timestr = time.strftime('%m%d%H%M')
     
     for subsetdataset in cfg.data.subsetdatasets:
         print(f"Start testing {subsetdataset}...")
@@ -124,7 +131,23 @@ if __name__ == '__main__':
                     trans_est = trans_est
                 else:
                     trans_est = np.eye(4, 4)
-
+                if subsetdataset == '3DMatch':
+                    scene = data_source['src_id'].split('/')[-2]
+                    src_id = data_source['src_id'].split('/')[-1].split('_')[-1]
+                    tgt_id = data_source['tgt_id'].split('/')[-1].split('_')[-1]
+                    logpath = f"log_{subsetdataset}/{scene}"
+                    if not os.path.exists(logpath):
+                        os.makedirs(logpath)
+                    # write the transformation matrix into .log file for evaluation.
+                    with open(os.path.join(logpath, f'{timestr}.log'), 'a+') as f:
+                        trans = np.linalg.inv(trans_est)
+                        s1 = f'{src_id}\t {tgt_id}\t  1\n'
+                        f.write(s1)
+                        f.write(f"{trans[0, 0]}\t {trans[0, 1]}\t {trans[0, 2]}\t {trans[0, 3]}\t \n")
+                        f.write(f"{trans[1, 0]}\t {trans[1, 1]}\t {trans[1, 2]}\t {trans[1, 3]}\t \n")
+                        f.write(f"{trans[2, 0]}\t {trans[2, 1]}\t {trans[2, 2]}\t {trans[2, 3]}\t \n")
+                        f.write(f"{trans[3, 0]}\t {trans[3, 1]}\t {trans[3, 2]}\t {trans[3, 3]}\t \n")
+                            
                 ####### calculate the recall #######
                 # rte_thresh = 2.0
                 # rre_thresh = 5.0
@@ -146,7 +169,9 @@ if __name__ == '__main__':
                     print(f"[{i + 1}/{num_batch}] "
                         f"Registration Recall: {temp_recall:.4f} "
                         f"RTE: {temp_te:.4f} "
-                        f"RRE: {temp_re:.4f} ")
+                        f"RRE: {temp_re:.4f} "
+                        f"data_time: {overall_time[0] / (i + 1):.4f}s "
+                        f"model_time: {overall_time[1] / (i + 1):.4f}s ")
         states = np.array(states)
         Recall = states[:, 0].sum() / states.shape[0]
         TE = states[states[:, 0] == 1, 1].mean()
@@ -154,11 +179,33 @@ if __name__ == '__main__':
         recall_list.append(Recall)
         rte_list.append(TE)
         rre_list.append(RE)
+        if subsetdataset == '3DMatch':
+            gtpath = cfg[subsetdataset].data.root + f'/test/{subsetdataset}/gt_result'
+            scenes = sorted(os.listdir(gtpath))
+            scene_names = [os.path.join(gtpath, ele) for ele in scenes]
+            recall_3DMatch = []
+            for idx, scene in enumerate(scene_names):
+                # ground truth info
+                gt_pairs, gt_traj = read_trajectory(os.path.join(scene, "gt.log"))
+                n_fragments, gt_traj_cov = read_trajectory_info(os.path.join(scene, "gt.info"))
+
+                # estimated info
+                est_pairs, est_traj = read_trajectory(os.path.join(f"log_{subsetdataset}", scenes[idx], f'{timestr}.log'))
+
+                temp_precision, temp_recall, c_flag, errors = evaluate_registration(n_fragments, est_traj,
+                                                                                    est_pairs, gt_pairs,
+                                                                                    gt_traj, gt_traj_cov)
+                recall_3DMatch.append(temp_recall)
+            
+        
         print()
         print(f"---------------{subsetdataset} Test Result---------------")
-        print(f"Registration Recall: {Recall:.4f}")
-        print(f"RTE: {TE:.4f}")
+        print(f"Registration Recall: {Recall:.8f}")
+        if subsetdataset == '3DMatch':
+            print(f'Registration Recall (3DMatch setting): {np.array(recall_3DMatch).mean():.8f}')
+        print(f"RTE: {TE*100:.8f}")
         print(f"RRE: {RE:.4f}")
+       
         
         average_times = overall_time / num_batch
         print(f"Average data_time: {average_times[0]:.4f}s "
@@ -175,12 +222,14 @@ if __name__ == '__main__':
         title = f" {subsetdataset} Test Result "
         print(f"{title.center(max_length, '-')}")
         print(f'Registration Recall: {recall_list[i]:.8f}')
+        if subsetdataset == '3DMatch':
+            print(f'Registration Recall (3DMatch setting): {np.array(recall_3DMatch).mean():.8f}')
         print(f'RTE: {rte_list[i]*100:.8f}')
         print(f'RRE: {rre_list[i]:.8f}')
     print('-' * max_length)
     print(f'Overall Registration Recall: {np.mean(recall_list):.8f}')
     
-    result_path = f"results/{experiment_id}"
+    result_path = f"results/{experiment_id}_{timestr}"
     if not os.path.exists(result_path):
         os.makedirs(result_path)
     with open(f"{result_path}/result.txt", 'w') as f:
@@ -192,6 +241,8 @@ if __name__ == '__main__':
             title = f" {subsetdataset} Test Result "
             f.write(f"{title.center(max_length, '-')}\n")
             f.write(f'Registration Recall: {recall_list[i]:.8f}\n')
+            if subsetdataset == '3DMatch':
+                f.write(f'Registration Recall (3DMatch setting): {np.array(recall_3DMatch).mean():.8f}\n')
             f.write(f'RTE: {rte_list[i]*100:.8f}\n')
             f.write(f'RRE: {rre_list[i]:.8f}\n')
 

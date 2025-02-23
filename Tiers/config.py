@@ -7,7 +7,7 @@ _C = edict()
 # data
 _C.data = edict()
 _C.data.dataset = 'Tiers'
-_C.data.root = '../../datasets/250118_tiers'
+_C.data.root = '../../datasets/250212_tiers'
 _C.data.downsample = 0.05 # first downsampling
 _C.data.voxel_size_0 = 0.30 # second downsampling
 _C.data.voxel_size_1 = _C.data.voxel_size_0
@@ -23,11 +23,11 @@ _C.train.num_workers = 0
 _C.train.pos_num = 512
 _C.train.augmentation_noise = 0.01
 _C.train.pretrain_model = ''
-_C.train.all_stage = ['Ref', 'Desc', 'Keypt', 'Inlier']
+_C.train.all_stage = ['Desc','Inlier']
 
 # test
 _C.test = edict()
-_C.test.experiment_id = '06050001'
+_C.test.experiment_id = '3DMatch'
 _C.test.pose_refine = False
 
 # optim

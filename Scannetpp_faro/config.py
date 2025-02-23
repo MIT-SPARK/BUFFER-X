@@ -23,11 +23,11 @@ _C.train.num_workers = 0
 _C.train.pos_num = 512
 _C.train.augmentation_noise = 0.001
 _C.train.pretrain_model = '' #snapshot/06132318
-_C.train.all_stage = ['Ref', 'Desc', 'Keypt', 'Inlier'] #['Ref', 'Desc', 'Keypt', 'Inlier']
+_C.train.all_stage = ['Desc', 'Inlier'] #['Ref', 'Desc', 'Keypt', 'Inlier']
 
 # test
 _C.test = edict()
-_C.test.experiment_id = '06132318'
+_C.test.experiment_id = '3DMatch'
 _C.test.pose_refine = False
 
 # optim
