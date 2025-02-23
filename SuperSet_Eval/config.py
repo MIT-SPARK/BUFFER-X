@@ -6,7 +6,8 @@ _C = edict()
 _C.data = edict()
 _C.data.dataset = 'SuperSet'
 # Note: It should be equal to the `_C.data.dataset` in KITTI and ThreeDMatch config file
-_C.data.subsetdatasets = ['KITTI', '3DMatch', 'Scannetpp_faro', 'Scannetpp_iphone', 'WOD', 'NewerCollege', 'KimeraMulti', 'Tiers', 'KAIST', 'ETH']
+_C.data.subsetdatasets = ['3DMatch', 'Scannetpp_faro', 'Scannetpp_iphone']
+# _C.data.subsetdatasets = ['KITTI', 'WOD', 'NewerCollege', 'KimeraMulti', 'Tiers', 'KAIST']
 _C.data.voxel_size_0 = 0.035 # Will eliminate this
 _C.data.manual_seed = 123
 
@@ -24,7 +25,7 @@ _C.train.all_stage = ['Desc', 'Inlier']
 
 # test
 _C.test = edict()
-_C.test.experiment_id = 'KITTI'
+_C.test.experiment_id = '02051633 copy'
 _C.test.pose_refine = False
 
 # point-wise learner

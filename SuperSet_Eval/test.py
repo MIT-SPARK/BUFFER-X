@@ -3,7 +3,7 @@ import sys
 sys.path.append('../')
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 import torch
 import torch.nn as nn
 import math
@@ -200,10 +200,10 @@ if __name__ == '__main__':
         
         print()
         print(f"---------------{subsetdataset} Test Result---------------")
-        print(f"Registration Recall: {Recall:.4f}")
+        print(f"Registration Recall: {Recall:.8f}")
         if subsetdataset == '3DMatch':
             print(f'Registration Recall (3DMatch setting): {np.array(recall_3DMatch).mean():.8f}')
-        print(f"RTE: {TE:.4f}")
+        print(f"RTE: {TE*100:.8f}")
         print(f"RRE: {RE:.4f}")
        
         
