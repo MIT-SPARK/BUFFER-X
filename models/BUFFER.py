@@ -368,7 +368,7 @@ class buffer(nn.Module):
                 #             kpts2 = tgt_pts[sampled_indices_tgt.flatten()].unsqueeze(0)
                     
             desc_timer.toc()
-            print("Desc time:", desc_timer.diff)
+            # print("Desc time:", desc_timer.diff)
             R = torch.cat(R_list, dim=0)
             t = torch.cat(t_list, dim=0)
             ss_kpts = torch.cat(ss_kpts_list, dim=0)
