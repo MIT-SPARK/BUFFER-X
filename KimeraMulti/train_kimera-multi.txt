@@ -1,3 +1,0 @@
-acl_jackal
-hathor
-sparkal1
