@@ -117,10 +117,11 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
     batched_features_list = []# = np.ones_like(input_points[0][:, :0]).astype(np.float32)
     batched_voxel_size_list = []
     batched_dataset_names = []
+    batched_sphericity = []
 
     assert len(list_data) == 1
     list_data = list_data[0]
-
+    
     s_pts, t_pts = list_data['src_fds_pts'], list_data['tgt_fds_pts']
     relt_pose = list_data['relt_pose']
     s_kpt, t_kpt = list_data['src_sds_pts'], list_data['tgt_sds_pts']
@@ -137,10 +138,12 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
     batched_lengths_list.append(len(tgt_kpt))
     batched_voxel_size_list.append(list_data['voxel_size'])
     batched_dataset_names.append(list_data['dataset_name'])
+    batched_sphericity.append(list_data['sphericity'])
     batched_points = torch.from_numpy(np.concatenate(batched_points_list, axis=0))
     batched_features = torch.from_numpy(np.concatenate(batched_features_list, axis=0))
     batched_lengths = torch.from_numpy(np.array(batched_lengths_list)).int()
     batched_voxel_sizes = torch.from_numpy(np.array(batched_voxel_size_list))
+    batched_sphericity = torch.from_numpy(np.array(batched_sphericity)).float()
     # Starting radius of convolutions
     r_normal = config.data.voxel_size_0 * config.point.conv_radius
 
@@ -225,7 +228,6 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
         r_normal *= 2.0
         layer += 1
         layer_blocks = []
-
     ###############
     # Return inputs
     ###############
@@ -243,8 +245,9 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
         'relt_pose': torch.from_numpy(relt_pose).float(),
         'src_id': src_id,
         'tgt_id': tgt_id,
-        'voxel_sizes': batched_voxel_sizes,
+        'voxel_sizes': list_data['sphericity'],
         'dataset_names': batched_dataset_names,
+        'sphericity': batched_sphericity,
     }
 
     return dict_inputs

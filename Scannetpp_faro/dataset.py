@@ -66,7 +66,7 @@ class ScannetppFaroDataset(Data.Dataset):
         tgt_pcd = o3d.io.read_point_cloud(tgt_path + '.ply')
         tgt_pcd.paint_uniform_color([0, 0.651, 0.929])
         
-        self.config.data.downsample = find_voxel_size(src_pcd, tgt_pcd)
+        self.config.data.downsample, sphericity = find_voxel_size(src_pcd, tgt_pcd)
         src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample)
         src_pts = np.array(src_pcd.points)
         np.random.shuffle(src_pts)
@@ -130,7 +130,8 @@ class ScannetppFaroDataset(Data.Dataset):
                 'src_id': src_id,
                 'tgt_id': tgt_id,
                 'voxel_size': ds_size,
-                'dataset_name': self.config.data.dataset}
+                'dataset_name': self.config.data.dataset,
+                'sphericity': sphericity,}
 
     def __len__(self):
         return self.length

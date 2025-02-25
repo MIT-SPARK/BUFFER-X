@@ -163,17 +163,23 @@ def find_voxel_size(src_pcd, tgt_pcd):
     
     pca = PCA(n_components=3)
     pca.fit(sampled_points)
-    
+      
     transformed_points = pca.transform(points)
     x_range = transformed_points[:, 0].max() - transformed_points[:, 0].min()
     y_range = transformed_points[:, 1].max() - transformed_points[:, 1].min()
     z_range = transformed_points[:, 2].max() - transformed_points[:, 2].min()
     
-    if (x_range > z_range * 3 and y_range > z_range * 3):
+    eigenvalues = pca.explained_variance_
+    lambda1, lambda2, lambda3 = sorted(eigenvalues, reverse=True)
+    # linearity = (lambda1 - lambda2) / lambda1
+    # planarity = (lambda2 - lambda3) / lambda1
+    sphericity = lambda3 / lambda1
+    
+    if (sphericity < 0.05):
         alpha = 1.5
     else:
         alpha = 2.0
-    
+
     voxel_size = np.sqrt(z_range) / 100 * alpha
     
-    return round(voxel_size, 4)
+    return round(voxel_size, 4), sphericity

@@ -117,7 +117,7 @@ class ThreeDMatchDataset(Data.Dataset):
         tgt_pcd = o3d.io.read_point_cloud(tgt_path + '.ply')
         
         if self.split == 'test':
-            self.config.data.downsample = find_voxel_size(src_pcd, tgt_pcd)
+            self.config.data.downsample, sphericity = find_voxel_size(src_pcd, tgt_pcd)
         
         src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample)
         src_pts = np.array(src_pcd.points)
@@ -181,7 +181,6 @@ class ThreeDMatchDataset(Data.Dataset):
         #     tgt_noms = np.array(tgt_pcd.normals)
         #     tgt_kpt = np.concatenate([tgt_kpt, tgt_noms], axis=-1)
 
-
         return {'src_fds_pts': src_pts, # first downsampling
                 'tgt_fds_pts': tgt_pts,
                 'relt_pose': relt_pose,
@@ -191,6 +190,7 @@ class ThreeDMatchDataset(Data.Dataset):
                 'tgt_id': tgt_id,
                 'voxel_size': ds_size,
                 'dataset_name': self.config.data.dataset,
+                'sphericity': sphericity,
                 }
 
     def __len__(self):

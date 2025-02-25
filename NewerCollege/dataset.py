@@ -104,7 +104,7 @@ class NewerCollegeDataset(Data.Dataset):
         src_pcd = make_open3d_point_cloud(xyz0, [1, 0.706, 0])
         tgt_pcd = make_open3d_point_cloud(xyz1, [0, 0.651, 0.929])
 
-        self.config.data.downsample = find_voxel_size(src_pcd, tgt_pcd)
+        self.config.data.downsample, sphericity = find_voxel_size(src_pcd, tgt_pcd)
         
         src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample)
         src_pts = np.array(src_pcd.points)
@@ -169,7 +169,9 @@ class NewerCollegeDataset(Data.Dataset):
                 'voxel_size': ds_size,
                 'src_id': '%s_%d' % (drive, t0),
                 'tgt_id': '%s_%d' % (drive, t1),
-                'dataset_name': self.config.data.dataset}
+                'dataset_name': self.config.data.dataset,
+                'sphericity': sphericity,
+                }
 
     def apply_transform(self, pts, trans):
         R = trans[:3, :3]

@@ -247,7 +247,8 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
         'tgt_id': tgt_id,
         'relt_pose': torch.from_numpy(relt_pose).float(),
         'voxel_sizes': batched_voxel_sizes,
-        'dataset_names': batched_dataset_names
+        'dataset_names': batched_dataset_names,
+        'sphericity': list_data['sphericity'],
     }
 
     return dict_inputs

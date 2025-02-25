@@ -238,6 +238,7 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
         'relt_pose': torch.from_numpy(relt_pose).float(),
         'src_id': src_id,
         'tgt_id': tgt_id,
+        'sphericity': list_data['sphericity'],
     }
 
     return dict_inputs

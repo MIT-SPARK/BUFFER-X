@@ -65,7 +65,7 @@ class ETHTestset(Data.Dataset):
         tgt_pcd = o3d.io.read_point_cloud(tgt_path + '.ply')
         tgt_pcd.paint_uniform_color([0, 0.651, 0.929])
         
-        self.config.data.downsample = find_voxel_size(src_pcd, tgt_pcd)
+        self.config.data.downsample, sphericity = find_voxel_size(src_pcd, tgt_pcd)
         
         src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample)
         src_pts = np.array(src_pcd.points)
@@ -109,14 +109,15 @@ class ETHTestset(Data.Dataset):
         # tgt_noms = np.array(tgt_pcd.normals)
         # tgt_kpt = np.concatenate([tgt_kpt, tgt_noms], axis=-1)
 
-
         return {'src_fds_pts': src_pts, # first downsampling
                 'tgt_fds_pts': tgt_pts,
                 'relt_pose': relt_pose,
                 'src_sds_pts': src_kpt, # second downsampling
                 'tgt_sds_pts': tgt_kpt,
                 'src_id': src_id,
-                'tgt_id': tgt_id}
+                'tgt_id': tgt_id,
+                'sphericity': sphericity
+                }
 
 
     def __len__(self):
