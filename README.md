@@ -5,21 +5,28 @@
 ### Directory Re-organization
 - `dataset`
     - `dataloader.py`
-    - `threedmatch_dataset.py`
-    - `kitti_dataset.py`
-    - `eth_dataset.py`
-    - `kaist_dataset.py`
+    - `threedmatch`
+    - `kitti`
+    - `kaist`
+    - ...
 - `config`
     - `config.py`
     - `threedmatch_config.py`
     - `kitti_config.py`
-    - `eth_config.py`
     - `kaist_config.py`
+    - ...
 - `models`
+    - `BUFFER.py`
+    - ...
 - `utils`
+    - `common.py`
+    - ...
 - `snapshot`
+    - `threedmatch`
+    - `kitti`
 - `test.py`
 - `train.py`
+- `trainer.py`
 - `demo.py`
 
 
