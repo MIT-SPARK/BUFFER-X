@@ -1,5 +1,5 @@
 import sys
-import copy
+
 sys.path.append('../')
 import os
 
@@ -13,8 +13,8 @@ from ThreeDMatch.config import make_cfg
 from models.BUFFER import buffer
 from ThreeDMatch.dataloader import get_dataloader
 from utils.SE3 import *
+from tqdm import tqdm
 
-import open3d as o3d
 
 def read_trajectory(filename, dim=4):
     """
@@ -230,153 +230,26 @@ if __name__ == '__main__':
     data_timer, model_timer = Timer(), Timer()
 
     overall_time = np.zeros(7)
-    fail_list = []
+    scene_scale = []
     with torch.no_grad():
         states = []
         num_batch = len(test_loader)
         data_iter = iter(test_loader)
-        for i in range(num_batch):
+        for i in tqdm(range(num_batch)):
             data_timer.tic()
             data_source = data_iter.__next__()
-
-            data_timer.toc()
-            model_timer.tic()
-            trans_est, times = model(data_source)
-            model_timer.toc()
-
-            if trans_est is not None:
-                trans_est = trans_est
-            else:
-                trans_est = np.eye(4, 4)
-
-            scene = data_source['src_id'].split('/')[-2]
-            src_id = data_source['src_id'].split('/')[-1].split('_')[-1]
-            tgt_id = data_source['tgt_id'].split('/')[-1].split('_')[-1]
-            logpath = f"log_{cfg.data.dataset}/{scene}"
-            if not os.path.exists(logpath):
-                os.makedirs(logpath)
-            # write the transformation matrix into .log file for evaluation.
-            with open(os.path.join(logpath, f'{timestr}.log'), 'a+') as f:
-                trans = np.linalg.inv(trans_est)
-                s1 = f'{src_id}\t {tgt_id}\t  1\n'
-                f.write(s1)
-                f.write(f"{trans[0, 0]}\t {trans[0, 1]}\t {trans[0, 2]}\t {trans[0, 3]}\t \n")
-                f.write(f"{trans[1, 0]}\t {trans[1, 1]}\t {trans[1, 2]}\t {trans[1, 3]}\t \n")
-                f.write(f"{trans[2, 0]}\t {trans[2, 1]}\t {trans[2, 2]}\t {trans[2, 3]}\t \n")
-                f.write(f"{trans[3, 0]}\t {trans[3, 1]}\t {trans[3, 2]}\t {trans[3, 3]}\t \n")
-
-            ####### calculate the recall of DGR #######
-            rte_thresh = 0.3
-            rre_thresh = 15
-            trans = data_source['relt_pose'].numpy()
-            rte = np.linalg.norm(trans_est[:3, 3] - trans[:3, 3])
-            rre = np.arccos(
-                np.clip((np.trace(trans_est[:3, :3].T @ trans[:3, :3]) - 1) / 2, -1 + 1e-16, 1 - 1e-16)) * 180 / math.pi
-            states.append(np.array([rte < rte_thresh and rre < rre_thresh, rte, rre]))
             
-            fail = False
-            if rte > rte_thresh or rre > rre_thresh:
-                print(f"{i}th fragment fails, RRE：{rre}, RTE：{rte}")
-                fail_list.append([scene, src_id, tgt_id])
-                fail = True
-            overall_time += np.array([data_timer.diff, model_timer.diff, *times])
-            torch.cuda.empty_cache()
-            
-            # if i % 10 == 0:
-            #     src_pts, tgt_pts = data_source['src_pcd_real_raw'], data_source['tgt_pcd_real_raw']
-            #     src_pcd = o3d.geometry.PointCloud()
-            #     src_pcd.points = o3d.utility.Vector3dVector(src_pts)
-            #     src_pcd.paint_uniform_color([1, 0.706, 0])
-                
-            #     src_gray_pts = data_source['src_pcd_real_raw']
-            #     src_gray_pcd = o3d.geometry.PointCloud()
-            #     src_gray_pcd.paint_uniform_color([0.5, 0.5, 0.5])
-                
-            #     tgt_pcd = o3d.geometry.PointCloud()
-            #     tgt_pcd.points = o3d.utility.Vector3dVector(tgt_pts)
-            #     tgt_pcd.paint_uniform_color([0, 0.651, 0.929])
-                
-            #     pair_name = f"{scene}_{src_id}_{tgt_id}"
-            #     ply_path = f"../results_ply/3DLoMatch/"
-            #     if not os.path.exists(ply_path):
-            #         os.makedirs(ply_path)
-                
-            #     before_matching = src_pcd + tgt_pcd
-            #     o3d.io.write_point_cloud(f"../results_ply/3DLoMatch/{pair_name}_before_matching.ply", before_matching)
-                
-            #     before_matching_gray = src_gray_pcd + tgt_pcd
-            #     o3d.io.write_point_cloud(f"../results_ply/3DLoMatch/{pair_name}_before_matching_gray.ply", before_matching_gray)
-                
-            #     src_pcd.transform(trans)
-            #     gt_matching = src_pcd + tgt_pcd
-            #     o3d.io.write_point_cloud(f"../results_ply/3DLoMatch/{pair_name}_gt_matching.ply", gt_matching)
-                
-            #     src_pcd.transform(np.linalg.inv(trans))
-            #     src_pcd.transform(trans_est)
-            #     pred_matching = src_pcd + tgt_pcd
-            #     result = "Fail" if fail else "Success"
-            #     o3d.io.write_point_cloud(f"../results_ply/3DLoMatch/{pair_name}_{result}_pred_matching.ply", pred_matching)
-            
-            if (i + 1) % 100 == 0 or i == num_batch - 1:
-                temp_states = np.array(states)
-                temp_recall = temp_states[:, 0].sum() / temp_states.shape[0]
-                temp_te = temp_states[temp_states[:, 0] == 1, 1].mean()
-                temp_re = temp_states[temp_states[:, 0] == 1, 2].mean()
-                print(f"[{i + 1}/{num_batch}] "
-                      f"Registration Recall: {temp_recall:.4f} "
-                      f"RTE: {temp_te:.4f} "
-                      f"RRE: {temp_re:.4f} "
-                      f"data_time: {data_timer.diff:.4f}s "
-                      f"model_time: {model_timer.diff:.4f}s ")
-    fail_pairs_save_path = "fail_pairs.txt"
-    with open(fail_pairs_save_path, 'w') as f:
-        for fail_pair in fail_list:
-            f.write(f"{fail_pair[0]}: {fail_pair[1]} {fail_pair[2]}\n")
-    states = np.array(states)
-    Recall = states[:, 0].sum() / states.shape[0]
-    TE = states[states[:, 0] == 1, 1].mean()
-    RE = states[states[:, 0] == 1, 2].mean()
+            src_pts = data_source['src_pcd_raw']
+            tgt_pts = data_source['tgt_pcd_raw']
 
-    # calculate Registration Recall
-    if cfg.data.dataset == '3DMatch':
-        gtpath = cfg.data.root + f'/test/{cfg.data.dataset}/gt_result'
-    elif cfg.data.dataset == '3DLoMatch':
-        gtpath = cfg.data.root + f'/test/{cfg.data.dataset}'
-    scenes = sorted(os.listdir(gtpath))
-    scene_names = [os.path.join(gtpath, ele) for ele in scenes]
-    recall = []
-    
-    scene_recall_path = f"scene_recall/{experiment_id}/{timestr}.txt"
-    if not os.path.exists(f"scene_recall/{experiment_id}"):
-        os.makedirs(f"scene_recall/{experiment_id}")
-    with open(scene_recall_path, 'w') as f:
-        for idx, scene in enumerate(scene_names):
-            scene_name = scene.split('/')[-1]
-            # ground truth info
-            gt_pairs, gt_traj = read_trajectory(os.path.join(scene, "gt.log"))
-            n_fragments, gt_traj_cov = read_trajectory_info(os.path.join(scene, "gt.info"))
+            # sample points
+            src_max_range = np.max(np.linalg.norm(src_pts, axis=1))
+            tgt_max_range = np.max(np.linalg.norm(tgt_pts, axis=1))
+            scene_scale.append((src_max_range+tgt_max_range)/2)
 
-            # estimated info
-            est_pairs, est_traj = read_trajectory(os.path.join(f"log_{cfg.data.dataset}", scenes[idx], f'{timestr}.log'))
-            # est_pairs, est_traj = read_trajectory(os.path.join(f"3DMatch_5000_prob", scenes[idx], f'est.log'))
-            temp_precision, temp_recall, c_flag, errors = evaluate_registration(n_fragments, est_traj,
-                                                                                est_pairs, gt_pairs,
-                                                                                    gt_traj, gt_traj_cov)
-            recall.append(temp_recall)
-            f.write(f"{scene_name}: {temp_recall:.8f}\n")
-        f.write(f"Average Recall: {np.array(recall).mean():.8f}")
-    print()
-    print("---------------Test Result---------------")
-    print(f'Registration Recall: {Recall:.8f}')
-    print(f'Registration Recall (3DMatch setting): {np.array(recall).mean():.8f}')
-    print(f'RTE: {TE*100:.8f}')
-    print(f'RRE: {RE:.8f}')
-    
-    average_times = overall_time / num_batch
-    print(f"Average data_time: {average_times[0]:.4f}s "
-        f"Average model_time: {average_times[1]:.4f}s ")
-    print(f"desc_time: {average_times[2]:.4f}s "
-        f"mutual_matching_time: {average_times[3]:.4f}s "
-        f"inlier_time: {average_times[4]:.4f}s "
-        f"correspondence_proposal_time: {average_times[5]:.4f}s "
-        f"ransac_time: {average_times[6]:.4f}s ")
+        mean_scale = np.mean(scene_scale)
+        scene_scale.append(mean_scale)
+        save_scale_path = f'scale_analysis_3DLoMatch.txt'
+        with open(save_scale_path, 'w') as f:
+            f.write(f"3DLoMatch: {mean_scale}\n")
+        print(f"Scale analysis has been saved to {save_scale_path}")

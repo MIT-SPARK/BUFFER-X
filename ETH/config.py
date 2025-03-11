@@ -17,7 +17,7 @@ _C.data.manual_seed = 123
 # test
 _C.test = edict()
 _C.test.scale = _C.data.voxel_size_0 / _C.data.voxel_size_1 # 'target size / source size'
-_C.test.experiment_id = '3DMatch'
+_C.test.experiment_id = 'KITTI_Rad_Aug_Uniform'
 _C.test.pose_refine = False
 _C.test.all_stage = ['Desc', 'Inlier']
 _C.test.batch_size = 1
@@ -29,7 +29,7 @@ _C.point.in_feats_dim = 3
 _C.point.first_feats_dim = 32
 _C.point.conv_radius = 2.0
 _C.point.keypts_th = 0.5
-_C.point.num_keypts = 1500
+_C.point.num_keypts = 2000
 
 # patch-wise embedder
 _C.patch = edict()

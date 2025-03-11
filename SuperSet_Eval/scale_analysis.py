@@ -3,7 +3,7 @@ import sys
 sys.path.append('../')
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 import torch
 import torch.nn as nn
 import math
@@ -30,7 +30,7 @@ from utils.SE3 import *
 from models.BUFFER import buffer
 
 from torch import optim
-
+from tqdm import tqdm
 from ThreeDMatch.test import evaluate_registration, read_trajectory, read_trajectory_info
 
 arg_lists = []
@@ -88,51 +88,50 @@ if __name__ == '__main__':
     model = nn.DataParallel(model, device_ids=[0])
     model.eval()
     
-    data_list = []
+    recall_list = []
+    rte_list = []
+    rre_list = []
     
     timestr = time.strftime('%m%d%H%M')
-    sphericity_file = f'sphericity.txt'
-    with open(sphericity_file, 'w') as f:
-        f.write(f"Dataset, Mean, Min, Max\n")
-        for subsetdataset in cfg.data.subsetdatasets:
-            f.write(f"{subsetdataset}, ")
-            print(f"Start testing {subsetdataset}...")
-            cfg[subsetdataset].stage = 'test'
-            test_loader = get_dataloader(split='test',
-                                        config=cfg,
-                                        subsetdataset=subsetdataset,
-                                        shuffle=False,
-                                        num_workers=cfg.train.num_workers,
-                                        )
-            print(f"{subsetdataset} Test set size:", test_loader.dataset.__len__())
-            
-            sphericity_list = []
+    
+    scale_list = []
+    for subsetdataset in cfg.data.subsetdatasets:
+        print(f"Start testing {subsetdataset}...")
+        cfg[subsetdataset].stage = 'test'
+        test_loader = get_dataloader(split='test',
+                                      config=cfg,
+                                     subsetdataset=subsetdataset,
+                                     shuffle=False,
+                                     num_workers=cfg.train.num_workers,
+                                     )
+        print(f"{subsetdataset} Test set size:", test_loader.dataset.__len__())
+        data_timer, model_timer = Timer(), Timer()
+        
+        scene_scale = []
+        overall_time = np.zeros(7)
+        with torch.no_grad():
             states = []
             num_batch = len(test_loader)
             data_iter = iter(test_loader)
-            for i in range(num_batch):
+            for i in tqdm(range(num_batch)):
                 data_source = data_iter.__next__()
-                sphericity = data_source['sphericity']
-                sphericity_list.append(sphericity)
-            mean_sphericity = np.mean(sphericity_list)
-            min_sphericity = np.min(sphericity_list)
-            max_sphericity = np.max(sphericity_list)
-            f.write(f"{mean_sphericity:.5f}, {min_sphericity:.5f}, {max_sphericity:.5f}\n")
-            data_list.append([subsetdataset, mean_sphericity, min_sphericity, max_sphericity])
-            print(f"{subsetdataset} Mean Sphericity: {mean_sphericity}")
-            print(f"{subsetdataset} Min Sphericity: {min_sphericity}")
-            print(f"{subsetdataset} Max Sphericity: {max_sphericity}")
-            f.write(f"{mean_sphericity}, {min_sphericity}, {max_sphericity}\n")
-            for i in range (10):
-                f.write(f"{np.round(np.percentile(sphericity_list, i*10), 5)}")
-                print(f"{subsetdataset} {i*10}th percentile: {np.round(np.percentile(sphericity_list, i*10), 5)}")
-                if i != 9:
-                    f.write(", ")
-                if i == 9:
-                    f.write("\n")
-            
+                src_pts = data_source['src_pcd']
+                tgt_pts = data_source['tgt_pcd']
                 
-                    
-      
-            
-     
+                # sample points
+                src_max_range = np.max(np.linalg.norm(src_pts, axis=1))
+                tgt_max_range = np.max(np.linalg.norm(tgt_pts, axis=1))
+                scene_scale.append((src_max_range+tgt_max_range)/2)
+
+        mean_scale = np.mean(scene_scale)
+        scale_list.append(mean_scale)
+        save_scale_path = f'scale_analysis_{subsetdataset}.txt'
+        with open(save_scale_path, 'w') as f:
+            f.write(f"{subsetdataset}: {mean_scale}\n")
+        print(f"Scale analysis has been saved to {save_scale_path}")
+    
+    save_scale_path = f'scale_analysis_outdoor_{timestr}.txt'
+    with open(save_scale_path, 'w') as f:
+        for i, subsetdataset in enumerate(cfg.data.subsetdatasets):
+            f.write(f"{subsetdataset}: {scale_list[i]}\n")
+    print(f"Scale analysis has been saved to {save_scale_path}")

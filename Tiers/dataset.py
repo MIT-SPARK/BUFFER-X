@@ -131,6 +131,9 @@ class TiersDataset(Data.Dataset):
         # process point clouds
         src_pcd = make_open3d_point_cloud(xyz0, [1, 0.706, 0])
         tgt_pcd = make_open3d_point_cloud(xyz1, [0, 0.651, 0.929])
+        
+        src_pcd_raw = np.array(src_pcd.points)
+        tgt_pcd_raw = np.array(tgt_pcd.points)
 
         self.config.data.downsample, sphericity = find_voxel_size(src_pcd, tgt_pcd)
         src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample)
@@ -197,7 +200,11 @@ class TiersDataset(Data.Dataset):
                 'src_id': '%s_%d' % (drive, t0),
                 'tgt_id': '%s_%d' % (drive, t1),
                 'dataset_name': self.config.data.dataset,
-                'sphericity': sphericity,}
+                'sphericity': sphericity,
+                'sensor': sensor,
+                'src_pcd_raw': src_pcd_raw,
+                'tgt_pcd_raw': tgt_pcd_raw
+                }
 
     def apply_transform(self, pts, trans):
         R = trans[:3, :3]

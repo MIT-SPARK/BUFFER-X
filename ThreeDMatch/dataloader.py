@@ -248,6 +248,8 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
         'voxel_sizes': list_data['sphericity'],
         'dataset_names': batched_dataset_names,
         'sphericity': batched_sphericity,
+        'src_pcd_real_raw': torch.from_numpy(list_data['src_pcd_raw']).float(),
+        'tgt_pcd_real_raw': torch.from_numpy(list_data['tgt_pcd_raw']).float()
     }
 
     return dict_inputs

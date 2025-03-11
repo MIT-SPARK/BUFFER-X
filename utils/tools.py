@@ -172,13 +172,13 @@ def find_voxel_size(src_pcd, tgt_pcd):
     eigenvalues = pca.explained_variance_
     lambda1, lambda2, lambda3 = sorted(eigenvalues, reverse=True)
     # linearity = (lambda1 - lambda2) / lambda1
-    # planarity = (lambda2 - lambda3) / lambda1
+    planarity = (lambda2 - lambda3) / lambda1
     sphericity = lambda3 / lambda1
     
     if (sphericity < 0.05):
-        alpha = 1.5
+        alpha = 1.0
     else:
-        alpha = 2.0
+        alpha = 1.5
 
     voxel_size = np.sqrt(z_range) / 100 * alpha
     

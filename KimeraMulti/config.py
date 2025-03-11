@@ -27,7 +27,7 @@ _C.train.all_stage = ['Desc', 'Inlier']
 
 # test
 _C.test = edict()
-_C.test.experiment_id = '3DMatch'
+_C.test.experiment_id = '02051633 copy'
 _C.test.pose_refine = False
 
 # optim

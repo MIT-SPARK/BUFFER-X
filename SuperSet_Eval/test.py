@@ -3,7 +3,7 @@ import sys
 sys.path.append('../')
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 import torch
 import torch.nn as nn
 import math
@@ -204,7 +204,7 @@ if __name__ == '__main__':
         if subsetdataset == '3DMatch':
             print(f'Registration Recall (3DMatch setting): {np.array(recall_3DMatch).mean():.8f}')
         print(f"RTE: {TE*100:.8f}")
-        print(f"RRE: {RE:.4f}")
+        print(f"RRE: {RE:.8f}")
        
         
         average_times = overall_time / num_batch

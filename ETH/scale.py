@@ -43,30 +43,27 @@ if __name__ == '__main__':
                                  )
     print("Test set size:", test_loader.dataset.__len__())
     data_timer, model_timer = Timer(), Timer()
-    sphericity_file = f'sphericity.txt'
-    with open(sphericity_file, 'w') as f:
-        f.write(f"Dataset, Mean, Min, Max\n")
+    scale_file = f'scale.txt'
+    with open(scale_file, 'w') as f:
         with torch.no_grad():
             states = []
             num_batch = len(test_loader)
             data_iter = iter(test_loader)
-            sphericity_list = []
+            scale_list = []
             for i in range(num_batch):
                 data_timer.tic()
                 data_source = data_iter.__next__()
-                sphericity = data_source['sphericity']
-                sphericity_list.append(sphericity)
-            mean_sphericity = np.mean(sphericity_list)
-            min_sphericity = np.min(sphericity_list)
-            max_sphericity = np.max(sphericity_list)
-            
-            
-            f.write(f"{mean_sphericity:5f}, {min_sphericity:5f}, {max_sphericity:5f}\n")
-            for i in range (10):
-                f.write(f"{np.round(np.percentile(sphericity_list, i*10), 5)}")
-                if i != 9:
-                    f.write(", ")
-                if i == 9:
-                    f.write("\n")
-
+                src_pts = data_source['src_pcd']
+                tgt_pts = data_source['tgt_pcd']
+                
+                # sample points
+                src_max_range = np.max(np.linalg.norm(src_pts, axis=1))
+                tgt_max_range = np.max(np.linalg.norm(tgt_pts, axis=1))
+                scale_list.append((src_max_range+tgt_max_range)/2)
+            mean_scale = np.mean(scale_list)
+            f.write(f"Mean scale: {mean_scale}\n")
+            print(f"Mean scale: {mean_scale}")
+                
+           
+       
           

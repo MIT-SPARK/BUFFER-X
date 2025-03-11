@@ -27,7 +27,7 @@ _C.train.all_stage = ['Desc', 'Inlier']
 
 # test
 _C.test = edict()
-_C.test.experiment_id = '3DMatch'
+_C.test.experiment_id = '02051633 copy'
 _C.test.pose_refine = True
 
 # optim
@@ -44,7 +44,7 @@ _C.point.in_feats_dim = 3
 _C.point.first_feats_dim = 32
 _C.point.conv_radius = 2.0
 _C.point.keypts_th = 0.1
-_C.point.num_keypts = 1500
+_C.point.num_keypts = 2000
 
 # patch-wise embedder
 _C.patch = edict()

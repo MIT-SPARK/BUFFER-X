@@ -6,8 +6,10 @@ _C = edict()
 _C.data = edict()
 _C.data.dataset = 'SuperSet'
 # Note: It should be equal to the `_C.data.dataset` in KITTI and ThreeDMatch config file
-_C.data.subsetdatasets = ['3DMatch', 'Scannetpp_faro', 'Scannetpp_iphone']
+# _C.data.subsetdatasets = ['3DMatch', 'Scannetpp_faro', 'Scannetpp_iphone']
 # _C.data.subsetdatasets = ['KITTI', 'WOD', 'NewerCollege', 'KimeraMulti', 'Tiers', 'KAIST']
+_C.data.subsetdatasets = ['3DMatch','Scannetpp_faro', 'Scannetpp_iphone', 'KITTI', 'WOD', 'NewerCollege', 'KimeraMulti', 'Tiers', 'KAIST']
+
 _C.data.voxel_size_0 = 0.035 # Will eliminate this
 _C.data.manual_seed = 123
 
@@ -25,7 +27,7 @@ _C.train.all_stage = ['Desc', 'Inlier']
 
 # test
 _C.test = edict()
-_C.test.experiment_id = '02051633 copy'
+_C.test.experiment_id = 'KITTI_Rad_Aug_Uniform'
 _C.test.pose_refine = False
 
 # point-wise learner
@@ -35,7 +37,7 @@ _C.point.in_feats_dim = 3
 _C.point.first_feats_dim = 32
 _C.point.conv_radius = 2.0              # NOTE: this conv_radius is ratio
 _C.point.keypts_th = 0.5                # KITTI: 0.5, 3DMatch: 0.1, used at inference
-_C.point.num_keypts = 1500
+_C.point.num_keypts = 2000
 
 # patch-wise embedder
 _C.patch = edict()

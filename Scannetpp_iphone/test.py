@@ -3,7 +3,9 @@ import sys
 sys.path.append('../')
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+import copy
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 import math
 import time
 import torch.nn as nn
@@ -108,7 +110,7 @@ if __name__ == '__main__':
             else:
                 trans_est = np.eye(4, 4)
 
-            scene = data_source['src_id'].split('/')[-2]
+            scene = data_source['src_id'].split('/')[0]
             src_id = data_source['src_id'].split('/')[-1].split('_')[-1]
             tgt_id = data_source['tgt_id'].split('/')[-1].split('_')[-1]
 
@@ -126,6 +128,43 @@ if __name__ == '__main__':
                 fail = True
             overall_time += np.array([data_timer.diff, model_timer.diff, *times])
             torch.cuda.empty_cache()
+            
+            # if i % 20 == 0:
+            #     src_pts, tgt_pts = data_source['src_pcd_real_raw'], data_source['tgt_pcd_real_raw']
+            #     src_pcd = o3d.geometry.PointCloud()
+            #     src_pcd.points = o3d.utility.Vector3dVector(src_pts)
+                
+            #     src_gray_pcd = copy.deepcopy(src_pcd)
+            #     src_gray_pcd.paint_uniform_color([0.5, 0.5, 0.5])
+                
+            #     src_pcd.paint_uniform_color([1, 0.706, 0])
+                
+            #     tgt_pcd = o3d.geometry.PointCloud()
+            #     tgt_pcd.points = o3d.utility.Vector3dVector(tgt_pts)
+            #     tgt_pcd.paint_uniform_color([0, 0.651, 0.929])
+                
+            #     pair_name = f"{scene}_{src_id}_{tgt_id}"
+                
+            #     ply_path = f"../results_ply/iphone/"
+            #     if not os.path.exists(ply_path):
+            #         os.makedirs(ply_path)
+                
+            #     before_matching = src_pcd + tgt_pcd
+            #     o3d.io.write_point_cloud(f"../results_ply/iphone/{pair_name}_before_matching.ply", before_matching)
+                
+            #     before_matching_gray = src_gray_pcd + tgt_pcd
+            #     o3d.io.write_point_cloud(f"../results_ply/iphone/{pair_name}_before_matching_gray.ply", before_matching_gray)
+                
+            #     src_pcd.transform(trans)
+            #     gt_matching = src_pcd + tgt_pcd
+            #     o3d.io.write_point_cloud(f"../results_ply/iphone/{pair_name}_gt_matching.ply", gt_matching)
+                
+            #     src_pcd.transform(np.linalg.inv(trans))
+            #     src_pcd.transform(trans_est)
+            #     pred_matching = src_pcd + tgt_pcd
+            #     result = "Fail" if fail else "Success"
+            #     o3d.io.write_point_cloud(f"../results_ply/iphone/{pair_name}_{result}_pred_matching.ply", pred_matching)
+            
 
             
             if (i + 1) % 100 == 0 or i == num_batch - 1:

@@ -3,7 +3,7 @@ import sys
 sys.path.append('../')
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 import math
 import time
 import torch.nn as nn
@@ -12,6 +12,7 @@ from ETH.config import make_cfg
 from models.BUFFER import buffer
 from utils.SE3 import *
 from ETH.dataloader import get_dataloader
+import open3d as o3d
 
 
 if __name__ == '__main__':
@@ -70,11 +71,50 @@ if __name__ == '__main__':
             rre = np.arccos(
                 np.clip((np.trace(trans_est[:3, :3].T @ trans[:3, :3]) - 1) / 2, -1 + 1e-16, 1 - 1e-16)) * 180 / math.pi
             states.append(np.array([rte < rte_thresh and rre < rre_thresh, rte, rre]))
-
+            fail = False
             if rte > rte_thresh or rre > rre_thresh:
                 print(f"{i}th fragment fails, RRE：{rre}, RTE：{rte}")
+                fail = True
 
             torch.cuda.empty_cache()
+            
+            scene = data_source['src_id'].split('_')[0]
+            src_id = data_source['src_id'].split('/')[-1].split('_')[-1]
+            tgt_id = data_source['tgt_id'].split('/')[-1].split('_')[-1]
+            if i % 10 == 0:
+                src_pts, tgt_pts = data_source['src_pcd_real_raw'], data_source['tgt_pcd_real_raw']
+                src_pcd = o3d.geometry.PointCloud()
+                src_pcd.points = o3d.utility.Vector3dVector(src_pts)
+                src_pcd.paint_uniform_color([1, 0.706, 0])
+                
+                src_gray_pts = data_source['src_pcd_real_raw']
+                src_gray_pcd = o3d.geometry.PointCloud()
+                src_gray_pcd.paint_uniform_color([0.5, 0.5, 0.5])
+                
+                tgt_pcd = o3d.geometry.PointCloud()
+                tgt_pcd.points = o3d.utility.Vector3dVector(tgt_pts)
+                tgt_pcd.paint_uniform_color([0, 0.651, 0.929])
+                
+                pair_name = f"{scene}_{src_id}_{tgt_id}"
+                ply_path = f"../results_ply/ETH/"
+                if not os.path.exists(ply_path):
+                    os.makedirs(ply_path)
+                
+                before_matching = src_pcd + tgt_pcd
+                o3d.io.write_point_cloud(f"../results_ply/ETH/{pair_name}_before_matching.ply", before_matching)
+                
+                before_matching_gray = src_gray_pcd + tgt_pcd
+                o3d.io.write_point_cloud(f"../results_ply/ETH/{pair_name}_before_matching_gray.ply", before_matching_gray)
+                
+                src_pcd.transform(trans)
+                gt_matching = src_pcd + tgt_pcd
+                o3d.io.write_point_cloud(f"../results_ply/ETH/{pair_name}_gt_matching.ply", gt_matching)
+                
+                src_pcd.transform(np.linalg.inv(trans))
+                src_pcd.transform(trans_est)
+                pred_matching = src_pcd + tgt_pcd
+                result = "Fail" if fail else "Success"
+                o3d.io.write_point_cloud(f"../results_ply/ETH/{pair_name}_{result}_pred_matching.ply", pred_matching)
             
             if (i + 1) % 100 == 0 or i == num_batch - 1:
                 temp_states = np.array(states)
