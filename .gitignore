@@ -9,6 +9,8 @@
 *.pyc
 *.ply
 *.txt
+*.npz
+*.npy
 
 .idea/
 .vscode/
