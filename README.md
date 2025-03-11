@@ -1,5 +1,29 @@
 [![License CC BY-NC-SA 4.0](https://img.shields.io/badge/license-CC4.0-blue.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode)
 
+## Code Clean-up Blueprint
+
+### Directory Re-organization
+- `dataset`
+    - `dataloader.py`
+    - `threedmatch_dataset.py`
+    - `kitti_dataset.py`
+    - `eth_dataset.py`
+    - `kaist_dataset.py`
+- `config`
+    - `config.py`
+    - `threedmatch_config.py`
+    - `kitti_config.py`
+    - `eth_config.py`
+    - `kaist_config.py`
+- `models`
+- `utils`
+- `snapshot`
+- `test.py`
+- `train.py`
+- `demo.py`
+
+
+
 ## 민균 코멘트
 
 주요 변경점
@@ -102,17 +126,6 @@ Following [Predator](https://github.com/prs-eth/OverlapPredator.git), we provide
 Download the processed dataset from [Google Drive](https://drive.google.com/drive/folders/1tWVV4u_YablYmPta8fmHLY-JN4kZWh8R?usp=sharing) and put the folder into `data`. 
 Then the structure should be as follows:
 
-- `data`
-    - `ThreeDMatch`
-        - `train`
-            - `7-scenes-chess`
-            - ...
-            - `3DMatch_train_overlap.pkl`
-            - `train_3dmatch.txt`
-            - `val_3dmatch.txt`
-        - `test`
-            - `3DLoMatch`
-            - `3DMatch`
 
 **Training**
 
