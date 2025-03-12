@@ -44,7 +44,7 @@ class OutdoorBaseConfig:
         self._C.point.first_feats_dim = 32
         self._C.point.conv_radius = 2.0
         self._C.point.keypts_th = 0.5
-        self._C.point.num_keypts = 2000
+        self._C.point.num_fps = 1500
 
         # Patch-wise embedder
         self._C.patch = edict()
@@ -55,6 +55,7 @@ class OutdoorBaseConfig:
         self._C.patch.ele_n = 7
         self._C.patch.delta = 0.8
         self._C.patch.voxel_sample = 10
+        self._C.patch.num_points_radius_estimate = 2000
 
         # Inliers & RANSAC
         self._C.match = edict()

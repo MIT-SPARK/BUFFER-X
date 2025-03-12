@@ -1,7 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
 import models.patchnet as pn
-from models.point_learner import EFCNN, DetNet
 from models.patch_embedder import MiniSpinNet
 import pointnet2_ops.pointnet2_utils as pnt2
 from knn_cuda import KNN
@@ -74,9 +73,7 @@ class buffer(nn.Module):
         self.config = config
         self.config.stage = config.stage
 
-        self.Ref = EFCNN(config)
         self.Desc = MiniSpinNet(config)
-        self.Keypt = DetNet(config)
         self.Inlier = CostVolume(config)
         # equivariant feature matching
         self.equi_match = EquiMatch(config)
@@ -126,13 +123,13 @@ class buffer(nn.Module):
 
         # src_pts, tgt_pts = data_source['src_pcd'], data_source['tgt_pcd']
         src_pcd_raw, tgt_pcd_raw = data_source['src_pcd_raw'], data_source['tgt_pcd_raw']
-        # len_src_f = data_source['stack_lengths'][0][0]
+
 
         if self.config.stage != 'test':
             
             src_pts, tgt_pts = data_source['src_pcd'], data_source['tgt_pcd']
             # find positive correspondences
-            gt_trans = data_source['relt_pose']
+            gt_trans = data_source['relt_pose']   
             match_inds = self.get_matching_indices(src_pts, tgt_pts, gt_trans, data_source['voxel_sizes'][0])
             if self.config['data']['dataset'] == 'SuperSet':
                 dataset_name = data_source["dataset_names"][0]
@@ -155,26 +152,25 @@ class buffer(nn.Module):
             # training descriptor
             #######################
             # calculate feature descriptor
-            # src = self.Desc(src_pcd_raw[None], src_kpt[None], dataset_name, src_axis[None])
             
             # des_r = cfg.patch.des_r
             center = cfg.patch.des_r
-            # lower_bound = center * 0.5
-            # upper_bound = center * 1.5
-            # std_dev = (upper_bound - lower_bound) / 6
-            # des_r = np.round(np.clip(np.random.normal(center, std_dev, 1), lower_bound, upper_bound), 2)[0]
+            lower_bound = center * 0.5
+            upper_bound = center * 1.5
+            std_dev = (upper_bound - lower_bound) / 6
+            des_r = np.round(np.clip(np.random.normal(center, std_dev, 1), lower_bound, upper_bound), 2)[0]
             
             # Define the range of possible values based on the center
-            if center == 3.0:
-                possible_values = [2.0, 2.5, 3.0, 3.5, 4.0]
-            elif center == 0.3:
-                possible_values = [0.2, 0.25, 0.3, 0.35, 0.4]
+            # if center == 3.0:
+            #     possible_values = [2.0, 2.5, 3.0, 3.5, 4.0]
+            # elif center == 0.3:
+            #     possible_values = [0.2, 0.25, 0.3, 0.35, 0.4]
 
-            # Assign probabilities (optional: uniform probabilities)
-            probabilities = [0.2, 0.2, 0.2, 0.2, 0.2]  # Adjust probabilities as needed
+            # # Assign probabilities (optional: uniform probabilities)
+            # probabilities = [0.2, 0.2, 0.2, 0.2, 0.2]  # Adjust probabilities as needed
 
-            # Select a value from possible_values based on the probabilities
-            des_r = np.random.choice(possible_values, p=probabilities)
+            # # Select a value from possible_values based on the probabilities
+            # des_r = np.random.choice(possible_values, p=probabilities)
 
             src = self.Desc(src_pcd_raw[None], src_kpt[None], des_r, dataset_name)
             if self.config.stage == 'Inlier':
@@ -226,12 +222,8 @@ class buffer(nn.Module):
             #######################
             # inference
             ######################
-            # src_pts, tgt_pts = data_source['src_pcd'], data_source['tgt_pcd']
-            src_pts, tgt_pts = data_source['src_pcd_raw'], data_source['tgt_pcd_raw']
             src_pcd_raw, tgt_pcd_raw = data_source['src_pcd_raw'], data_source['tgt_pcd_raw']
             
-            
-            # len_src_f = data_source['stack_lengths'][0][0]
             # gt_trans = data_source['relt_pose']
             
             if self.config['data']['dataset'] == 'SuperSet':
@@ -243,21 +235,21 @@ class buffer(nn.Module):
                         
             # Origianl implementation
             
-            # sample_num = int(0.05 * src_pts.shape[0])
-            sample_num = 1500
+            # sample_num = int(0.05 * src_pcd_raw.shape[0])
+            sample_num = cfg.patch.num_points_radius_estimate
             
             # NOTE(hlim): It only takes < ~ 0.0002 sec, which is negligible
-            s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
-            s_fps_idx = pnt2.furthest_point_sample(src_pts[None], sample_num)
-            t_fps_idx = pnt2.furthest_point_sample(tgt_pts[None], sample_num)
+            s_pts_flipped, t_pts_flipped = src_pcd_raw[None].transpose(1, 2).contiguous(), tgt_pcd_raw[None].transpose(1,2).contiguous()
+            s_fps_idx = pnt2.furthest_point_sample(src_pcd_raw[None], sample_num)
+            t_fps_idx = pnt2.furthest_point_sample(tgt_pcd_raw[None], sample_num)
 
             kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
             kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
  
             des_r_list = find_des_r(src_pcd_raw, kpts1, tgt_pcd_raw, kpts2)
 
-            # num_keypts_list = [1500, 1500, 1500]
-            num_keypts_list = [1500] 
+            num_keypts_list = [1500, 1500, 1500]
+            # num_keypts_list = [1500] 
                         
             ss_kpts_raw_list = [None] * len(num_keypts_list)
             tt_kpts_raw_list = [None] * len(num_keypts_list)
@@ -267,12 +259,13 @@ class buffer(nn.Module):
             mutual_matching_total = 0
             inlier_total = 0
             correspondence_proposal_total = 0
+            num_keypt = cfg.point.num_fps
+            
             # Furthest point sampling 
             for i, des_r in enumerate(des_r_list):
-                num_keypt = num_keypts_list[i] 
-                s_pts_flipped, t_pts_flipped = src_pts[None].transpose(1, 2).contiguous(), tgt_pts[None].transpose(1,2).contiguous()
-                s_fps_idx = pnt2.furthest_point_sample(src_pts[None], num_keypt)
-                t_fps_idx = pnt2.furthest_point_sample(tgt_pts[None], num_keypt)
+                s_pts_flipped, t_pts_flipped = src_pcd_raw[None].transpose(1, 2).contiguous(), tgt_pcd_raw[None].transpose(1,2).contiguous()
+                s_fps_idx = pnt2.furthest_point_sample(src_pcd_raw[None], num_keypt)
+                t_fps_idx = pnt2.furthest_point_sample(tgt_pcd_raw[None], num_keypt)
                 kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
                 kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
 
@@ -559,7 +552,6 @@ def find_des_r(src_pts, src_kpts, tgt_pts, tgt_kpts, min_r=0.0, max_r=5.0, toler
         list: The calculated des_r values for the given percentages.
     """
     des_r_values = []
-    thresholds = [2]
     
     if src_pts.shape[0] > tgt_pts.shape[0]:
         pts = src_pts
@@ -598,52 +590,4 @@ def find_des_r(src_pts, src_kpts, tgt_pts, tgt_kpts, min_r=0.0, max_r=5.0, toler
 
         des_r_values.append(round(des_r, 2))  # Round to 2 decimal places for consistency
         
-        # print(des_r)
     return des_r_values
-
-def find_des_r_prime(src_pts, src_kpts, tgt_pts, tgt_kpts, i=0):
-    """
-    Finds the des_r values corresponding to the given target percentages of points within the radius.
-
-    Args:
-        src_pts (torch.Tensor): Source points of shape (N, 3).
-        src_kpts (torch.Tensor): Keypoints of shape (num_keypts, 3).
-        
-    Returns:
-        list: The calculated des_r values for the given percentages.
-    """
-    thresholds = [0.5, 2, 5]  # percentage thresholds
-    
-    if src_pts.shape[0] > tgt_pts.shape[0]:
-        pts = src_pts
-        kpts = src_kpts
-    else:
-        pts = tgt_pts    
-        kpts = tgt_kpts
-        
-    if pts.shape[0] > 200000:
-            pts = pts[torch.randint(0, pts.shape[0], (200000,))]
-    
-    dists = torch.cdist(kpts, pts)  # Calculate distances
-    
-    threshold = thresholds[i]
-    low, high = 0., 5.0  # Start with a wide search range for des_r
-    tolerance = 0.01  # threshold tolerance
-    
-    des_r = 0.0
-
-    while high - low > 1e-3:  # Precision threshold
-        des_r = (low + high) / 2.0
-        
-        points_within_radius = (dists < des_r).int()  # Binary mask for points within radius
-        percentage = points_within_radius.sum(dim=-1).float() / pts.shape[0] * 100  # Percentage per keypoint
-        percentage = percentage.mean().item()  # Average percentage across keypoints
-        
-        if percentage < threshold - tolerance:
-            low = des_r  # Increase des_r to capture more points
-        elif percentage > threshold + tolerance:
-            high = des_r  # Decrease des_r to capture fewer points
-        else:
-            break  # Close enough to the percentage
-    
-    return round(des_r, 2)
