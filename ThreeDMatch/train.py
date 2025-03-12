@@ -9,7 +9,8 @@ import time
 import argparse
 import copy
 import numpy as np
-from ThreeDMatch.config import make_cfg
+# from ThreeDMatch.config import make_cfg
+from config.threedlomatch_config import make_cfg
 from ThreeDMatch.dataloader import get_dataloader
 from ThreeDMatch.trainer import Trainer
 from models.BUFFER import buffer

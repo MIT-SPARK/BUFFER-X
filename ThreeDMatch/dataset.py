@@ -11,39 +11,6 @@ import copy
 import gc
 import pointnet2_ops.pointnet2_utils as pnt2
 
-def get_matching_indices(source, target, relt_pose, search_voxel_size):
-    source = transform(source, relt_pose)
-    diffs = source[:, None] - target[None]
-    dist = np.sqrt(np.sum(diffs ** 2, axis=-1) + 1e-12)
-    min_ind = np.concatenate([np.arange(source.shape[0])[:, None], np.argmin(dist, axis=1)[:, None]], axis=-1)
-    min_val = np.min(dist, axis=1)
-    match_inds = min_ind[min_val < search_voxel_size]
-
-    return match_inds
-
-def calculate_scale_with_percentile(pcd, low_percentile=2, high_percentile=98):
-    """
-    Calculate the scale of a point cloud using percentiles to exclude outliers.
-    
-    Args:
-        pcd (numpy.ndarray): Point cloud array of shape (N, 3).
-        low_percentile (float): Lower percentile for excluding outliers.
-        high_percentile (float): Upper percentile for excluding outliers.
-        
-    Returns:
-        float: The calculated scale of the point cloud.
-    """
-    # Compute the minimum and maximum coordinates within the percentile range
-    min_coords = np.percentile(pcd, low_percentile, axis=0)
-    max_coords = np.percentile(pcd, high_percentile, axis=0)
-    
-    # Compute the bounding box size
-    bounding_box_size = max_coords - min_coords
-    
-    # Calculate the scale as the norm of the bounding box size
-    scale = np.linalg.norm(bounding_box_size)
-    return scale
-
 class ThreeDMatchDataset(Data.Dataset):
     def __init__(self,
                  split,
@@ -121,6 +88,8 @@ class ThreeDMatchDataset(Data.Dataset):
         
         if self.split == 'test':
             self.config.data.downsample, sphericity = find_voxel_size(src_pcd, tgt_pcd)
+        else:
+            sphericity = 0
         
         src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample)
         src_pts = np.array(src_pcd.points)
@@ -170,19 +139,6 @@ class ThreeDMatchDataset(Data.Dataset):
         if (tgt_kpt.shape[0] > self.config.data.max_numPts):
             idx = np.random.choice(range(tgt_kpt.shape[0]), self.config.data.max_numPts, replace=False)
             tgt_kpt = tgt_kpt[idx]
-
-        # if self.split == 'test':
-        #     src_pcd = make_open3d_point_cloud(src_kpt)
-        #     src_pcd.estimate_normals()
-        #     src_pcd.orient_normals_towards_camera_location()
-        #     src_noms = np.array(src_pcd.normals)
-        #     src_kpt = np.concatenate([src_kpt, src_noms], axis=-1)
-
-        #     tgt_pcd = make_open3d_point_cloud(tgt_kpt)
-        #     tgt_pcd.estimate_normals()
-        #     tgt_pcd.orient_normals_towards_camera_location()
-        #     tgt_noms = np.array(tgt_pcd.normals)
-        #     tgt_kpt = np.concatenate([tgt_kpt, tgt_noms], axis=-1)
 
         return {'src_fds_pts': src_pts, # first downsampling
                 'tgt_fds_pts': tgt_pts,
