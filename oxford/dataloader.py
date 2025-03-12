@@ -1,5 +1,5 @@
 from functools import partial
-from NewerCollege.dataset import NewerCollegeDataset
+from oxford.dataset import OxfordDataset
 import torch
 import numpy as np
 import cpp_wrappers.cpp_subsampling.grid_subsampling as cpp_subsampling
@@ -255,7 +255,7 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
 
 
 def get_dataloader(split, config, num_workers=16, shuffle=True, drop_last=True):
-    dataset = NewerCollegeDataset(
+    dataset = OxfordDataset(
         split=split,
         config=config
     )

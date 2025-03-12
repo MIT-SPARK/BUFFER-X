@@ -7,10 +7,11 @@ import math
 import time
 import torch.nn as nn
 from utils.timer import Timer
-from NewerCollege.config import make_cfg
+# from oxford.config import make_cfg
+from config.oxford_config import make_cfg
 from models.BUFFER import buffer
 from utils.SE3 import *
-from NewerCollege.dataloader import get_dataloader
+from oxford.dataloader import get_dataloader
 import open3d as o3d
 
 if __name__ == '__main__':

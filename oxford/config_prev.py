@@ -6,7 +6,7 @@ _C = edict()
 
 # data
 _C.data = edict()
-_C.data.dataset = 'NewerCollege'
+_C.data.dataset = 'Oxford'
 _C.data.root = '../../datasets/newer-college'
 _C.data.downsample = 0.05 # first downsampling
 _C.data.voxel_size_0 = 0.30 # second downsampling

@@ -6,8 +6,8 @@ from utils.SE3 import *
 from utils.common import make_open3d_point_cloud
 from utils.tools import find_voxel_size
 
-newer_college_icp_cache = {}
-newer_college_cache = {}
+oxford_icp_cache = {}
+oxford_cache = {}
 cur_path = os.path.dirname(os.path.realpath(__file__))
 
 
@@ -22,11 +22,11 @@ def get_matching_indices(source, target, relt_pose, search_voxel_size):
     return match_inds
 
 
-class NewerCollegeDataset(Data.Dataset):
+class OxfordDataset(Data.Dataset):
     DATA_FILES = {
-        'train': 'train_newer-college.txt',
-        'val': 'val_newer-college.txt',
-        'test': 'test_newer-college.txt'
+        'train': 'train_oxford.txt',
+        'val': 'val_oxford.txt',
+        'test': 'test_oxford.txt'
     }
 
     def __init__(self,
@@ -42,9 +42,9 @@ class NewerCollegeDataset(Data.Dataset):
         self.length = 0
         # self.pdist = config.data.pdist
         self.pdist = 5
-        self.prepare_newer_college_ply(split=self.split)
+        self.prepare_oxford_ply(split=self.split)
 
-    def prepare_newer_college_ply(self, split='train'):
+    def prepare_oxford_ply(self, split='train'):
         subset_names = open(os.path.join(cur_path, self.DATA_FILES[split])).read().split()
         for dirname in subset_names:
             drive_id = str(dirname)
@@ -94,7 +94,6 @@ class NewerCollegeDataset(Data.Dataset):
         # Note (Minkyun Seo): 
         # Above code is commented out because it does not work well for the newer college dataset.
         trans = np.linalg.inv(positions[1]) @ positions[0]
-        # np.save(filename, trans)        
 
         if self.split != 'test':
             xyz0 += (np.random.rand(xyz0.shape[0], 3) - 0.5) * self.config.train.augmentation_noise
@@ -200,12 +199,12 @@ class NewerCollegeDataset(Data.Dataset):
 
     def get_video_odometry(self, drive, indices=None, ext='.txt', return_all=False):
         data_path = self.pc_path + '/%s/poses_kitti.txt' % drive
-        if data_path not in newer_college_cache:
-            newer_college_cache[data_path] = np.genfromtxt(data_path)
+        if data_path not in oxford_cache:
+            oxford_cache[data_path] = np.genfromtxt(data_path)
         if return_all:
-            return newer_college_cache[data_path]
+            return oxford_cache[data_path]
         else:
-            return newer_college_cache[data_path][indices]
+            return oxford_cache[data_path][indices]
 
     def odometry_to_positions(self, odometry):
         T_w_cam0 = odometry.reshape(3, 4)

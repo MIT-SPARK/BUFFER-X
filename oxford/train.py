@@ -9,9 +9,9 @@ import time
 import argparse
 import copy
 import numpy as np
-from NewerCollege.config import make_cfg
-from NewerCollege.dataloader import get_dataloader
-from NewerCollege.trainer import Trainer
+from oxford.config import make_cfg
+from oxford.dataloader import get_dataloader
+from oxford.trainer import Trainer
 from models.BUFFER import buffer
 from torch import optim
 
