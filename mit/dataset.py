@@ -6,8 +6,8 @@ from utils.SE3 import *
 from utils.common import make_open3d_point_cloud
 from utils.tools import find_voxel_size
 
-kimera_multi_icp_cache = {}
-kimera_multi_cache = {}
+mit_icp_cache = {}
+mit_cache = {}
 cur_path = os.path.dirname(os.path.realpath(__file__))
 
 
@@ -22,11 +22,11 @@ def get_matching_indices(source, target, relt_pose, search_voxel_size):
     return match_inds
 
 
-class KimeraMultiDataset(Data.Dataset):
+class MITDataset(Data.Dataset):
     DATA_FILES = {
-        'train': 'train_kimera-multi.txt',
-        'val': 'val_kimera-multi.txt',
-        'test': 'test_kimera-multi.txt'
+        'train': 'train_mit.txt',
+        'val': 'val_mit.txt',
+        'test': 'test_mit.txt'
     }
 
     def __init__(self,
@@ -42,9 +42,9 @@ class KimeraMultiDataset(Data.Dataset):
         self.length = 0
         # self.pdist = config.data.pdist
         self.pdist = 5
-        self.prepare_kimera_multi_ply(split=self.split)
+        self.prepare_mit_ply(split=self.split)
 
-    def prepare_kimera_multi_ply(self, split='train'):
+    def prepare_mit_ply(self, split='train'):
         subset_names = open(os.path.join(cur_path, self.DATA_FILES[split])).read().split()
         for dirname in subset_names:
             drive_id = str(dirname)
@@ -186,12 +186,12 @@ class KimeraMultiDataset(Data.Dataset):
 
     def get_video_odometry(self, drive, indices=None, ext='.txt', return_all=False):
         data_path = self.pc_path + '/%s/poses_kitti.txt' % drive
-        if data_path not in kimera_multi_cache:
-            kimera_multi_cache[data_path] = np.genfromtxt(data_path)
+        if data_path not in mit_cache:
+            mit_cache[data_path] = np.genfromtxt(data_path)
         if return_all:
-            return kimera_multi_cache[data_path]
+            return mit_cache[data_path]
         else:
-            return kimera_multi_cache[data_path][indices]
+            return mit_cache[data_path][indices]
 
     def odometry_to_positions(self, odometry):
         T_w_cam0 = odometry.reshape(3, 4)

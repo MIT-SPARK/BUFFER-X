@@ -1,5 +1,5 @@
 from functools import partial
-from KimeraMulti.dataset import KimeraMultiDataset
+from mit.dataset import MITDataset
 import torch
 import numpy as np
 import cpp_wrappers.cpp_subsampling.grid_subsampling as cpp_subsampling
@@ -255,7 +255,7 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
 
 
 def get_dataloader(split, config, num_workers=16, shuffle=True, drop_last=True):
-    dataset = KimeraMultiDataset(
+    dataset = MITDataset(
         split=split,
         config=config
     )

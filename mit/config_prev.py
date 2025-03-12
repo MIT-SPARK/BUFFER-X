@@ -6,7 +6,7 @@ _C = edict()
 
 # data
 _C.data = edict()
-_C.data.dataset = 'KimeraMulti'
+_C.data.dataset = 'MIT'
 _C.data.root = '../../datasets/kimera-multi'
 _C.data.downsample = 0.05 # first downsampling
 _C.data.voxel_size_0 = 0.30 # second downsampling

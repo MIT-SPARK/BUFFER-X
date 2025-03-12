@@ -9,9 +9,9 @@ import time
 import argparse
 import copy
 import numpy as np
-from KimeraMulti.config import make_cfg
-from KimeraMulti.dataloader import get_dataloader
-from KimeraMulti.trainer import Trainer
+from mit.config import make_cfg
+from mit.dataloader import get_dataloader
+from mit.trainer import Trainer
 from models.BUFFER import buffer
 from torch import optim
 
