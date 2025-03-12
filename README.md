@@ -2,7 +2,7 @@
     <h1>BUFFER-X</h1>
     <a href="https://github.com/MIT-SPARK/BUFFER-X"><img src="https://img.shields.io/badge/Python-3670A0?logo=python&logoColor=ffdd54" /></a>
     <a href="https://github.com/MIT-SPARK/BUFFER-X"><img src="https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black" /></a>
-    <a href="https://arxiv.org/abs/2409.15615"><img src="https://img.shields.io/badge/arXiv-b33737?logo=arXiv" /></a>
+    <a href="https://arxiv.org/abs/2503.07940"><img src="https://img.shields.io/badge/arXiv-b33737?logo=arXiv" /></a>
     <br />
     <br />
   <br />
