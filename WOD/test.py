@@ -7,7 +7,8 @@ import math
 import time
 import torch.nn as nn
 from utils.timer import Timer
-from WOD.config import make_cfg
+# from WOD.config import make_cfg
+from config.wod_config import make_cfg
 from models.BUFFER import buffer
 from utils.SE3 import *
 from WOD.dataloader import get_dataloader
@@ -24,7 +25,7 @@ if __name__ == '__main__':
     experiment_id = cfg.test.experiment_id
     # load the weight
     for stage in cfg.train.all_stage:
-        model_path = 'snapshot/%s/%s/best.pth' % (experiment_id, stage)
+        model_path = '../snapshot/%s/%s/best.pth' % (experiment_id, stage)
         state_dict = torch.load(model_path)
         new_dict = {k: v for k, v in state_dict.items() if stage in k}
         model_dict = model.state_dict()
