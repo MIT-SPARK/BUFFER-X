@@ -256,7 +256,7 @@ def get_dataloader(split, config, num_workers=16, shuffle=True, drop_last=True):
 
     dataloader = torch.utils.data.DataLoader(
         dataset=dataset,
-        batch_size=config.test.batch_size,
+        batch_size=config.train.batch_size,
         shuffle=shuffle,
         num_workers=num_workers,
         collate_fn=partial(collate_fn_descriptor, config=config, neighborhood_limits=neighborhood_limits),
