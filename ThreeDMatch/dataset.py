@@ -82,10 +82,10 @@ class ThreeDMatchDataset(Data.Dataset):
             ]
             self.poses = []
             for scene in scene_list:
-                if config.data.dataset == '3DMatch':
-                    gtpath = self.root + f'/{config.data.dataset}/gt_result/{scene}'
-                elif config.data.dataset == '3DLoMatch':
-                    gtpath = self.root + f'/{config.data.dataset}/{scene}'
+                if config.data.benchmark == '3DMatch':
+                    gtpath = self.root + f'/{config.data.benchmark}/gt_result/{scene}'
+                elif config.data.benchmark == '3DLoMatch':
+                    gtpath = self.root + f'/{config.data.benchmark}/{scene}'
 
                 gtLog = loadlog(gtpath)
                 pcdpath = f'3DMatch/fragments/{scene}'

@@ -3,13 +3,14 @@ import copy
 sys.path.append('../')
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import math
 import time
 import torch.nn as nn
 import nibabel.quaternions as nq
 from utils.timer import Timer
-from ThreeDMatch.config import make_cfg
+# from ThreeDMatch.config import make_cfg
+from config.threedmatch_config import make_cfg
 from models.BUFFER import buffer
 from ThreeDMatch.dataloader import get_dataloader
 from utils.SE3 import *
@@ -208,7 +209,7 @@ if __name__ == '__main__':
     experiment_id = cfg.test.experiment_id
     # load the weight
     for stage in cfg.train.all_stage:
-        model_path = 'snapshot/%s/%s/best.pth' % (experiment_id, stage)
+        model_path = '../snapshot/%s/%s/best.pth' % (experiment_id, stage)
         state_dict = torch.load(model_path)
         new_dict = {k: v for k, v in state_dict.items() if stage in k}
         model_dict = model.state_dict()
@@ -241,6 +242,7 @@ if __name__ == '__main__':
 
             data_timer.toc()
             model_timer.tic()
+            
             trans_est, times = model(data_source)
             model_timer.toc()
 
@@ -252,7 +254,7 @@ if __name__ == '__main__':
             scene = data_source['src_id'].split('/')[-2]
             src_id = data_source['src_id'].split('/')[-1].split('_')[-1]
             tgt_id = data_source['tgt_id'].split('/')[-1].split('_')[-1]
-            logpath = f"log_{cfg.data.dataset}/{scene}"
+            logpath = f"log_{cfg.data.benchmark}/{scene}"
             if not os.path.exists(logpath):
                 os.makedirs(logpath)
             # write the transformation matrix into .log file for evaluation.
@@ -338,10 +340,10 @@ if __name__ == '__main__':
     RE = states[states[:, 0] == 1, 2].mean()
 
     # calculate Registration Recall
-    if cfg.data.dataset == '3DMatch':
-        gtpath = cfg.data.root + f'/test/{cfg.data.dataset}/gt_result'
-    elif cfg.data.dataset == '3DLoMatch':
-        gtpath = cfg.data.root + f'/test/{cfg.data.dataset}'
+    if cfg.data.benchmark == '3DMatch':
+        gtpath = cfg.data.root + f'/test/{cfg.data.benchmark}/gt_result'
+    elif cfg.data.benchmark == '3DLoMatch':
+        gtpath = cfg.data.root + f'/test/{cfg.data.benchmark}'
     scenes = sorted(os.listdir(gtpath))
     scene_names = [os.path.join(gtpath, ele) for ele in scenes]
     recall = []
@@ -357,7 +359,7 @@ if __name__ == '__main__':
             n_fragments, gt_traj_cov = read_trajectory_info(os.path.join(scene, "gt.info"))
 
             # estimated info
-            est_pairs, est_traj = read_trajectory(os.path.join(f"log_{cfg.data.dataset}", scenes[idx], f'{timestr}.log'))
+            est_pairs, est_traj = read_trajectory(os.path.join(f"log_{cfg.data.benchmark}", scenes[idx], f'{timestr}.log'))
             # est_pairs, est_traj = read_trajectory(os.path.join(f"3DMatch_5000_prob", scenes[idx], f'est.log'))
             temp_precision, temp_recall, c_flag, errors = evaluate_registration(n_fragments, est_traj,
                                                                                 est_pairs, gt_pairs,

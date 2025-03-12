@@ -7,6 +7,7 @@ _C = edict()
 # data
 _C.data = edict()
 _C.data.dataset = '3DMatch'
+_C.data.benchmark = '3DLoMatch'
 _C.data.root = '../../datasets/ThreeDMatch'
 _C.data.downsample = 0.02 # first downsampling
 _C.data.voxel_size_0 = 0.035 # second downsampling
