@@ -2,11 +2,6 @@ from functools import partial
 from ThreeDMatch.dataset import ThreeDMatchDataset
 import torch
 import numpy as np
-import cpp_wrappers.cpp_subsampling.grid_subsampling as cpp_subsampling
-import cpp_wrappers.cpp_neighbors.radius_neighbors as cpp_neighbors
-from models.point_learner import architecture
-from models.KPConv.lib.utils import load_config
-from models.KPConv.lib.timer import Timer
 
 def collate_fn_descriptor(list_data, config):
     batched_points_list = []
