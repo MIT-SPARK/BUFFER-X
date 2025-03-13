@@ -46,8 +46,24 @@ def get_dataloader(dataset, split, config, num_workers=16, shuffle=True, drop_la
     """
     if dataset == "3DMatch":
         from .threedmatch import ThreeDMatchDataset as Dataset
+    elif dataset == "Scannetpp_iphone":
+        from .scannetpp_iphone import ScannetppIphoneDataset as Dataset
+    elif dataset == "Scannetpp_faro":
+        from .scannetpp_faro import ScannetppFaroDataset as Dataset
+    elif dataset == "Tiers":
+        from .tiers import TiersDataset as Dataset
     elif dataset == "KITTI":
         from .kitti import KITTIDataset as Dataset
+    elif dataset == "WOD":
+        from .wod import WODDataset as Dataset
+    elif dataset == "MIT":
+        from .mit import MITDataset as Dataset
+    elif dataset == "KAIST":
+        from .kaist import KAISTDataset as Dataset
+    elif dataset == "ETH":
+        from .eth import ETHDataset as Dataset
+    elif dataset == "Oxford":
+        from .oxford import OxfordDataset as Dataset
     else:
         raise ValueError(f"Unsupported dataset: {dataset}")
 
