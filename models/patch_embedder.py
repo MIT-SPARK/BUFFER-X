@@ -9,7 +9,6 @@ from utils.SE3 import *
 from einops import repeat, rearrange
 import kornia.geometry.conversions as Convert
 import open3d as o3d
-from ThreeDMatch.dataset import make_open3d_point_cloud
 import copy
 from utils.timer import Timer
 
@@ -166,8 +165,8 @@ class MiniSpinNet(nn.Module):
         center = input[:, -1, :3]
         delta_x = input[:, :, :3] - center.unsqueeze(1)  # (B, npoint, 3), normalized coordinates
         
-        z_axis_datasets = {'3DMatch', '3DLoMatch', 'NSS', 'Scannetpp_iphone', 'Scannetpp_faro'}
-        rand_axis_datasets = {'KITTI', 'ETH', 'WOD', 'NewerCollege', 'KimeraMulti'}
+        z_axis_datasets = {'3DMatch', '3DLoMatch', 'Scannetpp_iphone', 'Scannetpp_faro'}
+        rand_axis_datasets = {'KITTI', 'ETH', 'WOD', 'Oxford', 'MIT'}
         
         if dataset in z_axis_datasets:
             if z_axis is None:

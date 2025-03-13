@@ -8,7 +8,7 @@ from utils.SE3 import *
 from einops import rearrange
 import kornia.geometry.conversions as Convert
 import open3d as o3d
-from ThreeDMatch.dataset import make_open3d_point_cloud
+from utils.common import make_open3d_point_cloud
 from utils.timer import Timer
 import numpy as np
 
@@ -247,7 +247,7 @@ class buffer(nn.Module):
             kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
  
             des_r_list = find_des_r(src_pcd_raw, kpts1, tgt_pcd_raw, kpts2)
-
+            
             num_keypts_list = [1500, 1500, 1500]
             # num_keypts_list = [1500] 
                         
