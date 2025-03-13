@@ -12,7 +12,8 @@ from utils.timer import Timer
 # from ThreeDMatch.config import make_cfg
 from config.threedmatch_config import make_cfg
 from models.BUFFER import buffer
-from ThreeDMatch.dataloader import get_dataloader
+# from ThreeDMatch.dataloader import get_dataloader
+from dataset.dataloader import get_dataloader
 from utils.SE3 import *
 
 import open3d as o3d
@@ -222,7 +223,8 @@ if __name__ == '__main__':
     model = nn.DataParallel(model, device_ids=[0])
     model.eval()
 
-    test_loader = get_dataloader(split='test',
+    test_loader = get_dataloader(dataset="3DMatch",
+                                 split='test',
                                  config=cfg,
                                  shuffle=False,
                                  num_workers=cfg.train.num_workers,
