@@ -1,5 +1,5 @@
 from functools import partial
-from Scannetpp_faro.dataset import ScannetppFaroDataset, get_matching_indices
+from Scannetpp_faro.dataset import ScannetppFaroDataset
 import torch
 import numpy as np
 import cpp_wrappers.cpp_subsampling.grid_subsampling as cpp_subsampling

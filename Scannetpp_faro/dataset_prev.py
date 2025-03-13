@@ -10,19 +10,7 @@ from utils.common import make_open3d_point_cloud
 import copy
 import gc
 
-
-def get_matching_indices(source, target, relt_pose, search_voxel_size):
-    source = transform(source, relt_pose)
-    diffs = source[:, None] - target[None]
-    dist = np.sqrt(np.sum(diffs ** 2, axis=-1) + 1e-12)
-    min_ind = np.concatenate([np.arange(source.shape[0])[:, None], np.argmin(dist, axis=1)[:, None]], axis=-1)
-    min_val = np.min(dist, axis=1)
-    match_inds = min_ind[min_val < search_voxel_size]
-
-    return match_inds
-
-
-class ScannetppIphoneDataset(Data.Dataset):
+class ScannetppFaroDataset(Data.Dataset):
     def __init__(self,
                  split,
                  config=None
@@ -33,22 +21,17 @@ class ScannetppIphoneDataset(Data.Dataset):
         self.files = []
         self.length = 0
         
-        if split != 'test':
-            self.root = join(self.root, 'train')
-        else:
-            self.root = join(self.root, f'{split}')
-        self.scene_list = open(join(self.root, f'{self.split}_scannetpp.txt')).read().split()
+        self.scene_list = open(join(self.root, 'splits', f'{self.split}_scannetpp.txt')).read().split()
         
         self.poses = []
         for scene in self.scene_list:
-            gtpath = self.root + f'/{scene}/iphone'
+            gtpath = self.root + f'/data/{scene}/scans'
             gtLog = loadlog(gtpath)
-            pcdpath = gtpath
             for key in gtLog.keys():
                 id1 = key.split('_')[0]
                 id2 = key.split('_')[1]
-                src_id = f'{scene}/iphone/tsdf/cloud_bin_{id1}'
-                tgt_id = f'{scene}/iphone/tsdf/cloud_bin_{id2}'
+                src_id = f'data/{scene}/scans/trans_faro_1800x900_scanner_{id1}'
+                tgt_id = f'data/{scene}/scans/trans_faro_1800x900_scanner_{id2}'
                 self.files.append([src_id, tgt_id])
                 self.length += 1
                 self.poses.append(gtLog[key])
@@ -57,7 +40,6 @@ class ScannetppIphoneDataset(Data.Dataset):
 
         # load meta data
         src_id, tgt_id = self.files[index][0], self.files[index][1]
-
         if self.split != 'test':
             if random.random() > 0.5:
                 src_id, tgt_id = tgt_id, src_id
@@ -124,13 +106,12 @@ class ScannetppIphoneDataset(Data.Dataset):
         #     src_pcd.orient_normals_towards_camera_location()
         #     src_noms = np.array(src_pcd.normals)
         #     src_kpt = np.concatenate([src_kpt, src_noms], axis=-1)
-
+            
         #     tgt_pcd = make_open3d_point_cloud(tgt_kpt)
         #     tgt_pcd.estimate_normals()
         #     tgt_pcd.orient_normals_towards_camera_location()
         #     tgt_noms = np.array(tgt_pcd.normals)
         #     tgt_kpt = np.concatenate([tgt_kpt, tgt_noms], axis=-1)
-
 
         return {'src_fds_pts': src_pts, # first downsampling
                 'tgt_fds_pts': tgt_pts,
@@ -143,7 +124,7 @@ class ScannetppIphoneDataset(Data.Dataset):
                 'dataset_name': self.config.data.dataset,
                 'sphericity': sphericity,
                 'src_pcd_raw': src_pcd_raw,
-                'tgt_pcd_raw': tgt_pcd_raw
+                'tgt_pcd_raw': tgt_pcd_raw,
                 }
 
     def __len__(self):

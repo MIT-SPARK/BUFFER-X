@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from functools import partial
-from ETH.dataset import ETHTestset, get_matching_indices
+from ETH.dataset import ETHTestset
 import cpp_wrappers.cpp_subsampling.grid_subsampling as cpp_subsampling
 import cpp_wrappers.cpp_neighbors.radius_neighbors as cpp_neighbors
 from models.point_learner import architecture

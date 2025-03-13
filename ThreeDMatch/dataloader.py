@@ -20,12 +20,7 @@ def collate_fn_descriptor(list_data, config):
     src_id, tgt_id = list_data['src_id'], list_data['tgt_id']
     src_kpt = s_kpt[:, :3]
     tgt_kpt = t_kpt[:, :3]
-    src_f = s_kpt[:, 3:]
-    tgt_f = t_kpt[:, 3:]
-    batched_points_list.append(src_kpt)
-    batched_points_list.append(tgt_kpt)
-    batched_features_list.append(src_f)
-    batched_features_list.append(tgt_f)
+
     batched_lengths_list.append(len(src_kpt))
     batched_lengths_list.append(len(tgt_kpt))
     batched_voxel_size_list.append(list_data['voxel_size'])

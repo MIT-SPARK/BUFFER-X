@@ -6,27 +6,15 @@ from utils.SE3 import *
 from utils.common import make_open3d_point_cloud
 from utils.tools import find_voxel_size
 
-mit_icp_cache = {}
-mit_cache = {}
+tiers_icp_cache = {}
+tiers_cache = {}
 cur_path = os.path.dirname(os.path.realpath(__file__))
 
-
-def get_matching_indices(source, target, relt_pose, search_voxel_size):
-    source = transform(source, relt_pose)
-    diffs = source[:, None] - target[None]
-    dist = np.sqrt(np.sum(diffs ** 2, axis=-1) + 1e-12)
-    min_ind = np.concatenate([np.arange(source.shape[0])[:, None], np.argmin(dist, axis=1)[:, None]], axis=-1)
-    min_val = np.min(dist, axis=1)
-    match_inds = min_ind[min_val < search_voxel_size]
-
-    return match_inds
-
-
-class MITDataset(Data.Dataset):
+class TiersDataset(Data.Dataset):
     DATA_FILES = {
-        'train': 'train_mit.txt',
-        'val': 'val_mit.txt',
-        'test': 'test_mit.txt'
+        'train': 'train_tiers.txt',
+        'val': 'val_tiers.txt',
+        'test': 'test_tiers.txt'
     }
 
     def __init__(self,
@@ -40,59 +28,87 @@ class MITDataset(Data.Dataset):
         self.files = {'train': [], 'val': [], 'test': []}
         self.poses = []
         self.length = 0
+        self.pdist = 2
         # self.pdist = config.data.pdist
-        self.pdist = 5
-        self.prepare_mit_ply(split=self.split)
 
-    def prepare_mit_ply(self, split='train'):
+        self.prepare_tiers_ply(split=self.split)
+
+    def prepare_tiers_ply(self, split='train'):
         subset_names = open(os.path.join(cur_path, self.DATA_FILES[split])).read().split()
         for dirname in subset_names:
             drive_id = str(dirname)
-            fnames = glob.glob(self.pc_path + '/%s/scans/*.pcd' % drive_id)
-            assert len(fnames) > 0, f"Make sure that the path {self.pc_path} has data {dirname}"
-            inames = sorted([int(os.path.split(fname)[-1][:-4]) for fname in fnames])
+            sensor_types = os.listdir(os.path.join(self.pc_path, dirname))
+            for sensor in sensor_types:
+                fnames = glob.glob(self.pc_path + '/%s/%s/scans/*.pcd' % (drive_id, sensor))
+                assert len(fnames) > 0, f"Make sure that the path {self.pc_path} has data {dirname}"
+                inames = sorted([int(os.path.split(fname)[-1][:-4]) for fname in fnames])
 
-            all_odo = self.get_video_odometry(drive_id, return_all=True)
-            all_pos = np.array([self.odometry_to_positions(odo) for odo in all_odo])
-            Ts = all_pos[:, :3, 3]
-            pdist = (Ts.reshape(1, -1, 3) - Ts.reshape(-1, 1, 3)) ** 2
-            pdist = np.sqrt(pdist.sum(-1))
-            
-            # set valid pair threshold to 5
-            valid_pairs = pdist > self.pdist
-            curr_time = inames[0]
-            while curr_time in inames:
-                next_time = np.where(valid_pairs[curr_time][curr_time:curr_time + 100])[0]
-                if len(next_time) == 0:
-                    curr_time += 1
-                else:
-                    next_time = next_time[0] + curr_time - 1
+                all_odo = self.get_video_odometry(drive_id, sensor, return_all=True)
+                all_pos = np.array([self.odometry_to_positions(odo) for odo in all_odo])
+                Ts = all_pos[:, :3, 3]
+                pdist = (Ts.reshape(1, -1, 3) - Ts.reshape(-1, 1, 3)) ** 2
+                pdist = np.sqrt(pdist.sum(-1))
+                
+                # set valid pair threshold to 5
+                valid_pairs = pdist > self.pdist
+                curr_time = inames[0]
+                while curr_time in inames:
+                    next_time = np.where(valid_pairs[curr_time][curr_time:curr_time + 100])[0]
+                    if len(next_time) == 0:
+                        curr_time += 1
+                    else:
+                        next_time = next_time[0] + curr_time - 1
 
-                if next_time in inames:
-                    self.files[split].append((drive_id, curr_time, next_time))
-                    curr_time = next_time + 1
+                    if next_time in inames:
+                        self.files[split].append((drive_id, sensor, curr_time, next_time))
+                        curr_time = next_time + 1
 
-        self.length = len(self.files[split])
+            self.length = len(self.files[split])
 
     def __getitem__(self, index):
 
         # load meta data
         drive = self.files[self.split][index][0]
-        t0, t1 = self.files[self.split][index][1], self.files[self.split][index][2]
+        sensor = self.files[self.split][index][1]
+        t0, t1 = self.files[self.split][index][2], self.files[self.split][index][3]
 
-        all_odometry = self.get_video_odometry(drive, [t0, t1])
+        all_odometry = self.get_video_odometry(drive, sensor, [t0, t1])
         positions = [self.odometry_to_positions(odometry) for odometry in all_odometry]
-        fname0 = self._get_velodyne_fn(drive, t0)
-        fname1 = self._get_velodyne_fn(drive, t1)
+        fname0 = self._get_velodyne_fn(drive, sensor, t0)
+        fname1 = self._get_velodyne_fn(drive, sensor, t1)
         
         # XYZ and reflectance
         o3d_cloud0 = o3d.io.read_point_cloud(fname0)
         o3d_cloud1 = o3d.io.read_point_cloud(fname1)
         xyz0 = np.asarray(o3d_cloud0.points, dtype=np.float32)
         xyz1 = np.asarray(o3d_cloud1.points, dtype=np.float32)
+
+        # key = '%s_%06d_%06d' % (drive, t0, t1)
+        # filename = self.icp_path + '/' + key + '.npy'
+        # if key not in tiers_icp_cache:
+        #     if not os.path.exists(filename):
+        #         M = (self.velo2cam @ positions[0].T @ np.linalg.inv(positions[1].T)
+        #              @ np.linalg.inv(self.velo2cam)).T
+        #         xyz0_t = self.apply_transform(xyz0, M)
+        #         pcd0 = make_open3d_point_cloud(xyz0_t, [0.5, 0.5, 0.5])
+        #         pcd1 = make_open3d_point_cloud(xyz1, [0, 1, 0])
+        #         reg = o3d.pipelines.registration.registration_icp(pcd0, pcd1, 0.20, np.eye(4),
+        #                                                           o3d.pipelines.registration.TransformationEstimationPointToPoint(),
+        #                                                           o3d.pipelines.registration.ICPConvergenceCriteria(
+        #                                                               max_iteration=200))
+        #         pcd0.transform(reg.transformation)
+        #         M2 = M @ reg.transformation
+        #         # write to a file
+        #         np.save(filename, M2)
+        #     else:
+        #         M2 = np.load(filename)
+        #     tiers_icp_cache[key] = M2
+        # else:
+        #     M2 = tiers_icp_cache[key]
+        # trans = M2
         
         # Note (Minkyun Seo): 
-        # Above code is commented out because it does not work well for the kimera-multi dataset.
+        # Above code is commented out because it does not work well for the tiers dataset.
         trans = np.linalg.inv(positions[1]) @ positions[0]
         # np.save(filename, trans)
 
@@ -105,10 +121,9 @@ class MITDataset(Data.Dataset):
         tgt_pcd = make_open3d_point_cloud(xyz1, [0, 0.651, 0.929])
         
         src_pcd_raw = np.array(src_pcd.points)
-        tgt_pcd_raw = np.array(tgt_pcd.points) 
-        
+        tgt_pcd_raw = np.array(tgt_pcd.points)
+
         self.config.data.downsample, sphericity = find_voxel_size(src_pcd, tgt_pcd)
-        
         src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample)
         src_pts = np.array(src_pcd.points)
         np.random.shuffle(src_pts)
@@ -174,6 +189,7 @@ class MITDataset(Data.Dataset):
                 'tgt_id': '%s_%d' % (drive, t1),
                 'dataset_name': self.config.data.dataset,
                 'sphericity': sphericity,
+                'sensor': sensor,
                 'src_pcd_raw': src_pcd_raw,
                 'tgt_pcd_raw': tgt_pcd_raw
                 }
@@ -184,22 +200,36 @@ class MITDataset(Data.Dataset):
         pts = pts @ R.T + T
         return pts
 
-    def get_video_odometry(self, drive, indices=None, ext='.txt', return_all=False):
-        data_path = self.pc_path + '/%s/poses_kitti.txt' % drive
-        if data_path not in mit_cache:
-            mit_cache[data_path] = np.genfromtxt(data_path)
+    @property
+    def velo2cam(self):
+        try:
+            velo2cam = self._velo2cam
+        except AttributeError:
+            R = np.array([
+                7.533745e-03, -9.999714e-01, -6.166020e-04, 1.480249e-02, 7.280733e-04,
+                -9.998902e-01, 9.998621e-01, 7.523790e-03, 1.480755e-02
+            ]).reshape(3, 3)
+            T = np.array([-4.069766e-03, -7.631618e-02, -2.717806e-01]).reshape(3, 1)
+            velo2cam = np.hstack([R, T])
+            self._velo2cam = np.vstack((velo2cam, [0, 0, 0, 1])).T
+        return self._velo2cam
+
+    def get_video_odometry(self, drive, sensor, indices=None, ext='.txt', return_all=False):
+        data_path = self.pc_path + '/%s/%s/poses_kitti.txt' % (drive, sensor)
+        if data_path not in tiers_cache:
+            tiers_cache[data_path] = np.genfromtxt(data_path)
         if return_all:
-            return mit_cache[data_path]
+            return tiers_cache[data_path]
         else:
-            return mit_cache[data_path][indices]
+            return tiers_cache[data_path][indices]
 
     def odometry_to_positions(self, odometry):
         T_w_cam0 = odometry.reshape(3, 4)
         T_w_cam0 = np.vstack((T_w_cam0, [0, 0, 0, 1]))
         return T_w_cam0
 
-    def _get_velodyne_fn(self, drive, t):
-        fname = self.pc_path + '/%s/scans/%06d.pcd' % (drive, t)
+    def _get_velodyne_fn(self, drive, sensor, t):
+        fname = self.pc_path + '/%s/%s/scans/%06d.pcd' % (drive, sensor, t)
         return fname
 
     def __len__(self):

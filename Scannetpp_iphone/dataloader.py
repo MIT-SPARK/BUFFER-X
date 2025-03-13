@@ -1,5 +1,5 @@
 from functools import partial
-from Scannetpp_iphone.dataset import ScannetppIphoneDataset, get_matching_indices
+from Scannetpp_iphone.dataset import ScannetppIphoneDataset
 import torch
 import numpy as np
 import cpp_wrappers.cpp_subsampling.grid_subsampling as cpp_subsampling

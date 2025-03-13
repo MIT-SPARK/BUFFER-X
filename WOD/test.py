@@ -11,7 +11,8 @@ from utils.timer import Timer
 from config.wod_config import make_cfg
 from models.BUFFER import buffer
 from utils.SE3 import *
-from WOD.dataloader import get_dataloader
+# from WOD.dataloader import get_dataloader
+from dataset.dataloader import get_dataloader
 import open3d as o3d
 
 if __name__ == '__main__':
@@ -38,7 +39,8 @@ if __name__ == '__main__':
     model = nn.DataParallel(model, device_ids=[0])
     model.eval()
 
-    test_loader = get_dataloader(split='test',
+    test_loader = get_dataloader(dataset = "WOD",
+                                split='test',
                                  config=cfg,
                                  shuffle=False,
                                  num_workers=cfg.train.num_workers,
@@ -84,42 +86,6 @@ if __name__ == '__main__':
             scene = data_source['src_id'].split('/')[0]
             src_id = data_source['src_id'].split('/')[-1].split('_')[-1]
             tgt_id = data_source['tgt_id'].split('/')[-1].split('_')[-1]
-            if i % 10 == 0:
-                src_pts, tgt_pts = data_source['src_pcd_real_raw'], data_source['tgt_pcd_real_raw']
-                src_pcd = o3d.geometry.PointCloud()
-                src_pcd.points = o3d.utility.Vector3dVector(src_pts)
-                src_pcd.paint_uniform_color([1, 0.706, 0])
-                
-                src_gray_pts = data_source['src_pcd_real_raw']
-                src_gray_pcd = o3d.geometry.PointCloud()
-                src_gray_pcd.points = o3d.utility.Vector3dVector(src_gray_pts)
-                src_gray_pcd.paint_uniform_color([0.5, 0.5, 0.5])
-                
-                tgt_pcd = o3d.geometry.PointCloud()
-                tgt_pcd.points = o3d.utility.Vector3dVector(tgt_pts)
-                tgt_pcd.paint_uniform_color([0, 0.651, 0.929])
-                
-                pair_name = f"{scene}_{src_id}_{tgt_id}"
-                ply_path = f"../results_ply/WOD/"
-                if not os.path.exists(ply_path):
-                    os.makedirs(ply_path)
-                
-                before_matching = src_pcd + tgt_pcd
-                o3d.io.write_point_cloud(f"../results_ply/WOD/{pair_name}_before_matching.ply", before_matching)
-                
-                before_matching_gray = src_gray_pcd + tgt_pcd
-                o3d.io.write_point_cloud(f"../results_ply/WOD/{pair_name}_before_matching_gray.ply", before_matching_gray)
-                
-                src_pcd.transform(trans)
-                gt_matching = src_pcd + tgt_pcd
-                o3d.io.write_point_cloud(f"../results_ply/WOD/{pair_name}_gt_matching.ply", gt_matching)
-                
-                src_pcd.transform(np.linalg.inv(trans))
-                src_pcd.transform(trans_est)
-                pred_matching = src_pcd + tgt_pcd
-                result = "Fail" if fail else "Success"
-                o3d.io.write_point_cloud(f"../results_ply/WOD/{pair_name}_{result}_pred_matching.ply", pred_matching)
-        
         
             if (i + 1) % 10 == 0 or i == num_batch - 1:
                 temp_states = np.array(states)

@@ -4,27 +4,17 @@ import open3d as o3d
 import glob
 from utils.SE3 import *
 from utils.common import make_open3d_point_cloud
-from utils.tools import analyze_pointcloud_statistics, find_voxel_size
+from utils.tools import find_voxel_size
 
-kaist_icp_cache = {}
-kaist_cache = {}
+mit_icp_cache = {}
+mit_cache = {}
 cur_path = os.path.dirname(os.path.realpath(__file__))
 
-def get_matching_indices(source, target, relt_pose, search_voxel_size):
-    source = transform(source, relt_pose)
-    diffs = source[:, None] - target[None]
-    dist = np.sqrt(np.sum(diffs ** 2, axis=-1) + 1e-12)
-    min_ind = np.concatenate([np.arange(source.shape[0])[:, None], np.argmin(dist, axis=1)[:, None]], axis=-1)
-    min_val = np.min(dist, axis=1)
-    match_inds = min_ind[min_val < search_voxel_size]
-
-    return match_inds
-
-class KAISTDataset(Data.Dataset):
+class MITDataset(Data.Dataset):
     DATA_FILES = {
-        'train': 'train_kaist.txt',
-        'val': 'val_kaist.txt',
-        'test': 'test_kaist.txt'
+        'train': 'train_mit.txt',
+        'val': 'val_mit.txt',
+        'test': 'test_mit.txt'
     }
 
     def __init__(self,
@@ -32,21 +22,21 @@ class KAISTDataset(Data.Dataset):
                  config=None
                  ):
         self.config = config
-        self.pc_path = config.data.root
+        self.pc_path = config.data.root 
         self.icp_path = config.data.root + '/icp'
         self.split = split
         self.files = {'train': [], 'val': [], 'test': []}
         self.poses = []
         self.length = 0
         # self.pdist = config.data.pdist
-        self.pdist = 10
-        self.prepare_kaist_ply(split=self.split)
+        self.pdist = 5
+        self.prepare_mit_ply(split=self.split)
 
-    def prepare_kaist_ply(self, split='train'):
+    def prepare_mit_ply(self, split='train'):
         subset_names = open(os.path.join(cur_path, self.DATA_FILES[split])).read().split()
         for dirname in subset_names:
             drive_id = str(dirname)
-            fnames = glob.glob(self.pc_path + '/%s/velodyne/*.bin' % drive_id)
+            fnames = glob.glob(self.pc_path + '/%s/scans/*.pcd' % drive_id)
             assert len(fnames) > 0, f"Make sure that the path {self.pc_path} has data {dirname}"
             inames = sorted([int(os.path.split(fname)[-1][:-4]) for fname in fnames])
 
@@ -55,11 +45,12 @@ class KAISTDataset(Data.Dataset):
             Ts = all_pos[:, :3, 3]
             pdist = (Ts.reshape(1, -1, 3) - Ts.reshape(-1, 1, 3)) ** 2
             pdist = np.sqrt(pdist.sum(-1))
-            # more_than_10 = pdist > 10
-            more_than_10 = pdist > self.pdist
+            
+            # set valid pair threshold to 5
+            valid_pairs = pdist > self.pdist
             curr_time = inames[0]
             while curr_time in inames:
-                next_time = np.where(more_than_10[curr_time][curr_time:curr_time + 100])[0]
+                next_time = np.where(valid_pairs[curr_time][curr_time:curr_time + 100])[0]
                 if len(next_time) == 0:
                     curr_time += 1
                 else:
@@ -83,14 +74,16 @@ class KAISTDataset(Data.Dataset):
         fname1 = self._get_velodyne_fn(drive, t1)
         
         # XYZ and reflectance
-        xyzr0 = np.fromfile(fname0, dtype=np.float32).reshape(-1, 4)
-        xyzr1 = np.fromfile(fname1, dtype=np.float32).reshape(-1, 4)
-
-        xyz0 = xyzr0[:, :3]
-        xyz1 = xyzr1[:, :3]
-
-        trans = np.linalg.inv(positions[1]) @ positions[0]
+        o3d_cloud0 = o3d.io.read_point_cloud(fname0)
+        o3d_cloud1 = o3d.io.read_point_cloud(fname1)
+        xyz0 = np.asarray(o3d_cloud0.points, dtype=np.float32)
+        xyz1 = np.asarray(o3d_cloud1.points, dtype=np.float32)
         
+        # Note (Minkyun Seo): 
+        # Above code is commented out because it does not work well for the kimera-multi dataset.
+        trans = np.linalg.inv(positions[1]) @ positions[0]
+        # np.save(filename, trans)
+
         if self.split != 'test':
             xyz0 += (np.random.rand(xyz0.shape[0], 3) - 0.5) * self.config.train.augmentation_noise
             xyz1 += (np.random.rand(xyz1.shape[0], 3) - 0.5) * self.config.train.augmentation_noise
@@ -98,19 +91,18 @@ class KAISTDataset(Data.Dataset):
         # process point clouds
         src_pcd = make_open3d_point_cloud(xyz0, [1, 0.706, 0])
         tgt_pcd = make_open3d_point_cloud(xyz1, [0, 0.651, 0.929])
-
+        
         src_pcd_raw = np.array(src_pcd.points)
-        tgt_pcd_raw = np.array(tgt_pcd.points)
+        tgt_pcd_raw = np.array(tgt_pcd.points) 
         
         self.config.data.downsample, sphericity = find_voxel_size(src_pcd, tgt_pcd)
         
-        src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample) 
+        src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample)
         src_pts = np.array(src_pcd.points)
         np.random.shuffle(src_pts)
-        
+
         tgt_pcd = o3d.geometry.PointCloud.voxel_down_sample(tgt_pcd, voxel_size=self.config.data.downsample)
-        tgt_pts = np.asarray(tgt_pcd.points)
-        
+
         if self.split != 'test':
             if self.config.stage == 'Ref':
                 # SO(3) augmentation
@@ -147,18 +139,18 @@ class KAISTDataset(Data.Dataset):
             idx = np.random.choice(range(tgt_kpt.shape[0]), self.config.data.max_numPts, replace=False)
             tgt_kpt = tgt_kpt[idx]
 
-        # if self.split == 'test':
-        #     src_pcd = make_open3d_point_cloud(src_kpt, [1, 0.706, 0])
-        #     src_pcd.estimate_normals()
-        #     src_pcd.orient_normals_towards_camera_location()
-        #     src_noms = np.array(src_pcd.normals)
-        #     src_kpt = np.concatenate([src_kpt, src_noms], axis=-1)
+        if self.split == 'test':
+            src_pcd = make_open3d_point_cloud(src_kpt, [1, 0.706, 0])
+            src_pcd.estimate_normals()
+            src_pcd.orient_normals_towards_camera_location()
+            src_noms = np.array(src_pcd.normals)
+            src_kpt = np.concatenate([src_kpt, src_noms], axis=-1)
 
-        #     tgt_pcd = make_open3d_point_cloud(tgt_kpt, [0, 0.651, 0.929])
-        #     tgt_pcd.estimate_normals()
-        #     tgt_pcd.orient_normals_towards_camera_location()
-        #     tgt_noms = np.array(tgt_pcd.normals)
-        #     tgt_kpt = np.concatenate([tgt_kpt, tgt_noms], axis=-1)
+            tgt_pcd = make_open3d_point_cloud(tgt_kpt, [0, 0.651, 0.929])
+            tgt_pcd.estimate_normals()
+            tgt_pcd.orient_normals_towards_camera_location()
+            tgt_noms = np.array(tgt_pcd.normals)
+            tgt_kpt = np.concatenate([tgt_kpt, tgt_noms], axis=-1)
 
         return {'src_fds_pts': src_pts,  # first downsampling
                 'tgt_fds_pts': tgt_pts,
@@ -181,13 +173,13 @@ class KAISTDataset(Data.Dataset):
         return pts
 
     def get_video_odometry(self, drive, indices=None, ext='.txt', return_all=False):
-        data_path = self.pc_path + '/%s/poses.txt' % drive
-        if data_path not in kaist_cache:
-            kaist_cache[data_path] = np.genfromtxt(data_path)
+        data_path = self.pc_path + '/%s/poses_kitti.txt' % drive
+        if data_path not in mit_cache:
+            mit_cache[data_path] = np.genfromtxt(data_path)
         if return_all:
-            return kaist_cache[data_path]
+            return mit_cache[data_path]
         else:
-            return kaist_cache[data_path][indices]
+            return mit_cache[data_path][indices]
 
     def odometry_to_positions(self, odometry):
         T_w_cam0 = odometry.reshape(3, 4)
@@ -195,7 +187,7 @@ class KAISTDataset(Data.Dataset):
         return T_w_cam0
 
     def _get_velodyne_fn(self, drive, t):
-        fname = self.pc_path + '/%s/velodyne/%06d.bin' % (drive, t)
+        fname = self.pc_path + '/%s/scans/%06d.pcd' % (drive, t)
         return fname
 
     def __len__(self):
