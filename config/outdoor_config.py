@@ -29,6 +29,10 @@ class OutdoorBaseConfig:
         self._C.test = edict()
         self._C.test.experiment_id = 'threedmatch'
         self._C.test.pose_refine = False
+        
+        # Evaluation thresholds
+        self._C.test.rte_thresh = 2.0  # RTE threshold for outdoor datasets
+        self._C.test.rre_thresh = 5.0  # RRE threshold for outdoor datasets
 
         # Optimizer
         self._C.optim = edict()

@@ -30,6 +30,10 @@ class IndoorBaseConfig:
         self._C.test.experiment_id = 'threedmatch'
         self._C.test.pose_refine = False
 
+        # Evaluation thresholds
+        self._C.test.rte_thresh = 0.3  # RTE threshold for indoor datasets
+        self._C.test.rre_thresh = 15.0  # RRE threshold for indoor datasets
+
         # Optimizer
         self._C.optim = edict()
         self._C.optim.lr = {'Desc': 0.001, 'Inlier': 0.001}
