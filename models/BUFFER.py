@@ -152,25 +152,28 @@ class buffer(nn.Module):
             # training descriptor
             #######################
             # calculate feature descriptor
-            
-            # des_r = cfg.patch.des_r
-            center = cfg.patch.des_r
-            lower_bound = center * 0.5
-            upper_bound = center * 1.5
-            std_dev = (upper_bound - lower_bound) / 6
-            des_r = np.round(np.clip(np.random.normal(center, std_dev, 1), lower_bound, upper_bound), 2)[0]
-            
-            # Define the range of possible values based on the center
-            # if center == 3.0:
-            #     possible_values = [2.0, 2.5, 3.0, 3.5, 4.0]
-            # elif center == 0.3:
-            #     possible_values = [0.2, 0.25, 0.3, 0.35, 0.4]
+            if dataset_name == '3DMatch':
+                center = cfg.patch.des_r
+                lower_bound = center * 0.5
+                upper_bound = center * 1.5
+                std_dev = (upper_bound - lower_bound) / 6
+                des_r = np.round(np.clip(np.random.normal(center, std_dev, 1), lower_bound, upper_bound), 2)[0]
+                
+            elif dataset_name == 'KITTI':
+                # Define the range of possible values based on the center
+                center = cfg.patch.des_r
+                if center == 3.0:
+                    possible_values = [2.0, 2.5, 3.0, 3.5, 4.0]
+                elif center == 0.3:
+                    possible_values = [0.2, 0.25, 0.3, 0.35, 0.4]
 
-            # # Assign probabilities (optional: uniform probabilities)
-            # probabilities = [0.2, 0.2, 0.2, 0.2, 0.2]  # Adjust probabilities as needed
+                # Assign probabilities (optional: uniform probabilities)
+                probabilities = [0.2, 0.2, 0.2, 0.2, 0.2]  # Adjust probabilities as needed
 
-            # # Select a value from possible_values based on the probabilities
-            # des_r = np.random.choice(possible_values, p=probabilities)
+                # Select a value from possible_values based on the probabilities
+                des_r = np.random.choice(possible_values, p=probabilities)
+            else:
+                des_r = cfg.patch.des_r
 
             src = self.Desc(src_pcd_raw[None], src_kpt[None], des_r, dataset_name)
             if self.config.stage == 'Inlier':
