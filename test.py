@@ -122,7 +122,8 @@ if __name__ == '__main__':
                 temp_recall = temp_states[:, 0].sum() / temp_states.shape[0]
                 temp_te = temp_states[temp_states[:, 0] == 1, 1].mean()
                 temp_re = temp_states[temp_states[:, 0] == 1, 2].mean()
-                print(f"[{i + 1}/{num_batch}] Recall: {temp_recall:.4f} RTE: {temp_te:.4f} RRE: {temp_re:.4f}")
+                print(f"[{i + 1}/{num_batch}] Recall: {temp_recall:.4f} RTE: {temp_te:.4f} RRE: {temp_re:.4f}"
+                      f" Data time: {data_timer.diff:.4f}s Model time: {model_timer.diff:.4f}s")
 
     states = np.array(states)
     recall = states[:, 0].sum() / states.shape[0]
