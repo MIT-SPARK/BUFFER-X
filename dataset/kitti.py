@@ -119,6 +119,8 @@ class KITTIDataset(Data.Dataset):
 
         if self.split == 'test':
             self.config.data.downsample, sphericity = find_voxel_size(src_pcd, tgt_pcd)
+        else:
+            sphericity = 0
         
         src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample) 
         src_pts = np.array(src_pcd.points)
@@ -128,12 +130,8 @@ class KITTIDataset(Data.Dataset):
         tgt_pts = np.asarray(tgt_pcd.points)
         
         if self.split != 'test':
-            if self.config.stage == 'Ref':
-                # SO(3) augmentation
-                R = rotation_matrix(3, 1)
-            else:
-                # SO(2) augmentation
-                R = rotation_matrix(1, 1)
+            # SO(2) augmentation
+            R = rotation_matrix(1, 1)
             t = np.zeros([3, 1])
             aug_trans = integrate_trans(R, t)
             tgt_pcd.transform(aug_trans)
