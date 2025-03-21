@@ -1,3 +1,0 @@
-01_short_experiments
-05_quad_with_dynamics
-07_parkland_mound
