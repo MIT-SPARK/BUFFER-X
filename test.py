@@ -1,6 +1,8 @@
 import argparse
 import sys
 import os
+# Set GPU device
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import math
 import time
 import torch
@@ -20,11 +22,9 @@ parser.add_argument("--dataset", type=str, required=True, choices=[
     "3DMatch", "3DLoMatch", "Scannetpp_iphone", "Scannetpp_faro", "Tiers",
     "KITTI", "WOD", "MIT", "KAIST", "ETH", "Oxford"
 ], help="Dataset to test on")
-parser.add_argument("--gpu", type=str, default="0", help="CUDA device to use")
+parser.add_argument("--experiment_id", type=str, default=None,
+                    help="Optional experiment ID (default: uses config.test.experiment_id)")
 args = parser.parse_args()
-
-# Set GPU device
-os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
 if __name__ == '__main__':
     print(f"Start testing on {args.dataset}...")
@@ -37,7 +37,7 @@ if __name__ == '__main__':
 
     # Initialize model
     model = buffer(cfg)
-    experiment_id = cfg.test.experiment_id
+    experiment_id = args.experiment_id if args.experiment_id else cfg.test.experiment_id
 
     # Load model weights
     for stage in cfg.train.all_stage:
