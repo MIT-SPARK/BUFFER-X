@@ -1,5 +1,8 @@
 import sys
 import os
+
+# Set GPU device
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import torch
 import time
 import argparse
@@ -19,11 +22,7 @@ from config import make_cfg
 parser = argparse.ArgumentParser(description="Generalized Training Script for Registration Models")
 parser.add_argument("--dataset", type=str, required=True, choices=["3DMatch", "KITTI"],
                     help="Dataset to train on (3DMatch or KITTI)")
-parser.add_argument("--gpu", type=str, default="0", help="CUDA device to use")
 args = parser.parse_args()
-
-# Set GPU device
-os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
 
 class Args(object):
