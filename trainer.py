@@ -13,6 +13,7 @@ class Trainer(object):
         self.train_modal = self.cfg.stage
         self.epoch = self.cfg.train.epoch
         self.save_dir = args.save_dir
+        self.logger = args.logger
 
         self.model = args.model
         self.optimizer = args.optimizer
@@ -27,7 +28,7 @@ class Trainer(object):
         self.desc_loss = ContrastiveLoss()
         self.class_loss = torch.nn.CrossEntropyLoss()
         self.Huber_loss = torch.nn.HuberLoss()
-
+        
         # create meters and timers
         self.meter_list = ['desc_loss', 'desc_acc', 'eqv_loss', 'eqv_acc', 'match_loss']
         self.meter_dict = {}
@@ -61,9 +62,9 @@ class Trainer(object):
 
             if (epoch + 1) % self.evaluate_interval == 0 or epoch == 0:
                 res = self.evaluate()
-                print(f'Evaluation: Epoch {epoch}')
+                self.logger.info(f'Evaluation: Epoch {epoch}')
                 for key in res.keys():
-                    print(f"{key}: {res[key]}")
+                    self.logger.info(f"{key}: {res[key]}")
                     self.writer.add_scalar(key, res[key], epoch)
 
                 if self.train_modal == 'Desc':
@@ -81,16 +82,16 @@ class Trainer(object):
                 old_lr = self.optimizer.param_groups[0]['lr']
                 self.scheduler.step()
                 new_lr = self.optimizer.param_groups[0]['lr']
-                print('update detector learning rate: %f -> %f' % (old_lr, new_lr))
+                self.logger.info('update detector learning rate: %f -> %f' % (old_lr, new_lr))
 
             if self.writer:
                 self.writer.add_scalar('Learning Rate', self._get_lr(), epoch)
 
         # finish all epoch
-        print("Training finish!... save training results")
+        self.logger.info("Training finish!... save training results")
 
     def train_epoch(self, epoch):
-        print('training start!!')
+        self.logger.info('training start!!')
         self.model.train()
         data_timer, model_timer = Timer(), Timer()
 
@@ -146,7 +147,7 @@ class Trainer(object):
 
                 pred_ind, gt_ind = output['pred_ind'], output['gt_ind']
                 match_loss = self.Huber_loss(pred_ind, gt_ind)
-
+                
                 loss = match_loss
                 stats = {
                     "match_loss": float(match_loss.item()),
@@ -170,16 +171,16 @@ class Trainer(object):
                     self.meter_dict[key].update(stats[key])
 
             if (i + 1) % 200 == 0:
-                print(f"Epoch: {epoch + 1} [{i + 1:4d}/{num_iter}] "
+                self.logger.info(f"Epoch: {epoch + 1} [{i + 1:4d}/{num_iter}] "
                       f"data_time: {data_timer.avg:.2f}s "
                       f"model_time: {model_timer.avg:.2f}s ")
                 for key in self.meter_dict.keys():
-                    print(f"{key}: {self.meter_dict[key].avg:.6f}")
+                    self.logger.info(f"{key}: {self.meter_dict[key].avg:.6f}")
                     self.meter_dict[key].reset()
         self._snapshot(f'{epoch}')
 
     def evaluate(self):
-        print('validation start!!')
+        self.logger.info('validation start!!')
         self.model.eval()
         data_timer, model_timer = Timer(), Timer()
 
@@ -248,7 +249,7 @@ class Trainer(object):
         save_path = self.cfg.snapshot_root + f'/{self.train_modal}'
         ensure_dir(save_path)
         torch.save(self.model.module.state_dict(), save_path + f'/{info}.pth')
-        print(f"Save model to {save_path}/{info}.pth")
+        self.logger.info(f"Save model to {save_path}/{info}.pth")
 
     def _get_lr(self, group=0):
         return self.optimizer.param_groups[group]['lr']

@@ -6,6 +6,7 @@ from sklearn.neighbors import NearestNeighbors
 from sklearn.decomposition import PCA
 import time
 import nibabel.quaternions as nq
+import logging
 
 def get_pcd(pcdpath, filename):
     return open3d.io.read_point_cloud(os.path.join(pcdpath, filename + '.ply'))
@@ -162,3 +163,20 @@ def find_voxel_size(src_pcd, tgt_pcd):
     voxel_size = np.sqrt(z_range) / 100 * alpha
     
     return round(voxel_size, 4), sphericity
+
+def setup_logger(log_path=None):
+    logger = logging.getLogger("BUFFER-X")
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
+
+    if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
+        ch = logging.StreamHandler()
+        ch.setFormatter(formatter)
+        logger.addHandler(ch)
+
+    if log_path and not any(isinstance(h, logging.FileHandler) and h.baseFilename == os.path.abspath(log_path) for h in logger.handlers):
+        fh = logging.FileHandler(log_path)
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+    return logger

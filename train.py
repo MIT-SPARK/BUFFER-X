@@ -14,6 +14,7 @@ from utils.SE3 import *
 from dataset.dataloader import get_dataloader
 from models.BUFFER import buffer
 from trainer import Trainer
+from utils.tools import setup_logger
 
 # Import dataset-specific config
 from config import make_cfg
@@ -26,9 +27,9 @@ args = parser.parse_args()
 
 
 class Args(object):
-    def __init__(self, cfg):
+    def __init__(self, cfg, logger):
         self.cfg = cfg
-
+        self.logger = logger
         # Load model
         self.model = buffer(cfg)
         self.parameter = self.model.get_parameter()
@@ -40,7 +41,7 @@ class Args(object):
         if cfg.train.pretrain_model:
             state_dict = torch.load(cfg.train.pretrain_model)
             self.model.load_state_dict(state_dict)
-            print(f"Loaded pretrained model from {cfg.train.pretrain_model}\n")
+            logger.info(f"Loaded pretrained model from {cfg.train.pretrain_model}\n")
 
         for modname in left_stage:
             weight_path = os.path.join(cfg.snapshot_root, modname, 'best.pth')
@@ -50,7 +51,7 @@ class Args(object):
                 model_dict = self.model.state_dict()
                 model_dict.update(new_dict)
                 self.model.load_state_dict(model_dict)
-                print(f"Loaded {modname} from {weight_path}\n")
+                logger.info(f"Loaded {modname} from {weight_path}\n")
 
             # Freeze parameters of the loaded module
             for p in getattr(self.model, modname).parameters():
@@ -71,8 +72,8 @@ class Args(object):
         self.val_loader = get_dataloader(dataset=cfg.data.dataset, split='val', config=cfg, shuffle=False,
                                          num_workers=cfg.train.num_workers)
 
-        print(f"Training set size: {len(self.train_loader.dataset)}")
-        print(f"Validation set size: {len(self.val_loader.dataset)}")
+        logger.info(f"Training set size: {len(self.train_loader.dataset)}")
+        logger.info(f"Validation set size: {len(self.val_loader.dataset)}")
 
         # Snapshot paths
         self.save_dir = os.path.join(cfg.snapshot_root, cfg.stage)
@@ -83,8 +84,13 @@ class Args(object):
 
 
 if __name__ == '__main__':
-    print(f"Starting training on {args.dataset}...")
+    timestr = time.strftime('%m%d%H%M')
+    log_dir = f'logs/train/{args.dataset}'
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, f"{timestr}.log")
+    logger = setup_logger(log_file)
 
+    logger.info(f"Starting training on {args.dataset}...")
     # Load dataset-specific config
     cfg = make_cfg(args.dataset)
     cfg[cfg.data.dataset] = cfg.copy()
@@ -102,7 +108,7 @@ if __name__ == '__main__':
         torch.manual_seed(cfg.data.manual_seed)
         torch.cuda.manual_seed_all(cfg.data.manual_seed)
     else:
-        print("Warning: No seed setting!!!")
+        logger.warning("Warning: No seed setting!!!")
 
     dataset = args.dataset
     # Training loop
@@ -111,6 +117,6 @@ if __name__ == '__main__':
         cfg.snapshot_root = f'snapshot/{dataset}/{experiment_id}'
         cfg.tensorboard_root = f'tensorboard/{experiment_id}/{cfg.stage}'
 
-        args = Args(cfg)
+        args = Args(cfg, logger)
         trainer = Trainer(args)
         trainer.train()

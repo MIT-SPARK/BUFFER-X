@@ -3,6 +3,7 @@ import sys
 import os
 # Set GPU device
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
 import math
 import time
 import torch
@@ -16,6 +17,7 @@ from dataset.dataloader import get_dataloader
 from models.BUFFER import buffer
 import open3d as o3d
 
+
 # Argument parser
 parser = argparse.ArgumentParser(description="Generalized Testing Script for Registration Models")
 parser.add_argument("--dataset", type=str, required=True, choices=[
@@ -27,18 +29,20 @@ parser.add_argument("--experiment_id", type=str, default=None,
 args = parser.parse_args()
 
 if __name__ == '__main__':
-    print(f"Start testing on {args.dataset}...")
-
+    timestr = time.strftime('%m%d%H%M')
+    experiment_id = args.experiment_id if args.experiment_id else "default"
+    log_file = f"logs/test/{experiment_id}/{args.dataset}_{timestr}.log"
+    os.makedirs(f"logs/test/{experiment_id}", exist_ok=True)
+    logger = setup_logger(log_file)
+    logger.info(f"Start testing on {args.dataset}...")
+    
     # Load dataset-specific config
     cfg = make_cfg(args.dataset)
     cfg[cfg.data.dataset] = cfg.copy()
     cfg.stage = 'test'
-    timestr = time.strftime('%m%d%H%M')
 
     # Initialize model
     model = buffer(cfg)
-    experiment_id = args.experiment_id if args.experiment_id else cfg.test.experiment_id
-
     # Load model weights
     for stage in cfg.train.all_stage:
         model_path = f'snapshot/{experiment_id}/{stage}/best.pth'
@@ -47,11 +51,11 @@ if __name__ == '__main__':
         model_dict = model.state_dict()
         model_dict.update(new_dict)
         model.load_state_dict(model_dict)
-        print(f"Loaded {stage} model from {model_path}")
+        logger.info(f"Loaded {stage} model from {model_path}")
 
     # Model Parameter Info
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"Total number of trainable parameters: {total_params / 1e6:.2f}M")
+    logger.info(f"Total number of trainable parameters: {total_params / 1e6:.2f}M")
 
     model = nn.DataParallel(model, device_ids=[0])
     model.eval()
@@ -64,7 +68,7 @@ if __name__ == '__main__':
                                  shuffle=False,
                                  num_workers=cfg.train.num_workers)
 
-    print(f"Test set size: {len(test_loader.dataset)}")
+    logger.info(f"Test set size: {len(test_loader.dataset)}")
     data_timer, model_timer = Timer(), Timer()
 
     # Run test
@@ -111,18 +115,18 @@ if __name__ == '__main__':
             states.append([rte < rte_thresh and rre < rre_thresh, rte, rre])
 
             if rte > rte_thresh or rre > rre_thresh:
-                print(f"{i}th fragment failed, RRE: {rre:.4f}, RTE: {rte:.4f}")
+                logger.info(f"{i}th fragment failed, RRE: {rre:.4f}, RTE: {rte:.4f}")
 
             overall_time += np.array([data_timer.diff, model_timer.diff, *times])
             torch.cuda.empty_cache()
 
-            # Print progress every 100 iterations
+            # logger.info progress every 100 iterations
             if (i + 1) % 100 == 0 or i == num_batch - 1:
                 temp_states = np.array(states)
                 temp_recall = temp_states[:, 0].sum() / temp_states.shape[0]
                 temp_te = temp_states[temp_states[:, 0] == 1, 1].mean()
                 temp_re = temp_states[temp_states[:, 0] == 1, 2].mean()
-                print(f"[{i + 1}/{num_batch}] Recall: {temp_recall:.4f} RTE: {temp_te:.4f} RRE: {temp_re:.4f}"
+                logger.info(f"[{i + 1}/{num_batch}] Recall: {temp_recall:.4f} RTE: {temp_te:.4f} RRE: {temp_re:.4f}"
                       f" Data time: {data_timer.diff:.4f}s Model time: {model_timer.diff:.4f}s")
 
     states = np.array(states)
@@ -157,14 +161,14 @@ if __name__ == '__main__':
                 rmse_recall.append(temp_recall)
             
 
-    # Print summary
-    print("\n---------------Test Results---------------")
-    print(f"Recall: {recall:.8f}")
+    # logger.info summary
+    logger.info("\n---------------Test Results---------------")
+    logger.info(f"Recall: {recall:.8f}")
     if cfg.data.dataset == '3DMatch':
-        print(f'Registration Recall (3DMatch setting): {np.array(rmse_recall).mean():.8f}')
-    print(f"RTE: {rte_mean*100:.8f}")
-    print(f"RRE: {rre_mean:.8f}")
+        logger.info(f'Registration Recall (3DMatch setting): {np.array(rmse_recall).mean():.8f}')
+    logger.info(f"RTE: {rte_mean*100:.8f}")
+    logger.info(f"RRE: {rre_mean:.8f}")
 
     average_times = overall_time / num_batch
-    print(f"Average data_time: {average_times[0]:.4f}s "
+    logger.info(f"Average data_time: {average_times[0]:.4f}s "
           f"Average model_time: {average_times[1]:.4f}s ")
