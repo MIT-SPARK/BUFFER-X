@@ -88,6 +88,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+**/__pycache__/
+**/*.pyc
+*.cpython-*
+
 # C extensions
 
 # Distribution / packaging
