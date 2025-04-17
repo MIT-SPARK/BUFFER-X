@@ -41,27 +41,23 @@ class OutdoorBaseConfig:
         self._C.optim.weight_decay = 1e-6
         self._C.optim.scheduler_interval = {'Desc': 10, 'Inlier': 5}
 
-        # Point-wise learner
-        self._C.point = edict()
-        self._C.point.in_points_dim = 3
-        self._C.point.in_feats_dim = 3
-        self._C.point.first_feats_dim = 32
-        self._C.point.conv_radius = 2.0
-        self._C.point.keypts_th = 0.5
-        self._C.point.num_fps = 1500
-
-        # Patch-wise embedder
+        # Multi-scale patch embedder
         self._C.patch = edict()
-        self._C.patch.des_r = 3.0
+        self._C.patch.des_r = 3.0 # For training
         self._C.patch.num_points_per_patch = 512
+        self._C.patch.num_fps = 1500
         self._C.patch.rad_n = 3
         self._C.patch.azi_n = 20
         self._C.patch.ele_n = 7
         self._C.patch.delta = 0.8
         self._C.patch.voxel_sample = 10
+        self._C.patch.num_scales = 3
+        
+        # Threshold should be setted in decreasing order
+        self._C.patch.search_radius_thresholds = [5, 2, 0.5]
         self._C.patch.num_points_radius_estimate = 2000
 
-        # Inliers & RANSAC
+        # Hierarchical inlier search & RANSAC
         self._C.match = edict()
         self._C.match.dist_th = 0.30
         self._C.match.inlier_th = 2.0
