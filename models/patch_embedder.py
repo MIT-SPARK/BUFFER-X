@@ -17,8 +17,6 @@ class MiniSpinNet(nn.Module):
     def __init__(self, config):
         super(MiniSpinNet, self).__init__()
         self.config = config
-        # Data-dependent param: `des_r`
-        self.des_r = config.patch.des_r
         self.patch_sample = config.patch.num_points_per_patch
         self.rad_n = config.patch.rad_n
         self.azi_n = config.patch.azi_n
@@ -44,12 +42,6 @@ class MiniSpinNet(nn.Module):
         # self.conv_net = pn.Cylindrical_UNet(inchan=16, dim=32)
 
     def forward(self, pts, kpts, des_r, dataset_name, z_axis=None, is_aug=False):
-        
-        # if superset dataset
-        # des_r = self.config[dataset_name].patch.des_r
-        
-        # if single dataset
-        # des_r = self.des_rs
         
         # extract patches
         init_patch = self.select_patches(pts, kpts, vicinity=des_r, patch_sample=self.patch_sample)
@@ -117,40 +109,6 @@ class MiniSpinNet(nn.Module):
         mask = mask.unsqueeze(3).repeat([1, 1, 1, C])
         new_pts = refer_pts.unsqueeze(2).repeat([1, 1, patch_sample, 1])
         local_patches = new_points * (1 - mask).float() + new_pts * mask.float()
-        
-        # For calculating the average number of unique points per patch
-        
-        # vicinities = [0.005, 0.01, 0.025, 0.05, 0.1, 0.3, 0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 5.0, 10.0]
-
-        # for vicinity in vicinities:
-        #     print(f"\nRunning patch selection with vicinity: {vicinity}")
-
-        #     group_idx = pnt2.ball_query(vicinity, patch_sample, pts, refer_pts)
-        #     pts_trans = pts.transpose(1, 2).contiguous()
-        #     new_points = pnt2.grouping_operation(pts_trans, group_idx)
-        #     new_points = new_points.permute([0, 2, 3, 1])
-            
-        #     mask = group_idx[:, :, 0].unsqueeze(2).repeat(1, 1, patch_sample)
-        #     mask = (group_idx == mask).float()
-        #     mask[:, :, 0] = 0
-        #     mask[:, :, patch_sample - 1] = 1
-        #     mask = mask.unsqueeze(3).repeat([1, 1, 1, C])
-            
-        #     new_pts = refer_pts.unsqueeze(2).repeat([1, 1, patch_sample, 1])
-        #     local_patches = new_points * (1 - mask).float() + new_pts * mask.float()
-            
-        #     unique_points_per_patch = []
-        #     # Iterate over each patch
-        #     for patch in local_patches[0]:  # Ignore batch dimension (assuming batch size is 1)
-        #         # Use torch.unique with dim=0 to remove duplicate 3D points directly on the GPU
-        #         unique_points = torch.unique(patch, dim=0)
-                
-        #         # Store the number of unique points in the list
-        #         unique_points_per_patch.append(unique_points.shape[0])
-
-        #     # Calculate the average number of unique points per patch
-        #     average_unique_points = sum(unique_points_per_patch) / len(unique_points_per_patch)
-        #     print(f"Average number of unique points per patch: {average_unique_points:.2f}")
 
         del mask
         del new_points
