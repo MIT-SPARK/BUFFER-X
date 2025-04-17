@@ -101,19 +101,6 @@ class Trainer(object):
         for i in range(num_iter):
             data_timer.tic()
             data_source = data_iter.__next__()
-
-            # compute normals
-            src_pts, tgt_pts = data_source['src_pcd'], data_source['tgt_pcd']
-            src_pcd = make_open3d_point_cloud(src_pts.numpy(), [1, 0.706, 0])
-            src_pcd.estimate_normals()
-            src_pcd.orient_normals_towards_camera_location()
-            src_normls = np.array(src_pcd.normals)
-            tgt_pcd = make_open3d_point_cloud(tgt_pts.numpy(), [0, 0.651, 0.929])
-            tgt_pcd.estimate_normals()
-            tgt_pcd.orient_normals_towards_camera_location()
-            tgt_normls = np.array(tgt_pcd.normals)
-            data_source['features'] = torch.from_numpy(np.concatenate([src_normls, tgt_normls], axis=0)).float()
-
             data_timer.toc()
             model_timer.tic()
 
@@ -190,19 +177,6 @@ class Trainer(object):
             for i in range(num_batch):
                 data_timer.tic()
                 data_source = data_iter.__next__()
-
-                # compute normals
-                src_pts, tgt_pts = data_source['src_pcd'], data_source['tgt_pcd']
-                src_pcd = make_open3d_point_cloud(src_pts.numpy(), [0.2, 0.3, 0.4])
-                src_pcd.estimate_normals()
-                src_pcd.orient_normals_towards_camera_location()
-                src_normls = np.array(src_pcd.normals)
-                tgt_pcd = make_open3d_point_cloud(tgt_pts.numpy(), [0.7, 0.8, 0.9])
-                tgt_pcd.estimate_normals()
-                tgt_pcd.orient_normals_towards_camera_location()
-                tgt_normls = np.array(tgt_pcd.normals)
-                data_source['features'] = torch.from_numpy(np.concatenate([src_normls, tgt_normls], axis=0)).float()
-
                 data_timer.toc()
                 model_timer.tic()
                 # forward
