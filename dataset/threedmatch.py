@@ -17,7 +17,9 @@ class ThreeDMatchDataset(Data.Dataset):
         self.split = split
         self.files = []
         self.length = 0
-
+        self.prepare_matching_pairs(split=self.split)
+        
+    def prepare_matching_pairs(self, split='train'):
         if split != 'test':
             self.root = join(self.root, 'train')
             overlap_filename = join(self.root, f'3DMatch_train_overlap.pkl')
@@ -25,7 +27,7 @@ class ThreeDMatchDataset(Data.Dataset):
                 self.overlap = pickle.load(file)
             print(f"Load PKL file from {overlap_filename}")
 
-            self.scene_list = open(join(self.root, f'{self.split}_3dmatch.txt')).read().split()
+            self.scene_list = open(join(self.root, f'{split}_3dmatch.txt')).read().split()
             for key in self.overlap.keys():
                 src_id, tgt_id = key.split('@')[0], key.split('@')[1]
                 if src_id.split("/")[0] in self.scene_list:
@@ -45,10 +47,10 @@ class ThreeDMatchDataset(Data.Dataset):
             ]
             self.poses = []
             for scene in scene_list:
-                if config.data.benchmark == '3DMatch':
-                    gtpath = self.root + f'/{config.data.benchmark}/gt_result/{scene}'
-                elif config.data.benchmark == '3DLoMatch':
-                    gtpath = self.root + f'/{config.data.benchmark}/{scene}'
+                if self.config.data.benchmark == '3DMatch':
+                    gtpath = self.root + f'/{self.config.data.benchmark}/gt_result/{scene}'
+                elif self.config.data.benchmark == '3DLoMatch':
+                    gtpath = self.root + f'/{self.config.data.benchmark}/{scene}'
 
                 gtLog = loadlog(gtpath)
                 pcdpath = f'3DMatch/fragments/{scene}'
@@ -60,6 +62,7 @@ class ThreeDMatchDataset(Data.Dataset):
                     self.files.append([src_id, tgt_id])
                     self.length += 1
                     self.poses.append(gtLog[key])
+
 
 
     def __getitem__(self, index):

@@ -20,7 +20,9 @@ class ScannetppFaroDataset(Data.Dataset):
         self.split = split
         self.files = []
         self.length = 0
+        self.prepare_matching_pairs(split=self.split)
         
+    def prepare_matching_pairs(self, split='train'):
         self.scene_list = open(join(split_path, f'{self.split}_scannetpp.txt')).read().split()
         
         self.poses = []

@@ -32,9 +32,9 @@ class TiersDataset(Data.Dataset):
         self.pdist = 2
         # self.pdist = config.data.pdist
 
-        self.prepare_tiers_ply(split=self.split)
+        self.prepare_matching_pairs(split=self.split)
 
-    def prepare_tiers_ply(self, split='train'):
+    def prepare_matching_pairs(self, split='train'):
         subset_names = open(os.path.join(split_path, self.DATA_FILES[split])).read().split()
         for dirname in subset_names:
             drive_id = str(dirname)

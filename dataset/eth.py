@@ -17,6 +17,9 @@ class ETHDataset(Data.Dataset):
         self.split = split
         self.files = []
         self.length = 0
+        self.prepare_matching_pairs(split=self.split)
+        
+    def prepare_matching_pairs(self, split='train'):
 
         scene_list = [
             'gazebo_summer',

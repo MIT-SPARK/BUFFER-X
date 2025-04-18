@@ -30,9 +30,9 @@ class MITDataset(Data.Dataset):
         self.length = 0
         # self.pdist = config.data.pdist
         self.pdist = 5
-        self.prepare_mit_ply(split=self.split)
+        self.prepare_matching_pairs(split=self.split)
 
-    def prepare_mit_ply(self, split='train'):
+    def prepare_matching_pairs(self, split='train'):
         subset_names = open(os.path.join(split_path, self.DATA_FILES[split])).read().split()
         for dirname in subset_names:
             drive_id = str(dirname)
@@ -138,19 +138,6 @@ class MITDataset(Data.Dataset):
         if (tgt_kpt.shape[0] > self.config.data.max_numPts):
             idx = np.random.choice(range(tgt_kpt.shape[0]), self.config.data.max_numPts, replace=False)
             tgt_kpt = tgt_kpt[idx]
-
-        if self.split == 'test':
-            src_pcd = make_open3d_point_cloud(src_kpt, [1, 0.706, 0])
-            src_pcd.estimate_normals()
-            src_pcd.orient_normals_towards_camera_location()
-            src_noms = np.array(src_pcd.normals)
-            src_kpt = np.concatenate([src_kpt, src_noms], axis=-1)
-
-            tgt_pcd = make_open3d_point_cloud(tgt_kpt, [0, 0.651, 0.929])
-            tgt_pcd.estimate_normals()
-            tgt_pcd.orient_normals_towards_camera_location()
-            tgt_noms = np.array(tgt_pcd.normals)
-            tgt_kpt = np.concatenate([tgt_kpt, tgt_noms], axis=-1)
 
         return {'src_fds_pts': src_pts,  # first downsampling
                 'tgt_fds_pts': tgt_pts,

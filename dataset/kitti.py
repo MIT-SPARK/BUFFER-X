@@ -30,9 +30,9 @@ class KITTIDataset(Data.Dataset):
         self.poses = []
         self.length = 0
 
-        self.prepare_kitti_ply(split=self.split)
+        self.prepare_matching_pairs(split=self.split)
 
-    def prepare_kitti_ply(self, split='train'):
+    def prepare_matching_pairs(self, split='train'):
         subset_names = open(os.path.join(split_path, self.DATA_FILES[split])).read().split()
         for dirname in subset_names:
             drive_id = int(dirname)
