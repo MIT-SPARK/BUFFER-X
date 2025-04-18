@@ -21,7 +21,6 @@ DATASETS=(
   "Oxford"
 )
 
-for DATASET in "${DATASETS[@]}"
-do  
+for DATASET in "${DATASETS[@]}"; do
   python test.py --dataset "$DATASET" --experiment_id "$EXPERIMENT_ID"
 done
