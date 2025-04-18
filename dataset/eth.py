@@ -55,20 +55,16 @@ class ETHDataset(Data.Dataset):
         tgt_pcd = o3d.io.read_point_cloud(tgt_path + '.ply')
         tgt_pcd.paint_uniform_color([0, 0.651, 0.929])
         
-        src_pcd_raw = np.array(src_pcd.points)
-        tgt_pcd_raw = np.array(tgt_pcd.points) 
-        
         self.config.data.downsample, sphericity = find_voxel_size(src_pcd, tgt_pcd)
         
         src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample)
         src_pts = np.array(src_pcd.points)
         np.random.shuffle(src_pts)
-
         
         tgt_pcd = o3d.geometry.PointCloud.voxel_down_sample(tgt_pcd, voxel_size=self.config.data.downsample)
         tgt_pts = np.array(tgt_pcd.points)
         np.random.shuffle(tgt_pts)
-
+        
         # relative pose
         relt_pose = np.linalg.inv(self.poses[index])
 
@@ -100,8 +96,6 @@ class ETHDataset(Data.Dataset):
                 'voxel_size': ds_size,
                 'dataset_name': self.config.data.dataset,
                 'sphericity': sphericity,
-                'src_pcd_raw': src_pcd_raw,
-                'tgt_pcd_raw': tgt_pcd_raw
                 }
 
 

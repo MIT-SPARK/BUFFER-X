@@ -80,8 +80,6 @@ class MITDataset(Data.Dataset):
         # Note (Minkyun Seo): 
         # Above code is commented out because it does not work well for the kimera-multi dataset.
         trans = np.linalg.inv(positions[1]) @ positions[0]
-        # np.save(filename, trans)
-
         if self.split != 'test':
             xyz0 += (np.random.rand(xyz0.shape[0], 3) - 0.5) * self.config.train.augmentation_noise
             xyz1 += (np.random.rand(xyz1.shape[0], 3) - 0.5) * self.config.train.augmentation_noise
@@ -89,9 +87,6 @@ class MITDataset(Data.Dataset):
         # process point clouds
         src_pcd = make_open3d_point_cloud(xyz0, [1, 0.706, 0])
         tgt_pcd = make_open3d_point_cloud(xyz1, [0, 0.651, 0.929])
-        
-        src_pcd_raw = np.array(src_pcd.points)
-        tgt_pcd_raw = np.array(tgt_pcd.points) 
         
         self.config.data.downsample, sphericity = find_voxel_size(src_pcd, tgt_pcd)
         
@@ -147,8 +142,6 @@ class MITDataset(Data.Dataset):
                 'tgt_id': '%s_%d' % (drive, t1),
                 'dataset_name': self.config.data.dataset,
                 'sphericity': sphericity,
-                'src_pcd_raw': src_pcd_raw,
-                'tgt_pcd_raw': tgt_pcd_raw
                 }
 
     def apply_transform(self, pts, trans):

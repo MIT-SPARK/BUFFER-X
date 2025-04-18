@@ -110,27 +110,28 @@ class buffer(nn.Module):
         return lable
 
     def forward(self, data_source):
-        """
-        Input
-            - src_pts:    [bs, N, 3]
-            - src_kpt:    [bs, M, 3]
-            - tgt_pts:    [bs, N, 3]
-            - tgt_kpt:    [bs, M, 3]
-            - gt_trans:   [bs, 4, 4]
-        Output:
-            -
-        """
+        '''
+        src_fds_pcd / tgt_fds_pcd:
+        - First-level downsampled point clouds via voxelization.
+        - Farthest Point Sampling (FPS) is applied on these points to obtain keypoints.
+        - Patch descriptors are then computed by sampling neighborhoods from these fds points centered at each keypoint.
+        - During training: downsampled using config-specified voxel size.
+        - During testing: voxel size is automatically estimated for each sample.
 
-        # src_pts, tgt_pts = data_source['src_pcd'], data_source['tgt_pcd']
-        src_pcd_raw, tgt_pcd_raw = data_source['src_pcd_raw'], data_source['tgt_pcd_raw']
-
+        src_sds_pcd / tgt_sds_pcd:
+        - Second-level downsampled point clouds via voxelization.
+        - Used only during training as sampled keypoints for patch-based supervision. (e.g., loss, correspondence).
+        - Always downsampled using config-specified voxel size.
+        '''
+        
+        src_fds_pcd, tgt_fds_pcd = data_source['src_fds_pcd'], data_source['tgt_fds_pcd']
 
         if self.config.stage != 'test':
             
-            src_pts, tgt_pts = data_source['src_pcd'], data_source['tgt_pcd']
+            src_sds_pts, tgt_sds_pts = data_source['src_sds_pcd'], data_source['tgt_sds_pcd']
             # find positive correspondences
             gt_trans = data_source['relt_pose']   
-            match_inds = self.get_matching_indices(src_pts, tgt_pts, gt_trans, data_source['voxel_sizes'][0])
+            match_inds = self.get_matching_indices(src_sds_pts, tgt_sds_pts, gt_trans, data_source['voxel_sizes'][0])
             if self.config['data']['dataset'] == 'SuperSet':
                 dataset_name = data_source["dataset_names"][0]
                 cfg = self.config[dataset_name]
@@ -142,8 +143,8 @@ class buffer(nn.Module):
             if match_inds.shape[0] > self.config.train.pos_num:
                 rand_ind = np.random.choice(range(match_inds.shape[0]), self.config.train.pos_num, replace=False)
                 match_inds = match_inds[rand_ind]
-            src_kpt = src_pts[match_inds[:, 0]]
-            tgt_kpt = tgt_pts[match_inds[:, 1]]
+            src_kpt = src_sds_pts[match_inds[:, 0]]
+            tgt_kpt = tgt_sds_pts[match_inds[:, 1]]
             
             if src_kpt.shape[0] == 0 or tgt_kpt.shape[0] == 0:
                 print(f"{data_source['src_id']} {data_source['tgt_id']} has no keypts")
@@ -175,12 +176,12 @@ class buffer(nn.Module):
             else:
                 des_r = cfg.patch.des_r
 
-            src = self.Desc(src_pcd_raw[None], src_kpt[None], des_r, dataset_name)
+            src = self.Desc(src_fds_pcd[None], src_kpt[None], des_r, dataset_name)
             if self.config.stage == 'Inlier':
                 # SO(2) augmentation
-                tgt = self.Desc(tgt_pcd_raw[None], tgt_kpt[None], des_r, dataset_name, None, True)
+                tgt = self.Desc(tgt_fds_pcd[None], tgt_kpt[None], des_r, dataset_name, None, True)
             else:
-                tgt = self.Desc(tgt_pcd_raw[None], tgt_kpt[None], des_r, dataset_name, None)
+                tgt = self.Desc(tgt_fds_pcd[None], tgt_kpt[None], des_r, dataset_name, None)
 
             if self.config.stage == 'Desc':
                 # calc matching score of equivariant feature maps
@@ -225,9 +226,7 @@ class buffer(nn.Module):
             #######################
             # inference
             ######################
-            src_pcd_raw, tgt_pcd_raw = data_source['src_pcd_raw'], data_source['tgt_pcd_raw']
-            
-            # gt_trans = data_source['relt_pose']
+            src_fds_pcd, tgt_fds_pcd = data_source['src_fds_pcd'], data_source['tgt_fds_pcd']
             
             if self.config['data']['dataset'] == 'SuperSet':
                 dataset_name = data_source["dataset_names"][0]
@@ -246,14 +245,14 @@ class buffer(nn.Module):
                 f"num_scales {num_scales} != len(search_radius_thresholds) {len(search_radius_thresholds)}"
             
             # NOTE(hlim): It only takes < ~ 0.0002 sec, which is negligible
-            s_pts_flipped, t_pts_flipped = src_pcd_raw[None].transpose(1, 2).contiguous(), tgt_pcd_raw[None].transpose(1,2).contiguous()
-            s_fps_idx = pnt2.furthest_point_sample(src_pcd_raw[None], num_radius_estimation_points)
-            t_fps_idx = pnt2.furthest_point_sample(tgt_pcd_raw[None], num_radius_estimation_points)
+            s_pts_flipped, t_pts_flipped = src_fds_pcd[None].transpose(1, 2).contiguous(), tgt_fds_pcd[None].transpose(1,2).contiguous()
+            s_fps_idx = pnt2.furthest_point_sample(src_fds_pcd[None], num_radius_estimation_points)
+            t_fps_idx = pnt2.furthest_point_sample(tgt_fds_pcd[None], num_radius_estimation_points)
 
             kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
             kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
  
-            des_r_list = find_des_r(src_pcd_raw, kpts1, tgt_pcd_raw, kpts2, thresholds = search_radius_thresholds)
+            des_r_list = find_des_r(src_fds_pcd, kpts1, tgt_fds_pcd, kpts2, thresholds = search_radius_thresholds)
                         
             ss_kpts_raw_list = [None] * num_scales
             tt_kpts_raw_list = [None] * num_scales
@@ -266,9 +265,9 @@ class buffer(nn.Module):
             
             # Furthest point sampling 
             for i, des_r in enumerate(des_r_list):
-                s_pts_flipped, t_pts_flipped = src_pcd_raw[None].transpose(1, 2).contiguous(), tgt_pcd_raw[None].transpose(1,2).contiguous()
-                s_fps_idx = pnt2.furthest_point_sample(src_pcd_raw[None], num_fps)
-                t_fps_idx = pnt2.furthest_point_sample(tgt_pcd_raw[None], num_fps)
+                s_pts_flipped, t_pts_flipped = src_fds_pcd[None].transpose(1, 2).contiguous(), tgt_fds_pcd[None].transpose(1,2).contiguous()
+                s_fps_idx = pnt2.furthest_point_sample(src_fds_pcd[None], num_fps)
+                t_fps_idx = pnt2.furthest_point_sample(tgt_fds_pcd[None], num_fps)
                 kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
                 kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
 
@@ -279,8 +278,8 @@ class buffer(nn.Module):
             tt_des_list = [None] * num_scales        
             # Compute descriptors
             for i, des_r in enumerate(des_r_list):
-                src = self.Desc(src_pcd_raw[None], ss_kpts_raw_list[i], des_r, dataset_name)
-                tgt = self.Desc(tgt_pcd_raw[None], tt_kpts_raw_list[i], des_r, dataset_name)
+                src = self.Desc(src_fds_pcd[None], ss_kpts_raw_list[i], des_r, dataset_name)
+                tgt = self.Desc(tgt_fds_pcd[None], tt_kpts_raw_list[i], des_r, dataset_name)
                 ss_des_list[i] = src
                 tt_des_list[i] = tgt
 
@@ -539,14 +538,14 @@ def squared_cdist(x, y):
     xy = torch.matmul(x, y.T)  # (N, M)
     return x2 + y2 - 2 * xy  # Squared Euclidean distance
 
-def find_des_r(src_pts, src_kpts, tgt_pts, tgt_kpts, min_r=0.0, max_r=5.0, tolerance=0.01, thresholds =[5, 2, 0.5]):
+def find_des_r(src_fds_pts, src_kpts, tgt_fds_pts, tgt_kpts, min_r=0.0, max_r=5.0, tolerance=0.01, thresholds =[5, 2, 0.5]):
     """
     Finds the des_r values corresponding to the given target percentages of points within the radius.
     
     Args:
-        src_pts (torch.Tensor): Source points of shape (N, 3).
+        src_fds_pts (torch.Tensor): Source points of shape (N, 3).
         src_kpts (torch.Tensor): Keypoints of shape (b, num_keypts, 3).
-        tgt_pts (torch.Tensor): Target points of shape (M, 3).
+        tgt_fds_pts (torch.Tensor): Target points of shape (M, 3).
         tgt_kpts (torch.Tensor): Keypoints of shape (b, num_keypts, 3).
         min_r (float): Minimum radius threshold.
         max_r (float): Maximum radius threshold.
@@ -556,11 +555,11 @@ def find_des_r(src_pts, src_kpts, tgt_pts, tgt_kpts, min_r=0.0, max_r=5.0, toler
     """
     des_r_values = []
 
-    if src_pts.shape[0] > tgt_pts.shape[0]:
-        pts = src_pts
+    if src_fds_pts.shape[0] > tgt_fds_pts.shape[0]:
+        pts = src_fds_pts
         kpts = src_kpts
     else:
-        pts = tgt_pts    
+        pts = tgt_fds_pts    
         kpts = tgt_kpts
 
     num_pts = pts.shape[0]

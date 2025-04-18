@@ -81,10 +81,7 @@ class ThreeDMatchDataset(Data.Dataset):
         
         tgt_path = os.path.join(self.root, tgt_id)
         tgt_pcd = o3d.io.read_point_cloud(tgt_path + '.ply')
-        
-        src_pcd_raw = np.array(src_pcd.points)
-        tgt_pcd_raw = np.array(tgt_pcd.points)
-        
+
         if self.split == 'test':
             self.config.data.downsample, sphericity = find_voxel_size(src_pcd, tgt_pcd)
         else:
@@ -95,11 +92,9 @@ class ThreeDMatchDataset(Data.Dataset):
         np.random.shuffle(src_pts)
 
         # load tgt fragment
-        
         tgt_pcd.paint_uniform_color([0, 0.651, 0.929])
         tgt_pcd = o3d.geometry.PointCloud.voxel_down_sample(tgt_pcd, voxel_size=self.config.data.downsample)
         
-
         if self.split != 'test':
             # SO(3) augmentation
             R = rotation_matrix(3, 1)
@@ -148,9 +143,7 @@ class ThreeDMatchDataset(Data.Dataset):
                 'tgt_id': tgt_id,
                 'voxel_size': ds_size,
                 'dataset_name': self.config.data.dataset,
-                'sphericity': sphericity,
-                'src_pcd_raw': src_pcd_raw,
-                'tgt_pcd_raw': tgt_pcd_raw
+                'sphericity': sphericity
                 }
 
     def __len__(self):
