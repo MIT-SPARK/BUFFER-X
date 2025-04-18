@@ -6,8 +6,6 @@ from utils.SE3 import *
 from utils.common import make_open3d_point_cloud
 from utils.tools import find_voxel_size
 
-kaist_icp_cache = {}
-kaist_cache = {}
 cur_path = os.path.dirname(os.path.realpath(__file__))
 split_path = cur_path + "/../config/splits"
 class KAISTDataset(Data.Dataset):
@@ -30,6 +28,7 @@ class KAISTDataset(Data.Dataset):
         self.length = 0
         # self.pdist = config.data.pdist
         self.pdist = 10
+        self.kaist_cache = {}
         self.prepare_matching_pairs(split=self.split)
 
     def prepare_matching_pairs(self, split='train'):
@@ -159,12 +158,12 @@ class KAISTDataset(Data.Dataset):
 
     def get_video_odometry(self, drive, indices=None, ext='.txt', return_all=False):
         data_path = self.pc_path + '/%s/poses.txt' % drive
-        if data_path not in kaist_cache:
-            kaist_cache[data_path] = np.genfromtxt(data_path)
+        if data_path not in self.kaist_cache:
+            self.kaist_cache[data_path] = np.genfromtxt(data_path)
         if return_all:
-            return kaist_cache[data_path]
+            return self.kaist_cache[data_path]
         else:
-            return kaist_cache[data_path][indices]
+            return self.kaist_cache[data_path][indices]
 
     def odometry_to_positions(self, odometry):
         T_w_cam0 = odometry.reshape(3, 4)

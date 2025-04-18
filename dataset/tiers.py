@@ -6,8 +6,6 @@ from utils.SE3 import *
 from utils.common import make_open3d_point_cloud
 from utils.tools import find_voxel_size
 
-tiers_icp_cache = {}
-tiers_cache = {}
 cur_path = os.path.dirname(os.path.realpath(__file__))
 split_path = cur_path + "/../config/splits"
 
@@ -31,7 +29,7 @@ class TiersDataset(Data.Dataset):
         self.length = 0
         self.pdist = 2
         # self.pdist = config.data.pdist
-
+        self.tiers_cache = {}
         self.prepare_matching_pairs(split=self.split)
 
     def prepare_matching_pairs(self, split='train'):
@@ -181,12 +179,12 @@ class TiersDataset(Data.Dataset):
 
     def get_video_odometry(self, drive, sensor, indices=None, ext='.txt', return_all=False):
         data_path = self.pc_path + '/%s/%s/poses_kitti.txt' % (drive, sensor)
-        if data_path not in tiers_cache:
-            tiers_cache[data_path] = np.genfromtxt(data_path)
+        if data_path not in self.tiers_cache:
+            self.tiers_cache[data_path] = np.genfromtxt(data_path)
         if return_all:
-            return tiers_cache[data_path]
+            return self.tiers_cache[data_path]
         else:
-            return tiers_cache[data_path][indices]
+            return self.tiers_cache[data_path][indices]
 
     def odometry_to_positions(self, odometry):
         T_w_cam0 = odometry.reshape(3, 4)

@@ -6,8 +6,6 @@ from utils.SE3 import *
 from utils.common import make_open3d_point_cloud
 from utils.tools import find_voxel_size
 
-kitti_icp_cache = {}
-kitti_cache = {}
 cur_path = os.path.dirname(os.path.realpath(__file__))
 split_path = cur_path + "/../config/splits"
 
@@ -29,7 +27,8 @@ class KITTIDataset(Data.Dataset):
         self.files = {'train': [], 'val': [], 'test': []}
         self.poses = []
         self.length = 0
-
+        self.kitti_icp_cache = {}
+        self.kitti_cache = {}
         self.prepare_matching_pairs(split=self.split)
 
     def prepare_matching_pairs(self, split='train'):
@@ -84,7 +83,7 @@ class KITTIDataset(Data.Dataset):
 
         key = '%d_%d_%d' % (drive, t0, t1)
         filename = self.icp_path + '/' + key + '.npy'
-        if key not in kitti_icp_cache:
+        if key not in self.kitti_icp_cache:
             if not os.path.exists(filename):
                 M = (self.velo2cam @ positions[0].T @ np.linalg.inv(positions[1].T)
                      @ np.linalg.inv(self.velo2cam)).T
@@ -101,9 +100,9 @@ class KITTIDataset(Data.Dataset):
                 np.save(filename, M2)
             else:
                 M2 = np.load(filename)
-            kitti_icp_cache[key] = M2
+            self.kitti_icp_cache[key] = M2
         else:
-            M2 = kitti_icp_cache[key]
+            M2 = self.kitti_icp_cache[key]
         trans = M2
 
         if self.split != 'test':
@@ -197,12 +196,12 @@ class KITTIDataset(Data.Dataset):
 
     def get_video_odometry(self, drive, indices=None, ext='.txt', return_all=False):
         data_path = self.pc_path + '/poses/%02d.txt' % drive
-        if data_path not in kitti_cache:
-            kitti_cache[data_path] = np.genfromtxt(data_path)
+        if data_path not in self.kitti_cache:
+            self.kitti_cache[data_path] = np.genfromtxt(data_path)
         if return_all:
-            return kitti_cache[data_path]
+            return self.kitti_cache[data_path]
         else:
-            return kitti_cache[data_path][indices]
+            return self.kitti_cache[data_path][indices]
 
     def odometry_to_positions(self, odometry):
         T_w_cam0 = odometry.reshape(3, 4)

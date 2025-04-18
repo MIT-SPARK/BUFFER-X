@@ -6,8 +6,6 @@ from utils.SE3 import *
 from utils.common import make_open3d_point_cloud
 from utils.tools import find_voxel_size
 
-oxford_icp_cache = {}
-oxford_cache = {}
 cur_path = os.path.dirname(os.path.realpath(__file__))
 split_path = cur_path + "/../config/splits"
 
@@ -31,6 +29,7 @@ class OxfordDataset(Data.Dataset):
         self.length = 0
         # self.pdist = config.data.pdist
         self.pdist = 5
+        self.oxford_cache = {}
         self.prepare_matching_pairs(split=self.split)
 
     def prepare_matching_pairs(self, split='train'):
@@ -175,12 +174,12 @@ class OxfordDataset(Data.Dataset):
 
     def get_video_odometry(self, drive, indices=None, ext='.txt', return_all=False):
         data_path = self.pc_path + '/%s/poses_kitti.txt' % drive
-        if data_path not in oxford_cache:
-            oxford_cache[data_path] = np.genfromtxt(data_path)
+        if data_path not in self.oxford_cache:
+            self.oxford_cache[data_path] = np.genfromtxt(data_path)
         if return_all:
-            return oxford_cache[data_path]
+            return self.oxford_cache[data_path]
         else:
-            return oxford_cache[data_path][indices]
+            return self.oxford_cache[data_path][indices]
 
     def odometry_to_positions(self, odometry):
         T_w_cam0 = odometry.reshape(3, 4)

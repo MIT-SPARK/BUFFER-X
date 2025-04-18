@@ -6,8 +6,6 @@ from utils.SE3 import *
 from utils.common import make_open3d_point_cloud
 from utils.tools import find_voxel_size
 
-wod_icp_cache = {}
-wod_cache = {}
 cur_path = os.path.dirname(os.path.realpath(__file__))
 split_path = cur_path + "/../config/splits"
 
@@ -29,7 +27,7 @@ class WODDataset(Data.Dataset):
         self.files = {'train': [], 'val': [], 'test': []}
         self.poses = []
         self.length = 0
-
+        self.wod_cache = {}
         self.prepare_matching_pairs(split=self.split)
 
     def prepare_matching_pairs(self, split='train'):
@@ -75,10 +73,6 @@ class WODDataset(Data.Dataset):
         xyz0 = np.fromfile(fname0, dtype=np.float32).reshape(-1, 3)
         xyz1 = np.fromfile(fname1, dtype=np.float32).reshape(-1, 3)
         
-        pcd0 = make_open3d_point_cloud(xyz0, [1, 0.706, 0])
-        pcd1 = make_open3d_point_cloud(xyz1, [0, 0.651, 0.929]) 
-
-        # 여기부터 GT 제대로 구할 때까지
         key = '%s_%d_%d' % (drive, t0, t1)
         filename = self.icp_path + '/' + key + '.npy'
         
@@ -158,12 +152,12 @@ class WODDataset(Data.Dataset):
 
     def get_video_odometry(self, drive, indices=None, ext='.txt', return_all=False):
         data_path = self.pc_path + '/sequences/%s/poses.txt' % drive # To use each datasets' GT pose
-        if data_path not in wod_cache:
-            wod_cache[data_path] = np.genfromtxt(data_path)
+        if data_path not in self.wod_cache:
+            self.wod_cache[data_path] = np.genfromtxt(data_path)
         if return_all:
-            return wod_cache[data_path]
+            return self.wod_cache[data_path]
         else:
-            return wod_cache[data_path][indices]
+            return self.wod_cache[data_path][indices]
 
     def odometry_to_positions(self, odometry):
         T_w_cam0 = odometry.reshape(3, 4)
