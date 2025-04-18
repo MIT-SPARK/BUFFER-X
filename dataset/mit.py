@@ -26,8 +26,7 @@ class MITDataset(Data.Dataset):
         self.files = {'train': [], 'val': [], 'test': []}
         self.poses = []
         self.length = 0
-        # self.pdist = config.data.pdist
-        self.pdist = 5
+        self.pdist = config.test.pdist
         self.mit_cache = {}
         self.prepare_matching_pairs(split=self.split)
 

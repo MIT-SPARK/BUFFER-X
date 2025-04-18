@@ -27,6 +27,7 @@ class KITTIDataset(Data.Dataset):
         self.files = {'train': [], 'val': [], 'test': []}
         self.poses = []
         self.length = 0
+        self.pdist = config.test.pdist
         self.kitti_icp_cache = {}
         self.kitti_cache = {}
         self.prepare_matching_pairs(split=self.split)
@@ -44,7 +45,7 @@ class KITTIDataset(Data.Dataset):
             Ts = all_pos[:, :3, 3]
             pdist = (Ts.reshape(1, -1, 3) - Ts.reshape(-1, 1, 3)) ** 2
             pdist = np.sqrt(pdist.sum(-1))
-            more_than_10 = pdist > 10
+            more_than_10 = pdist > self.pdist
             curr_time = inames[0]
             while curr_time in inames:
                 next_time = np.where(more_than_10[curr_time][curr_time:curr_time + 100])[0]

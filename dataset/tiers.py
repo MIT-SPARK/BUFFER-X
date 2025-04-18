@@ -27,8 +27,7 @@ class TiersDataset(Data.Dataset):
         self.files = {'train': [], 'val': [], 'test': []}
         self.poses = []
         self.length = 0
-        self.pdist = 2
-        # self.pdist = config.data.pdist
+        self.pdist = config.test.pdist
         self.tiers_cache = {}
         self.prepare_matching_pairs(split=self.split)
 
@@ -48,7 +47,6 @@ class TiersDataset(Data.Dataset):
                 pdist = (Ts.reshape(1, -1, 3) - Ts.reshape(-1, 1, 3)) ** 2
                 pdist = np.sqrt(pdist.sum(-1))
                 
-                # set valid pair threshold to 5
                 valid_pairs = pdist > self.pdist
                 curr_time = inames[0]
                 while curr_time in inames:
