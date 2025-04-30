@@ -132,12 +132,9 @@ class buffer(nn.Module):
             # find positive correspondences
             gt_trans = data_source['relt_pose']   
             match_inds = self.get_matching_indices(src_sds_pts, tgt_sds_pts, gt_trans, data_source['voxel_sizes'][0])
-            if self.config['data']['dataset'] == 'SuperSet':
-                dataset_name = data_source["dataset_names"][0]
-                cfg = self.config[dataset_name]
-            else: 
-                dataset_name = self.config['data']['dataset']
-                cfg = self.config
+
+            dataset_name = self.config['data']['dataset']
+            cfg = self.config
 
             # randomly sample some positive pairs to speed up the training
             if match_inds.shape[0] > self.config.train.pos_num:
@@ -227,14 +224,10 @@ class buffer(nn.Module):
             # inference
             ######################
             src_fds_pcd, tgt_fds_pcd = data_source['src_fds_pcd'], data_source['tgt_fds_pcd']
-            
-            if self.config['data']['dataset'] == 'SuperSet':
-                dataset_name = data_source["dataset_names"][0]
-                cfg = self.config[dataset_name]
-            else: 
-                dataset_name = self.config['data']['dataset']
-                cfg = self.config
-                        
+
+            dataset_name = self.config['data']['dataset']
+            cfg = self.config
+                    
             num_radius_estimation_points = cfg.patch.num_points_radius_estimate
             search_radius_thresholds = cfg.patch.search_radius_thresholds
                         
@@ -337,14 +330,10 @@ class buffer(nn.Module):
                 correspondence_proposal_total += correspondence_proposal_timer.diff
                     
             desc_timer.toc()
-            # print("Desc time:", desc_timer.diff)
             R = torch.cat(R_list, dim=0)
             t = torch.cat(t_list, dim=0)
             ss_kpts = torch.cat(ss_kpts_list, dim=0)
             tt_kpts = torch.cat(tt_kpts_list, dim=0)
-            
-            # What if we sample another new keypoints to eval R, t? 
-            # Then, Initial Correspondence Not used anymore
 
             correspondence_proposal_timer = Timer()
             correspondence_proposal_timer.tic()     
