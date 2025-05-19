@@ -257,10 +257,12 @@ class buffer(nn.Module):
             correspondence_proposal_total = 0
             
             # Furthest point sampling 
+
             for i, des_r in enumerate(des_r_list):
                 s_pts_flipped, t_pts_flipped = src_fds_pcd[None].transpose(1, 2).contiguous(), tgt_fds_pcd[None].transpose(1,2).contiguous()
                 s_fps_idx = pnt2.furthest_point_sample(src_fds_pcd[None], num_fps)
                 t_fps_idx = pnt2.furthest_point_sample(tgt_fds_pcd[None], num_fps)
+
                 kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
                 kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
 
@@ -269,6 +271,7 @@ class buffer(nn.Module):
 
             ss_des_list = [None] * num_scales
             tt_des_list = [None] * num_scales        
+
             # Compute descriptors
             for i, des_r in enumerate(des_r_list):
                 src = self.Desc(src_fds_pcd[None], ss_kpts_raw_list[i], des_r, dataset_name)
