@@ -1,5 +1,0 @@
-tiers_indoor06
-tiers_indoor08
-tiers_indoor09
-tiers_indoor10
-tiers_indoor11

@@ -9,6 +9,8 @@
 *.pyc
 *.ply
 *.txt
+*.npz
+*.npy
 
 .idea/
 .vscode/
@@ -85,6 +87,10 @@ compile_commands.json
 __pycache__/
 *.py[cod]
 *$py.class
+
+**/__pycache__/
+**/*.pyc
+*.cpython-*
 
 # C extensions
 
