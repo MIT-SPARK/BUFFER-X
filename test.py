@@ -1,8 +1,6 @@
 import argparse
 import sys
 import os
-# Set GPU device
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import math
 import time
@@ -16,7 +14,6 @@ from config import make_cfg
 from dataset.dataloader import get_dataloader
 from models.BUFFER import buffer
 import open3d as o3d
-
 
 # Argument parser
 parser = argparse.ArgumentParser(description="Generalized Testing Script for Registration Models")
@@ -113,9 +110,11 @@ if __name__ == '__main__':
             rte = np.linalg.norm(trans_est[:3, 3] - trans[:3, 3])
             rre = np.arccos(np.clip((np.trace(trans_est[:3, :3].T @ trans[:3, :3]) - 1) / 2, -1 + 1e-16, 1 - 1e-16)) * 180 / math.pi
             states.append([rte < rte_thresh and rre < rre_thresh, rte, rre])
+            fail = False
 
             if rte > rte_thresh or rre > rre_thresh:
                 logger.info(f"{i}th fragment failed, RRE: {rre:.4f}, RTE: {rte:.4f}")
+                fail = True
 
             overall_time += np.array([data_timer.diff, model_timer.diff, *times])
             torch.cuda.empty_cache()
