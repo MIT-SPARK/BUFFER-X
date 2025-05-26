@@ -371,7 +371,7 @@ class buffer(nn.Module):
             ransac_timer.toc()
             
             if cfg.test.pose_refine is True:
-                pose = self.post_refinement(torch.FloatTensor(init_pose[None]).cuda(), ss_kpts[None], tt_kpts[None], dataset_name)
+                pose = self.post_refinement(torch.FloatTensor(init_pose[None]).cuda(), ss_kpts[None], tt_kpts[None])
                 pose = pose[0].detach().cpu().numpy()
             else:
                 pose = init_pose
@@ -426,7 +426,7 @@ class buffer(nn.Module):
 
         return match_inds
 
-    def post_refinement(self, initial_trans, src_keypts, tgt_keypts, dataset_name=None, weights=None):
+    def post_refinement(self, initial_trans, src_keypts, tgt_keypts, weights=None):
         """
         [CVPR'21 PointDSC] (https://github.com/XuyangBai/PointDSC)
         Perform post refinement using the initial transformation matrix, only adopted during testing.
@@ -439,11 +439,9 @@ class buffer(nn.Module):
             - final_trans:   [bs, 4, 4]
         """
         assert initial_trans.shape[0] == 1
-        if dataset_name in ['3DMatch', '3DLoMatch', 'ETH']:
-            inlier_threshold_list = [0.10] * 20
-        else:  # for KITTI
-            inlier_threshold_list = [1.2] * 20
-
+        
+        inlier_threshold_list = [self.config.match.dist_th] * 20
+        
         previous_inlier_num = 0
         for inlier_threshold in inlier_threshold_list:
             warped_src_keypts = transform(src_keypts, initial_trans)
