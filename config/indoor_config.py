@@ -52,6 +52,7 @@ class IndoorBaseConfig:
         self._C.patch.delta = 0.8
         self._C.patch.voxel_sample = 10
         self._C.patch.num_scales = 3
+        self._C.patch.is_aligned_to_global_z = False
         
         # Threshold should be setted in decreasing order
         self._C.patch.search_radius_thresholds = [5, 2, 0.5]

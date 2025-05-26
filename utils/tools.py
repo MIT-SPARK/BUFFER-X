@@ -116,53 +116,72 @@ def evaluate_registration(num_fragment, result, result_pairs, gt_pairs, gt, gt_i
             flags.append(2)
     return good / max(n_res, 1e-6), good / n_gt, flags, transformation_errors
 
-def find_voxel_size(src_pcd, tgt_pcd):
+def compute_pca_alignment(pcd):
+        pts = np.asarray(pcd.points)
+        num_points = pts.shape[0]
+        sample_size = int(num_points / 10)
+        sampled_pts = pts[np.random.choice(num_points, size=sample_size, replace=False)]
+
+        pca = PCA(n_components=3)
+        pca.fit(sampled_pts)
+        eigenvalues = pca.explained_variance_
+        lambda1, lambda2, lambda3 = sorted(eigenvalues, reverse=True)
+        sphericity = lambda3 / lambda1
+
+        z_axis_candidate = pca.components_[-1]
+        z_axis_candidate = z_axis_candidate / np.linalg.norm(z_axis_candidate)
+        z_alignment_score = np.abs(np.dot(z_axis_candidate, np.array([0, 0, 1])))
+        is_aligned = z_alignment_score > 0.98
+
+        return sphericity, is_aligned, pca
+
+def sphericity_based_voxel_analysis(src_pcd, tgt_pcd):
     """
-    Finds the voxel_size corresponding to the given target percentages of points within the radius.
+    Estimates voxel size and sphericity, and checks if both source and target point clouds
+    are aligned with the global z-axis using PCA.
 
     Args:
-        src_pts (torch.Tensor): Source points of shape (N, 3).
-        src_kpts (torch.Tensor): Keypoints of shape (num_keypts, 3).
-        
-    Returns:
-        list: The calculated voxel_size for the given percentages.
-    """
-    src_pts = np.asarray(src_pcd.points)
-    tgt_pts = np.asarray(tgt_pcd.points)
-    
-    if src_pts.shape[0] > tgt_pts.shape[0]:
-        points = src_pts
-    else:
-        points = tgt_pts
-        
-    points_num = points.shape[0]
-    sample_size = int(points_num / 10)
-    sampled_indices = np.random.choice(points_num, size=sample_size, replace=False)
-    
-    sampled_points = points[sampled_indices]
-    
-    pca = PCA(n_components=3)
-    pca.fit(sampled_points)
-      
-    transformed_points = pca.transform(points)
-    x_range = transformed_points[:, 0].max() - transformed_points[:, 0].min()
-    y_range = transformed_points[:, 1].max() - transformed_points[:, 1].min()
-    z_range = transformed_points[:, 2].max() - transformed_points[:, 2].min()
-    
-    eigenvalues = pca.explained_variance_
-    lambda1, lambda2, lambda3 = sorted(eigenvalues, reverse=True)
-    # linearity = (lambda1 - lambda2) / lambda1
-    planarity = (lambda2 - lambda3) / lambda1
-    sphericity = lambda3 / lambda1
-    
-    if (sphericity < 0.05):
-        alpha = 1.0
-    else:
-        alpha = 1.5
+        src_pcd (open3d.geometry.PointCloud): Source point cloud.
+        tgt_pcd (open3d.geometry.PointCloud): Target point cloud.
 
+    Returns:
+        voxel_size (float): Estimated voxel size.
+        sphericity (float): Sphericity of the denser point cloud.
+        is_aligned_to_global_z (bool): True if both clouds are aligned to global z-axis.
+    """
+
+    # PCA for both src and tgt
+    sphericity_src, is_src_aligned, pca_src = compute_pca_alignment(src_pcd)
+    sphericity_tgt, is_tgt_aligned, pca_tgt = compute_pca_alignment(tgt_pcd)
+
+    # Use denser point cloud for voxel size estimation
+    if len(src_pcd.points) > len(tgt_pcd.points):
+        ref_pcd = src_pcd
+        sphericity = sphericity_src
+        pca = pca_src
+    else:
+        ref_pcd = tgt_pcd
+        sphericity = sphericity_tgt
+        pca = pca_tgt
+
+    transformed_pts = pca.transform(np.asarray(ref_pcd.points))
+    z_range = transformed_pts[:, 2].max() - transformed_pts[:, 2].min()
+    alpha = 1.0 if sphericity < 0.05 else 1.5
     voxel_size = np.sqrt(z_range) / 100 * alpha
+    voxel_size = max(voxel_size, 0.001)
     
-    return round(voxel_size, 4), sphericity
+    z_src = pca_src.components_[-1]
+    z_tgt = pca_tgt.components_[-1]
+
+    z_src /= np.linalg.norm(z_src)
+    z_tgt /= np.linalg.norm(z_tgt)
+
+    dot_z = np.dot(z_src, z_tgt)
+    same_direction = dot_z > 0.96
+
+    is_aligned_to_global_z = is_src_aligned and is_tgt_aligned and same_direction
+
+    return round(voxel_size, 4), sphericity, is_aligned_to_global_z
 
 def setup_logger(log_path=None):
     logger = logging.getLogger("BUFFER-X")

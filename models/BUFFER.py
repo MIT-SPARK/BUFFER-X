@@ -172,13 +172,14 @@ class buffer(nn.Module):
                 des_r = np.random.choice(possible_values, p=probabilities)
             else:
                 des_r = cfg.patch.des_r
-
-            src = self.Desc(src_fds_pcd[None], src_kpt[None], des_r, dataset_name)
+            
+            is_aligned_to_global_z = data_source['is_aligned_to_global_z']
+            src = self.Desc(src_fds_pcd[None], src_kpt[None], des_r, is_aligned_to_global_z)
             if self.config.stage == 'Inlier':
                 # SO(2) augmentation
-                tgt = self.Desc(tgt_fds_pcd[None], tgt_kpt[None], des_r, dataset_name, None, True)
+                tgt = self.Desc(tgt_fds_pcd[None], tgt_kpt[None], des_r, is_aligned_to_global_z, None, True)
             else:
-                tgt = self.Desc(tgt_fds_pcd[None], tgt_kpt[None], des_r, dataset_name, None)
+                tgt = self.Desc(tgt_fds_pcd[None], tgt_kpt[None], des_r, is_aligned_to_global_z, None)
 
             if self.config.stage == 'Desc':
                 # calc matching score of equivariant feature maps
@@ -268,11 +269,13 @@ class buffer(nn.Module):
                 tt_kpts_raw_list[i] = kpts2
 
             ss_des_list = [None] * num_scales
-            tt_des_list = [None] * num_scales        
+            tt_des_list = [None] * num_scales
+            
+            is_aligned_to_global_z = data_source['is_aligned_to_global_z']   
             # Compute descriptors
             for i, des_r in enumerate(des_r_list):
-                src = self.Desc(src_fds_pcd[None], ss_kpts_raw_list[i], des_r, dataset_name)
-                tgt = self.Desc(tgt_fds_pcd[None], tt_kpts_raw_list[i], des_r, dataset_name)
+                src = self.Desc(src_fds_pcd[None], ss_kpts_raw_list[i], des_r, is_aligned_to_global_z)
+                tgt = self.Desc(tgt_fds_pcd[None], tt_kpts_raw_list[i], des_r, is_aligned_to_global_z)
                 ss_des_list[i] = src
                 tt_des_list[i] = tgt
 
