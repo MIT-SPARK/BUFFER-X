@@ -1,8 +1,6 @@
 import sys
 import os
 
-# Set GPU device
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import torch
 import time
 import argparse
