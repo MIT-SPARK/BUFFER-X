@@ -10,7 +10,7 @@ from torch import optim
 
 from utils.SE3 import *
 from dataset.dataloader import get_dataloader
-from models.BUFFER import buffer
+from models.BUFFERX import BufferX
 from trainer import Trainer
 from utils.tools import setup_logger
 
@@ -29,7 +29,7 @@ class Args(object):
         self.cfg = cfg
         self.logger = logger
         # Load model
-        self.model = buffer(cfg)
+        self.model = BufferX(cfg)
         self.parameter = self.model.get_parameter()
 
         # Load pre-trained weights and freeze unnecessary modules

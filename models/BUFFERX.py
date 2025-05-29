@@ -67,9 +67,9 @@ class CostVolume(nn.Module):
         return ind
 
 
-class buffer(nn.Module):
+class BufferX(nn.Module):
     def __init__(self, config):
-        super(buffer, self).__init__()
+        super(BufferX, self).__init__()
         self.config = config
         self.config.stage = config.stage
 
@@ -283,7 +283,12 @@ class buffer(nn.Module):
             t_list = [None] * num_scales
             ss_kpts_list = [None] * num_scales
             tt_kpts_list = [None] * num_scales
-            # Match
+            
+            ############################
+            # Hierachical inlier search
+            ############################
+            
+            # Intra-scale matching
             for i, (src_kpts, src, tgt_kpts, tgt) in enumerate(zip(ss_kpts_raw_list, 
                                                     ss_des_list,
                                                     tt_kpts_raw_list,
@@ -293,6 +298,7 @@ class buffer(nn.Module):
 
                 mutual_matching_timer = Timer()
                 mutual_matching_timer.tic()
+                
                 # Perform mutual matching using equivariant feature maps
                 s_mids, t_mids = self.mutual_matching(src_des, tgt_des)
                                 
@@ -308,6 +314,7 @@ class buffer(nn.Module):
                 
                 inlier_timer = Timer()
                 inlier_timer.tic()
+                
                 # Calculate inliers
                 ind = self.Inlier(ss_equi[:, :, 1:cfg.patch.ele_n - 1],
                                 tt_equi[:, :, 1:cfg.patch.ele_n - 1])
@@ -316,6 +323,7 @@ class buffer(nn.Module):
 
                 correspondence_proposal_timer = Timer()
                 correspondence_proposal_timer.tic()
+                
                 # Recover pose
                 angle = ind * 2 * np.pi / cfg.patch.azi_n + 1e-6
                 angle_axis = torch.zeros_like(ss_kpts)
@@ -341,7 +349,7 @@ class buffer(nn.Module):
             correspondence_proposal_timer = Timer()
             correspondence_proposal_timer.tic()     
             
-            # Find the best R and t
+            # Cross-scale consensus maximization
             tss_kpts = ss_kpts[None] @ R.transpose(-1, -2) + t[:, None]
             diffs = torch.sqrt(torch.sum((tss_kpts - tt_kpts[None]) ** 2, dim=-1))
             thr = torch.sqrt(torch.sum(ss_kpts ** 2, dim=-1)) * np.pi / cfg.patch.azi_n * cfg.match.inlier_th

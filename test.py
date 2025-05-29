@@ -12,7 +12,7 @@ from utils.SE3 import *
 from utils.tools import *
 from config import make_cfg
 from dataset.dataloader import get_dataloader
-from models.BUFFER import buffer
+from models.BUFFERX import BufferX
 import open3d as o3d
 
 # Argument parser
@@ -39,7 +39,7 @@ if __name__ == '__main__':
     cfg.stage = 'test'
 
     # Initialize model
-    model = buffer(cfg)
+    model = BufferX(cfg)
     # Load model weights
     for stage in cfg.train.all_stage:
         model_path = f'snapshot/{experiment_id}/{stage}/best.pth'
