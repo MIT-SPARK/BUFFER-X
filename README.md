@@ -1,114 +1,24 @@
 [![License CC BY-NC-SA 4.0](https://img.shields.io/badge/license-CC4.0-blue.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode)
+## BUFFER-X: Towards Zero-Shot Point Cloud Registration in Diverse Scenes (ICCV 2025)
 
-## Code Clean-up Blueprint
+This is the official repository of **BUFFER-X**, a zero-shot point cloud registration method designed for robust performance across diverse scenes without retraining or manual tuning. For technical details, please refer to:
 
-### Directory Re-organization
-- `dataset`
-    - `dataloader.py`
-    - `threedmatch`
-    - `kitti`
-    - `kaist`
-    - ...
-- `config`
-    - `config.py`
-    - `threedmatch_config.py`
-    - `kitti_config.py`
-    - `kaist_config.py`
-    - ...
-- `models`
-    - `BUFFER.py`
-    - ...
-- `utils`
-    - `common.py`
-    - ...
-- `snapshot`
-    - `threedmatch`
-    - `kitti`
-- `test.py`
-- `train.py`
-- `trainer.py`
-- `demo.py`
+**[BUFFER-X: Towards Zero-Shot Point Cloud Registration in Diverse Scenes](https://arxiv.org/abs/2503.07940)**  <br />
+[Minkyun Seo*](https://scholar.google.com/citations?user=esoiHnYAAAAJ&hl=en), [Hyungtae Lim*](https://scholar.google.com/citations?user=S1A3nbIAAAAJ&hl=en), [Kanghee Lee](https://scholar.google.com/citations?user=s-haNkwAAAAJ&hl=en), [Luca Carlone](https://scholar.google.com/citations?user=U4kKRdMAAAAJ&hl=it), [Jaesik Park](https://scholar.google.com/citations?user=_3q6KBIAAAAJ&hl=en). <br />
+
+**[[Paper](https://arxiv.org/abs/2503.07940)] [Video] [Project page]** <br />
 
 
+### (1) Overview
+![fig1](fig/BUFFER-X_Overview.png)
 
-## 민균 코멘트
 
-주요 변경점
-- SuperSet_Eval을 통해 한 번에 Eval 가능 (단, 3DMatch의 경우 3DMatch Setting은 따로 해줘야 함)
-- utils/tools.py에 있는 find_voxel_size 함수를 이용하여 voxel size를 정하도록 수정함
-- models/BUFFER.py에 있는 find_des_r 함수를 이용하여 radius를 정하도록 수정함
-- 기존 BUFFER의 point_learner 부분 삭제 (사실 point_learner.py 삭제해도 됨)
-- 3가지 scale의 radius로 매칭
-- dataset.py에 있는 second downsample도 test 시점에는 완전히 불필요함. + Normal 계산도 마찬가지
- 단, 추후 training 과정에서 필요할까봐 남겨둠.
-- snapshot에서 pretrained weight는 3DMatch, KITTI 중 고르면 됨.
-- 현재 유일하게 자동화하지 않은 부분은 RANSAC param.
-
-## Train & Test 
-
-### Training 관련
-
-- Train Dataset에 대한 Prior knowledge는 있다고 판단
-- 따라서, Train Dataset에 대한 Voxel Size, Radius는 지정해준 값을 일단 사용 중 (BUFFER와 동일)
-- 하지만, Train 시점에서부터 Voxel Size, Radius를 동적으로 사용하는 것도 테스트 예정
-  (일종의 augmentation 기대)
-- Training은 3DMatch, KITTI에서만 하는 것으로
-
-### 3DMatch
-
-```
-cd ./ThreeDMatch
-python train.py
-python test.py
-```
-
-### Superset Eval
-
-```
-cd ./SuperSet_eval
-python test.py
-```
-
-### Todo
-- Voxel size 찾는 부분 속도 개선
-- 3 Scale Matching 시간 개선 (병렬화 필요)
-- RANSAC param 자동화
-
-테스트 환경
-(민균 기준 BUFFER의 환경 그대로 사용함)
-- Python 3.10 
-- Cuda 11.8 
-- Cudnn 8 
-
-## 참고용:
-
-- 알고리즘에서 scale을 쓰는 부분을 모두 제거했음!
-- Superset 관리를 `config["KITTI"]`, `config["ThreeDMatch"]`와 같이 dataset의 이름을 key로 받아서 관리하도록 수정함
-- `config.data.voxel_size_0`의 값을 reference voxel size로 사용함
-- 앞으로는 Docker 내의 주소를 위해 다음과 같이 주소를 통일하시죳!
-
-```angular2html
-/opt/project <- BUFFER directory
-/opt/datasets
-├── ETH
-    ├── ...
-├── kitti
-    ├── ...
-├── ThreeDMatch
-    ├── ...
-```
-
-## 하면 좋은 것 
-
-- 현재는 batch를 1밖에 지원안 함...이를 수정하면 더 좋을 것 같음!
-
----
-
-###  Setup
+### (2) Setup
 This code has been tested with Python 3.8, Pytorch 1.9.1, CUDA 11.1 on Ubuntu 20.04.
  
 - Clone the repository 
 ```
+TBU
 git clone https://github.com/aosheng1996/BUFFER && cd BUFFER
 ```
 - Setup conda virtual environment
@@ -127,141 +37,76 @@ cd cpp_wrappers && sh compile_wrappers.sh && cd ..
 git clone https://github.com/KinglittleQ/torch-batch-svd.git && cd torch-batch-svd && python setup.py install && cd .. && sudo rm -rf torch-batch-svd/
 ```
 
-### (3) 3DMatch
-Following [Predator](https://github.com/prs-eth/OverlapPredator.git), we provide the processed 3DMatch training set (subsampled fragments with voxel size of 1.5cm and their ground truth transformation matrices). 
+### (3) Datasets
 
-Download the processed dataset from [Google Drive](https://drive.google.com/drive/folders/1tWVV4u_YablYmPta8fmHLY-JN4kZWh8R?usp=sharing) and put the folder into `data`. 
-Then the structure should be as follows:
+Due to the large number and variety of datasets used in our experiments, we provide detailed download instructions and folder structures in a separate document:
 
+[DATASETS.md](datasets/DATASETS.md)
+
+### (4) Training and Testing
 
 **Training**
 
-Training BUFFER on the 3DMatch dataset:
+BUFFER-X supports training on either the **3DMatch** or **KITTI** dataset.  
+
+#### Example
 ```
-cd ./ThreeDMatch
-python train.py
+CUDA_VISIBLE_DEVICES=0 python train.py --dataset 3DMatch
 ```
+
 **Testing**
 
-Evaluate the performance of the trained models on the 3DMatch dataset:
+To evaluate **BUFFER-X** on a specific dataset, use the `test.py` script with the following arguments:
 
-```
-cd ./ThreeDMatch
-python test.py
-```
-To evaluate the performance of BUFFER on the 3DLoMatch dataset, you only need to modify the `_C.data.dataset = '3DMatch'` in `config.py` to `_C.data.dataset = '3DLoMatch'` and performs:
-```
-python test.py
-``` 
-
-### (4) KITTI
-Download the data from the [KITTI Odometry website](http://www.cvlibs.net/datasets/kitti/eval_odometry.php) into `data`. 
-Then the structure is as follows:
-
-- `data`
+- `--dataset`: The name of the dataset to test on. Must be one of:
+    - `3DMatch`
+    - `3DLoMatch`
+    - `Scannetpp_iphone`
+    - `Scannetpp_faro`
+    - `Tiers`
     - `KITTI`
-        - `dataset`
-            - `pose`
-                - `00.txt`
-                - ...
-            - `sequences`
-                - `00`
-                - ...
-
-**Training**
-
-Training BUFFER on the KITTI dataset:
-
-```
-cd ./KITTI
-python train.py
-```
-
-**Testing**
-
-Evaluate the performance of the trained models on the KITTI dataset:
-
-```
-cd ./KITTI
-python test.py
-```
-
-### (5) ETH
-
-The test set can be downloaded from [here](https://share.phys.ethz.ch/~gsg/3DSmoothNet/data/ETH.rar), and put the folder into `data`, then the structure is as follows:
-
-- `data`
+    - `WOD`
+    - `MIT`
+    - `KAIST`
     - `ETH`
-        - `gazebo_summer`
-        - `gazebo_winter`
-        - `wood_autmn`
-        - `wood_summer`
+    - `Oxford`
 
+- `--experiment_id`: The ID of the experiment to use for testing.
 
-### (6) Generalizing to Unseen Datasets 
-
-**3DMatch to ETH**
-
-Generalization from 3DMatch dataset to ETH dataset:
+#### Example  
+Evaluate a model with the experiment ID `threedmatch` on the KITTI dataset:
 ```
-cd ./generalization/ThreeD2ETH
-python test.py
+CUDA_VISIBLE_DEVICES=0 python test.py --dataset KITTI --experiment_id threedmatch
 ```
 
-**3DMatch to KITTI**
+You can also run evaluation on all supported datasets with a single script:
 
-Generalization from 3DMatch dataset to KITTI dataset:
-
-```
-cd ./generalization/ThreeD2KITTI
-python test.py
-```
-
-**KITTI to 3DMatch**
-
-Generalization from KITTI dataset to 3DMatch dataset:
-```
-cd ./generalization/KITTI2ThreeD
-python test.py
-```
-
-**KITTI to ETH**
-
-Generalization from KITTI dataset to ETH dataset:
-```
-cd ./generalization/KITTI2ETH
-python test.py
+```bash
+./eval_all.sh EXPERIMENT_ID
 ```
 
 ## Acknowledgement
 
 In this project, we use (parts of) the implementations of the following works:
 
+* [FCGF](https://github.com/chrischoy/FCGF)
 * [Vector Neurons](https://github.com/FlyingGiraffe/vnn)
 * [D3Feat](https://github.com/XuyangBai/D3Feat.pytorch)
 * [PointDSC](https://github.com/XuyangBai/PointDSC)
 * [SpinNet](https://github.com/QingyongHu/SpinNet)
 * [GeoTransformer](https://github.com/qinzheng93/GeoTransformer)
 * [RoReg](https://github.com/HpWang-whu/RoReg)
+* [BUFFER](https://github.com/SYSU-SAIL/BUFFER)
 
 ### Citation
 If you find our work useful in your research, please consider citing:
 
-    @inproceedings{ao2023buffer,
-      title={BUFFER: Balancing Accuracy, Efficiency, and Generalizability in Point Cloud Registration},
-      author={Ao, Sheng and Hu, Qingyong and Wang, Hanyun and Xu, Kai and Guo, Yulan},
-      booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
-      pages={1255--1264},
-      year={2023}
+    @article{Seo_BUFFERX_arXiv_2025,
+    Title={BUFFER-X: Towards Zero-Shot Point Cloud Registration in Diverse Scenes},
+    Author={Minkyun Seo and Hyungtae Lim and Kanghee Lee and Luca Carlone and Jaesik Park},
+    Journal={2503.07940 (arXiv)},
+    Year={2025}
     }
 
 ### Updates
-* 07/06/2023: The code is released!
-* 28/02/2023: This paper has been accepted by CVPR 2023!
-
-## Related Repos
-1. [RandLA-Net: Efficient Semantic Segmentation of Large-Scale Point Clouds](https://github.com/QingyongHu/RandLA-Net) ![GitHub stars](https://img.shields.io/github/stars/QingyongHu/RandLA-Net.svg?style=flat&label=Star)
-2. [SoTA-Point-Cloud: Deep Learning for 3D Point Clouds: A Survey](https://github.com/QingyongHu/SoTA-Point-Cloud) ![GitHub stars](https://img.shields.io/github/stars/QingyongHu/SoTA-Point-Cloud.svg?style=flat&label=Star)
-3. [3D-BoNet: Learning Object Bounding Boxes for 3D Instance Segmentation on Point Clouds](https://github.com/Yang7879/3D-BoNet) ![GitHub stars](https://img.shields.io/github/stars/Yang7879/3D-BoNet.svg?style=flat&label=Star)
-4. [SensatUrban: Learning Semantics from Urban-Scale Photogrammetric Point Clouds](https://github.com/QingyongHu/SensatUrban) ![GitHub stars](https://img.shields.io/github/stars/QingyongHu/SensatUrban.svg?style=flat&label=Star)
-5. [SpinNet: Learning a General Surface Descriptor for 3D Point Cloud Registration](https://github.com/QingyongHu/SpinNet)![GitHub stars](https://img.shields.io/github/stars/QingyongHu/SpinNet.svg?style=flat&label=Star)
+* 25/06/2025: This paper has been accepted by ICCV 2025!
