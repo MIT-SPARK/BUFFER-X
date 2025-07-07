@@ -221,17 +221,19 @@ class BufferX(nn.Module):
                         }
 
         else:
-            #######################
+            ##################
             # inference
-            ######################
+            ##################
             src_fds_pcd, tgt_fds_pcd = data_source['src_fds_pcd'], data_source['tgt_fds_pcd']
 
             dataset_name = self.config['data']['dataset']
             cfg = self.config
-                    
+            
+            #######################################
+            # Density-aware radius estimation
+            #######################################
             num_radius_estimation_points = cfg.patch.num_points_radius_estimate
-            search_radius_thresholds = cfg.patch.search_radius_thresholds
-                        
+            search_radius_thresholds = cfg.patch.search_radius_thresholds  
             num_fps = cfg.patch.num_fps
             num_scales = cfg.patch.num_scales
             
@@ -248,6 +250,9 @@ class BufferX(nn.Module):
  
             des_r_list = find_des_r(src_fds_pcd, kpts1, tgt_fds_pcd, kpts2, thresholds = search_radius_thresholds)
                         
+            #################################
+            # Multi-scale patch embedder
+            #################################
             ss_kpts_raw_list = [None] * num_scales
             tt_kpts_raw_list = [None] * num_scales
 
@@ -256,7 +261,7 @@ class BufferX(nn.Module):
             mutual_matching_total = 0
             inlier_total = 0
             correspondence_proposal_total = 0
-            
+
             # Furthest point sampling 
             for i, des_r in enumerate(des_r_list):
                 s_pts_flipped, t_pts_flipped = src_fds_pcd[None].transpose(1, 2).contiguous(), tgt_fds_pcd[None].transpose(1,2).contiguous()
@@ -272,6 +277,7 @@ class BufferX(nn.Module):
             tt_des_list = [None] * num_scales
             
             is_aligned_to_global_z = data_source['is_aligned_to_global_z']   
+            
             # Compute descriptors
             for i, des_r in enumerate(des_r_list):
                 src = self.Desc(src_fds_pcd[None], ss_kpts_raw_list[i], des_r, is_aligned_to_global_z)
@@ -284,9 +290,9 @@ class BufferX(nn.Module):
             ss_kpts_list = [None] * num_scales
             tt_kpts_list = [None] * num_scales
             
-            ############################
+            #################################
             # Hierachical inlier search
-            ############################
+            #################################
             
             # Intra-scale matching
             for i, (src_kpts, src, tgt_kpts, tgt) in enumerate(zip(ss_kpts_raw_list, 
@@ -315,7 +321,7 @@ class BufferX(nn.Module):
                 inlier_timer = Timer()
                 inlier_timer.tic()
                 
-                # Calculate inliers
+                # Pairwise transformation estimation
                 ind = self.Inlier(ss_equi[:, :, 1:cfg.patch.ele_n - 1],
                                 tt_equi[:, :, 1:cfg.patch.ele_n - 1])
                 inlier_timer.toc()
