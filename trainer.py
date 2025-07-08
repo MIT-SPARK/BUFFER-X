@@ -71,7 +71,7 @@ class Trainer(object):
                     if res['desc_loss'] < best_loss:
                         best_loss = res['desc_loss']
                         self._snapshot('best')
-                elif self.train_modal == 'Inlier':
+                elif self.train_modal == 'Pose':
                     if res['match_loss'] < best_loss:
                         best_loss = res['match_loss']
                         self._snapshot('best')
@@ -130,7 +130,7 @@ class Trainer(object):
                     "eqv_acc": float(eqv_acc.item()),
                 }
 
-            if self.train_modal == 'Inlier':
+            if self.train_modal == 'Pose':
 
                 pred_ind, gt_ind = output['pred_ind'], output['gt_ind']
                 match_loss = self.Huber_loss(pred_ind, gt_ind)
@@ -198,7 +198,7 @@ class Trainer(object):
                         "eqv_acc": float(eqv_acc.item()),
                     }
 
-                if self.train_modal == 'Inlier':
+                if self.train_modal == 'Pose':
                     pred_ind, gt_ind = output['pred_ind'], output['gt_ind']
                     match_loss = self.Huber_loss(pred_ind, gt_ind)
 

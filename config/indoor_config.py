@@ -23,7 +23,7 @@ class IndoorBaseConfig:
         self._C.train.pos_num = 512
         self._C.train.augmentation_noise = 0.001
         self._C.train.pretrain_model = ''
-        self._C.train.all_stage = ['Desc', 'Inlier']
+        self._C.train.all_stage = ['Desc', 'Pose']
 
         # Test
         self._C.test = edict()
@@ -36,10 +36,10 @@ class IndoorBaseConfig:
 
         # Optimizer
         self._C.optim = edict()
-        self._C.optim.lr = {'Desc': 0.001, 'Inlier': 0.001}
+        self._C.optim.lr = {'Desc': 0.001, 'Pose': 0.001}
         self._C.optim.lr_decay = 0.50
         self._C.optim.weight_decay = 1e-6
-        self._C.optim.scheduler_interval = {'Desc': 2, 'Inlier': 1}
+        self._C.optim.scheduler_interval = {'Desc': 2, 'Pose': 1}
 
         # Multi-scale patch embedder
         self._C.patch = edict()

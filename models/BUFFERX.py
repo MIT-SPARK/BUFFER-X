@@ -74,7 +74,7 @@ class BufferX(nn.Module):
         self.config.stage = config.stage
 
         self.Desc = MiniSpinNet(config)
-        self.Inlier = CostVolume(config)
+        self.Pose = CostVolume(config)
         # equivariant feature matching
         self.equi_match = EquiMatch(config)
 
@@ -175,7 +175,7 @@ class BufferX(nn.Module):
             
             is_aligned_to_global_z = data_source['is_aligned_to_global_z']
             src = self.Desc(src_fds_pcd[None], src_kpt[None], des_r, is_aligned_to_global_z)
-            if self.config.stage == 'Inlier':
+            if self.config.stage == 'Pose':
                 # SO(2) augmentation
                 tgt = self.Desc(tgt_fds_pcd[None], tgt_kpt[None], des_r, is_aligned_to_global_z, None, True)
             else:
@@ -210,12 +210,12 @@ class BufferX(nn.Module):
                     print(f"{data_source['src_id']} {data_source['tgt_id']} don't have enough patches")
                     return None
                 
-            pred_ind = self.Inlier(src['equi'][:, :, 1:self.config.patch.ele_n - 1],
+            pred_ind = self.Pose(src['equi'][:, :, 1:self.config.patch.ele_n - 1],
                                    tgt['equi'][:, :, 1:self.config.patch.ele_n - 1])
             # calculate gt lable in SO(2)
             lable = self.cal_so2_gt(src, tgt, gt_trans, False, aug_rotation=tgt['aug_rotation'])
 
-            if self.config.stage == 'Inlier':
+            if self.config.stage == 'Pose':
                 return {'pred_ind': pred_ind,
                         'gt_ind': lable,
                         }
@@ -259,7 +259,7 @@ class BufferX(nn.Module):
             desc_timer = Timer()
             desc_timer.tic()
             mutual_matching_total = 0
-            inlier_total = 0
+            pose_total = 0
             correspondence_proposal_total = 0
 
             # Furthest point sampling 
@@ -318,14 +318,14 @@ class BufferX(nn.Module):
                 mutual_matching_timer.toc()   
                 mutual_matching_total += mutual_matching_timer.diff
                 
-                inlier_timer = Timer()
-                inlier_timer.tic()
+                pose_timer = Timer()
+                pose_timer.tic()
                 
                 # Pairwise transformation estimation
-                ind = self.Inlier(ss_equi[:, :, 1:cfg.patch.ele_n - 1],
+                ind = self.Pose(ss_equi[:, :, 1:cfg.patch.ele_n - 1],
                                 tt_equi[:, :, 1:cfg.patch.ele_n - 1])
-                inlier_timer.toc()
-                inlier_total += inlier_timer.diff
+                pose_timer.toc()
+                pose_total += pose_timer.diff
 
                 correspondence_proposal_timer = Timer()
                 correspondence_proposal_timer.tic()
@@ -390,7 +390,7 @@ class BufferX(nn.Module):
             else:
                 pose = init_pose
             times = [desc_timer.diff, mutual_matching_total,
-                        inlier_total, correspondence_proposal_total, ransac_timer.diff]
+                        pose_total, correspondence_proposal_total, ransac_timer.diff]
             return pose, times
 
     def mutual_matching(self, src_des, tgt_des):
