@@ -385,7 +385,8 @@ class BufferX(nn.Module):
             ransac_timer.toc()
             
             if cfg.test.pose_refine is True:
-                pose = self.post_refinement(torch.FloatTensor(init_pose[None]).cuda(), ss_kpts[None], tt_kpts[None])
+                init_pose_tensor = torch.FloatTensor(init_pose.copy()[None]).cuda()
+                pose = self.post_refinement(init_pose_tensor, ss_kpts[None], tt_kpts[None])
                 pose = pose[0].detach().cpu().numpy()
             else:
                 pose = init_pose
