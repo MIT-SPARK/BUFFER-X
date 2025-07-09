@@ -69,7 +69,7 @@ if __name__ == '__main__':
     data_timer, model_timer = Timer(), Timer()
 
     # Run test
-    overall_time = np.zeros(7)
+    overall_time = None
     with torch.no_grad():
         states = []
         num_batch = len(test_loader)
@@ -115,8 +115,12 @@ if __name__ == '__main__':
             if rte > rte_thresh or rre > rre_thresh:
                 logger.info(f"{i}th fragment failed, RRE: {rre:.4f}, RTE: {rte:.4f}")
                 fail = True
-
-            overall_time += np.array([data_timer.diff, model_timer.diff, *times])
+            
+            curr_time = np.array([data_timer.diff, model_timer.diff, *times])
+            if overall_time is None:
+                overall_time = curr_time
+            else:
+                overall_time += curr_time
             torch.cuda.empty_cache()
 
             # logger.info progress every 100 iterations
@@ -159,7 +163,6 @@ if __name__ == '__main__':
                                                                                     gt_traj, gt_traj_cov)
                 rmse_recall.append(temp_recall)
             
-
     # logger.info summary
     logger.info("\n---------------Test Results---------------")
     logger.info(f"Recall: {recall:.8f}")
