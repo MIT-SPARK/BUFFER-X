@@ -1,0 +1,170 @@
+# Overview
+
+This document provides an overview of the datasets used in our experiments. The datasets are categorized into indoor and outdoor datasets. Each entry includes brief instructions and expected folder structures for proper use.  
+
+You can click the links below to jump to each dataset section.
+
+### 📌 Indoor Datasets
+- [1. 3DMatch](#1-3dmatch)
+- [2. 3DLoMatch](#2-3dlomatch)
+- [3. ScanNet++ iPhone](#3-scannet-iphone)
+- [4. ScanNet++ Faro](#4-scannet-faro)
+- [5. TIERS](#5-tiers)
+
+### 📌 Outdoor Datasets
+- [6. KITTI](#6-kitti)
+- [7. Waymo Open Dataset](#7-waymo-open-dataset)
+- [8. KAIST](#8-kaist)
+- [9. MIT](#9-mit)
+- [10. ETH](#10-eth)
+- [11. Oxford](#11-oxford)
+
+## Indoor Datasets
+
+### (1) 3DMatch
+Following [Predator](https://github.com/prs-eth/OverlapPredator.git), we provide the processed 3DMatch training set (subsampled fragments with voxel size of 1.5cm and their ground truth transformation matrices). 
+
+Download the processed dataset from [Google Drive](https://drive.google.com/drive/folders/1tWVV4u_YablYmPta8fmHLY-JN4kZWh8R?usp=sharing) and put the folder into `datasets`. 
+Then the structure should be as follows:
+
+- `datasets`
+    - `ThreeDMatch`
+        - `train`
+            - `7-scenes-chess`
+            - ...
+            - `3DMatch_train_overlap.pkl`
+            - `train_3dmatch.txt`
+            - `val_3dmatch.txt`
+        - `test`
+            - `3DLoMatch`
+            - `3DMatch`
+
+### (2) 3DLoMatch
+
+3DLoMatch shares the same data structure as 3DMatch.
+
+### (3) ScanNet++ iPhone
+Due to dataset sharing policies, we are unable to provide the preprocessed ScanNet++ iPhone and FARO data. Please download the raw ScanNet++ dataset directly from the official source and run our preprocessing scripts (to be released soon).
+
+### (4) ScanNet++ Faro
+Due to dataset sharing policies, we are unable to provide the preprocessed ScanNet++ iPhone and FARO data. Please download the raw ScanNet++ dataset directly from the official source and run our preprocessing scripts (to be released soon).
+
+### (5) TIERS
+
+The original dataset is available at the official [TIERS GitHub repository](https://github.com/TIERS/tiers-lidars-dataset). In our experiments, we only use the indoor sequences from the TIERS dataset.
+
+Alternatively, you can directly download the processed dataset from [Google Drive (TBU)](TBU) and put the folder into `datasets`. 
+Then the structure should be as follows:
+
+- `datasets`
+    - `TIERS`
+        - `tiers_indoor06`
+            - `os0_128`
+                - `scans`
+                    - `000000.pcd`
+                    - ...
+                - `poses_kitti.txt`
+            - `os1_64`
+            - `vel16`
+        - `tiers_indoor08`
+        - `tiers_indoor09`
+        - `tiers_indoor10`
+        - `tiers_indoor11`
+
+## Outdoor Datasets
+
+### (6) KITTI
+Download the data from the [KITTI Odometry website](http://www.cvlibs.net/datasets/kitti/eval_odometry.php) into `datasets`. 
+Then the structure is as follows:
+
+- `datasets`
+    - `KITTI`
+        - `dataset`
+            - `pose`
+                - `00.txt`
+                - ...
+            - `sequences`
+                - `00`
+                - ...
+
+### (7) Waymo Open Dataset
+
+Following [EYOC](https://github.com/liuQuan98/EYOC), we provide the processed WOD dataset.
+
+Download the processed dataset from [Google Drive (TBU)](TBU) and put the folder into `datasets`. 
+Then the structure should be as follows:
+
+- `datasets`
+    - `WOD`
+        - `test`
+            - `sequences`
+                - `2601205676330128831_4880_000_4900_000`
+                    - `scans`
+                        - `000000.bin`
+                        - ...
+                    - `poses.txt`
+                - ...
+
+### (8) KAIST
+
+This dataset is derived from the **HeliPR dataset**, using only the **KAIST sequence** for our experiments. The original HeliPR dataset can be downloaded from the [official website](https://sites.google.com/view/heliprdataset).
+
+Alternatively, you can directly download the processed dataset from [Google Drive (TBU)](TBU) and put the folder into `datasets`. 
+Then the structure should be as follows:
+
+- `datasets`
+    - `KAIST`
+        - `Aeva`
+            - `velodyne`
+                - `000000.bin`
+                - ...
+            - `calib.txt`    
+            - `poses.txt`    
+        - `Avia`
+        - `Ouster`
+
+### (9) MIT
+
+This dataset is derived from the Kimera-Multi dataset, using only the **MIT sequence** for our experiments. The original dataset can be downloaded from the [official website](https://github.com/MIT-SPARK/Kimera-Multi).
+
+Alternatively, you can directly download  the processed dataset from [Google Drive (TBU)](TBU) and put the folder into `datasets`. 
+Then the structure should be as follows:
+
+- `datasets`
+    - `MIT`
+        - `acl_jackal`
+            - `scans`
+                - `000000.pcd`
+                - ...
+            - `kimera_multi1_map.pcd`    
+            - `poses_kitti.txt`    
+            - `poses_tum.txt`
+
+### (10) ETH
+
+The test set can be downloaded from [here](https://share.phys.ethz.ch/~gsg/3DSmoothNet/data/ETH.rar), and put the folder into `datasets`, then the structure is as follows:
+
+- `datasets`
+    - `ETH`
+        - `gazebo_summer`
+        - `gazebo_winter`
+        - `wood_autmn`
+        - `wood_summer`
+
+### (11) Oxford
+
+This dataset is based on the [Newer College Dataset](https://ori-drs.github.io/newer-college-dataset/). We use selected sequences from the dataset for evaluation.
+
+Alternatively, you can directly download the preprocessed dataset from [Google Drive (TBU)](TBU) and put the folder into `datasets`.  
+Then the structure should be as follows:
+- `datasets`
+    - `Oxford`
+        - `01_short_experiments`
+            - `scans`
+                - `000000.pcd`
+                - ...
+            - `01_short_experiments_map.pcd`    
+            - `poses_kitti.txt`    
+            - `poses_tum.txt`
+        - `05_quad_with_dynamics` 
+        - `07_parkland_mound`

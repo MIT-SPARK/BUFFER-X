@@ -6,7 +6,7 @@ This is the official repository of **BUFFER-X**, a zero-shot point cloud registr
 **[BUFFER-X: Towards Zero-Shot Point Cloud Registration in Diverse Scenes](https://arxiv.org/abs/2503.07940)**  <br />
 [Minkyun Seo*](https://scholar.google.com/citations?user=esoiHnYAAAAJ&hl=en), [Hyungtae Lim*](https://scholar.google.com/citations?user=S1A3nbIAAAAJ&hl=en), [Kanghee Lee](https://scholar.google.com/citations?user=s-haNkwAAAAJ&hl=en), [Luca Carlone](https://scholar.google.com/citations?user=U4kKRdMAAAAJ&hl=it), [Jaesik Park](https://scholar.google.com/citations?user=_3q6KBIAAAAJ&hl=en). <br />
 
-**[[Paper](https://arxiv.org/abs/2503.07940)] [Video] [Project page]** <br />
+<!-- **[[Paper](https://arxiv.org/abs/2503.07940)] [Video] [Project page]** <br /> -->
 
 
 ### (1) Overview
@@ -18,13 +18,12 @@ This code has been tested with Python 3.8, Pytorch 1.9.1, CUDA 11.1 on Ubuntu 20
  
 - Clone the repository 
 ```
-TBU
-git clone https://github.com/aosheng1996/BUFFER && cd BUFFER
+git clone https://github.com/MIT-SPARK/BUFFER-X && cd BUFFERX
 ```
 - Setup conda virtual environment
 ```
-conda create -n buffer python=3.8
-source activate buffer
+conda create -n bufferx python=3.8
+source activate bufferx
 pip install torch==1.9.1+cu111 torchvision==0.10.1+cu111 torchaudio==0.9.1 -f https://download.pytorch.org/whl/torch_stable.html
 pip install open3d==0.13.0
 
@@ -41,7 +40,7 @@ git clone https://github.com/KinglittleQ/torch-batch-svd.git && cd torch-batch-s
 
 Due to the large number and variety of datasets used in our experiments, we provide detailed download instructions and folder structures in a separate document:
 
-[DATASETS.md](datasets/DATASETS.md)
+[DATASETS.md](dataset/DATASETS.md)
 
 ### (4) Training and Testing
 
@@ -74,7 +73,7 @@ To evaluate **BUFFER-X** on a specific dataset, use the `test.py` script with th
 - `--experiment_id`: The ID of the experiment to use for testing.
 
 #### Example  
-Evaluate a model with the experiment ID `threedmatch` on the KITTI dataset:
+Evaluate a model with the experiment ID `threedmatch` on the `KITTI` dataset:
 ```
 CUDA_VISIBLE_DEVICES=0 python test.py --dataset KITTI --experiment_id threedmatch
 ```
