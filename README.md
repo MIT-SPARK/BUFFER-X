@@ -14,7 +14,7 @@ This is the official repository of **BUFFER-X**, a zero-shot point cloud registr
 
 
 ### (2) Setup
-This code has been tested with Python 3.8, Pytorch 1.9.1, CUDA 11.1 on Ubuntu 20.04.
+This code has been tested with Python 3.8, Pytorch 1.9.1, CUDA 11.1 on Ubuntu 22.04.
  
 - Clone the repository 
 ```
