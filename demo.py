@@ -1,30 +1,27 @@
-import sys
-
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import math
 import time
 import torch.nn as nn
+from config import make_cfg
 from utils.timer import Timer
-from KITTI.config import make_cfg
-from models.BUFFER import buffer
+from models.BUFFERX import BufferX
 from utils.SE3 import *
-from utils.common import make_open3d_point_cloud
-from utils.tools import find_voxel_size
+from utils.tools import sphericity_based_voxel_analysis
 import open3d as o3d
 
 if __name__ == '__main__':
     print("Start testing...")
-    cfg = make_cfg()
+    cfg = make_cfg("3DMatch")
     cfg[cfg.data.dataset] = cfg.copy()
     cfg.stage = 'test'
     timestr = time.strftime('%m%d%H%M')
-    model = buffer(cfg)
+    model = BufferX(cfg)
+    model_timer = Timer()
 
     experiment_id = cfg.test.experiment_id
     # load the weight
     for stage in cfg.train.all_stage:
-        model_path = 'KITTI/snapshot/%s/%s/best.pth' % (experiment_id, stage)
+        model_path = 'snapshot/%s/%s/best.pth' % (experiment_id, stage)
         state_dict = torch.load(model_path)
         new_dict = {k: v for k, v in state_dict.items() if stage in k}
         model_dict = model.state_dict()
@@ -37,18 +34,23 @@ if __name__ == '__main__':
     model = nn.DataParallel(model, device_ids=[0])
     model.eval()
 
-    src_path = "../datasets/250118_tiers/tiers_indoor06/vel16/scans/000008.pcd"
-    tgt_path = "../datasets/250118_tiers/tiers_indoor06/vel16/vel16_map.pcd"
+    # src_path = "/root/dataset/modelnet_ply/cup/cup_0080.ply"
+    # tgt_path = "/root/dataset/modelnet_ply/cup/cup_0080.ply"
+    
+    pcd_data = o3d.data.DemoICPPointClouds()
+    src_path = pcd_data.paths[0]
+    tgt_path = pcd_data.paths[1]
 
-    trans = np.array([[0.999301, 0.0371835, -0.00398471, 0.650437],
-                        [-0.0372082, 0.999288, -0.00629173, 0.679018],
-                        [0.00374792, 0.00643559, 0.999972, 0.0701454],
-                        [0, 0, 0, 1]])
+    trans = np.array([[0.0, -1.0, 0.0, 0.3],
+                   [1.0, 0.0, 0.0, 0.5],
+                   [0.0, 0.0, 1.0, 0.1],
+                   [0, 0, 0, 1]])
     
     src_pcd = o3d.io.read_point_cloud(src_path)
     tgt_pcd = o3d.io.read_point_cloud(tgt_path)
+    tgt_pcd = tgt_pcd.transform(trans)
     
-    ds_size = find_voxel_size(src_pcd)
+    ds_size, sphericity, is_aligned_to_global_z = sphericity_based_voxel_analysis(src_pcd, tgt_pcd)
             
     src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=ds_size) 
     src_pts = np.array(src_pcd.points)
@@ -59,21 +61,17 @@ if __name__ == '__main__':
     np.random.shuffle(tgt_pts)
     
     data_source = {
-        'src_pcd_raw': torch.from_numpy(src_pts).float(),
-        'tgt_pcd_raw': torch.from_numpy(tgt_pts).float(),
+        'src_fds_pcd': torch.from_numpy(src_pts).float(),
+        'tgt_fds_pcd': torch.from_numpy(tgt_pts).float(),
+        'is_aligned_to_global_z': is_aligned_to_global_z,
     }
-    
     
     overall_time = np.zeros(7)
     with torch.no_grad():
         states = []
-        # data_timer.tic()
-        # data_source = data_iter.__next__()
-
-        # data_timer.toc()
-        # model_timer.tic()
+        model_timer.tic()
         trans_est, times = model(data_source)
-        # model_timer.toc()
+        model_timer.toc()
 
         if trans_est is not None:
             trans_est = trans_est
@@ -88,15 +86,15 @@ if __name__ == '__main__':
         rre = np.arccos(
             np.clip((np.trace(trans_est[:3, :3].T @ trans[:3, :3]) - 1) / 2, -1 + 1e-16, 1 - 1e-16)) * 180 / math.pi
         states.append(np.array([rte < rte_thresh and rre < rre_thresh, rte, rre]))
+        
 
         fail = False
         if rte > rte_thresh or rre > rre_thresh:
-            print(f"Fragment fails, RRE：{rre:.4f}, RTE：{rte:.4f}")
             fail = True
             
         torch.cuda.empty_cache()
         
-        src_pts, tgt_pts = data_source['src_pcd_raw'], data_source['tgt_pcd_raw']
+        src_pts, tgt_pts = data_source['src_fds_pcd'], data_source['tgt_fds_pcd']
         src_pcd = o3d.geometry.PointCloud()
         src_pcd.points = o3d.utility.Vector3dVector(src_pts)
         src_pcd.paint_uniform_color([1, 0.706, 0])
@@ -121,28 +119,4 @@ if __name__ == '__main__':
         result = "Fail" if fail else "Success"
         o3d.io.write_point_cloud(f"results_ply/{result}_pred_matching.ply", pred_matching)
         print(f"Fragment {result}, RRE：{rre:.4f}, RTE：{rte:.4f}")
-            
-        # temp_states = np.array(states)
-        # temp_recall = temp_states[:, 0].sum() / temp_states.shape[0]
-        # temp_te = temp_states[temp_states[:, 0] == 1, 1].mean()
-        # temp_re = temp_states[temp_states[:, 0] == 1, 2].mean()
-
-# states = np.array(states)
-# Recall = states[:, 0].sum() / states.shape[0]
-# TE = states[states[:, 0] == 1, 1].mean()
-# RE = states[states[:, 0] == 1, 2].mean()
-# print()
-# print("---------------Test Result---------------")
-# print(f'Registration Recall: {Recall:.8f}')
-# print(f'RTE: {TE*100:.8f}')
-# print(f'RRE: {RE:.8f}')
-
-# average_times = overall_time / num_batch
-# print(f"Average data_time: {average_times[0]:.4f}s "
-#     f"Average model_time: {average_times[1]:.4f}s ")
-# print(f"desc_time: {average_times[2]:.4f}s "
-#     f"mutual_matching_time: {average_times[3]:.4f}s "
-#     f"inlier_time: {average_times[4]:.4f}s "
-#     f"correspondence_proposal_time: {average_times[5]:.4f}s "
-#     f"ransac_time: {average_times[6]:.4f}s ")
 
