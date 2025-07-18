@@ -18,7 +18,7 @@ This code has been tested with Python 3.8, Pytorch 1.9.1, CUDA 11.1 on Ubuntu 20
  
 - Clone the repository 
 ```
-git clone https://github.com/MIT-SPARK/BUFFER-X && cd BUFFERX
+git clone https://github.com/MIT-SPARK/BUFFER-X && cd BUFFER-X
 ```
 - Setup conda virtual environment
 ```
@@ -71,6 +71,20 @@ To evaluate **BUFFER-X** on a specific dataset, use the `test.py` script with th
     - `Oxford`
 
 - `--experiment_id`: The ID of the experiment to use for testing.
+
+Download the pretrained weight from [Google Drive (TBU)](TBU).
+Then the structure should be as follows:
+- `BUFFER-X`
+    - `snapshot`
+        - `threedmatch`
+            - `Desc`
+            - `Pose`
+        - `kitti`
+            - `Desc`
+            - `Pose`
+    - `config`
+    - `dataset`
+    - ...
 
 #### Example  
 Evaluate a model with the experiment ID `threedmatch` on the `KITTI` dataset:
