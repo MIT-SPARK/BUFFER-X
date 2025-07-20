@@ -4,7 +4,7 @@ import open3d as o3d
 import glob
 from utils.SE3 import *
 from utils.common import make_open3d_point_cloud
-from utils.tools import find_voxel_size
+from utils.tools import sphericity_based_voxel_analysis
 
 cur_path = os.path.dirname(os.path.realpath(__file__))
 split_path = cur_path + "/../config/splits"
@@ -115,9 +115,11 @@ class KITTIDataset(Data.Dataset):
         tgt_pcd = make_open3d_point_cloud(xyz1, [0, 0.651, 0.929])
 
         if self.split == 'test':
-            self.config.data.downsample, sphericity = find_voxel_size(src_pcd, tgt_pcd)
+            self.config.data.downsample, sphericity, _ = sphericity_based_voxel_analysis(src_pcd, tgt_pcd)
+            is_aligned_to_global_z = self.config.patch.is_aligned_to_global_z
         else:
             sphericity = 0
+            is_aligned_to_global_z = True
         
         src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample) 
         src_pts = np.array(src_pcd.points)
@@ -168,6 +170,7 @@ class KITTIDataset(Data.Dataset):
                 'tgt_id': '%d_%d' % (drive, t1),
                 'dataset_name': self.config.data.dataset,
                 'sphericity': sphericity,
+                'is_aligned_to_global_z': is_aligned_to_global_z,
                 }
 
     def apply_transform(self, pts, trans):

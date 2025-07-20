@@ -22,5 +22,5 @@ DATASETS=(
 )
 
 for DATASET in "${DATASETS[@]}"; do
-  python test.py --dataset "$DATASET" --experiment_id "$EXPERIMENT_ID"
+  CUDA_VISIBLE_DEVICES=0 python test.py --dataset "$DATASET" --experiment_id "$EXPERIMENT_ID"
 done

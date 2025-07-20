@@ -10,7 +10,7 @@ class ThreeDMatchConfig(IndoorBaseConfig):
         self._C.test.pose_refine = True
         
         self._C.train.pretrain_model = ''
-        self._C.train.all_stage = ['Desc', 'Inlier']
+        self._C.train.all_stage = ['Desc', 'Pose']
 
 def make_cfg():
     return ThreeDMatchConfig().get_cfg()

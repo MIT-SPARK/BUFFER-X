@@ -1,8 +1,6 @@
 import argparse
 import sys
 import os
-# Set GPU device
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import math
 import time
@@ -14,9 +12,8 @@ from utils.SE3 import *
 from utils.tools import *
 from config import make_cfg
 from dataset.dataloader import get_dataloader
-from models.BUFFER import buffer
+from models.BUFFERX import BufferX
 import open3d as o3d
-
 
 # Argument parser
 parser = argparse.ArgumentParser(description="Generalized Testing Script for Registration Models")
@@ -42,7 +39,7 @@ if __name__ == '__main__':
     cfg.stage = 'test'
 
     # Initialize model
-    model = buffer(cfg)
+    model = BufferX(cfg)
     # Load model weights
     for stage in cfg.train.all_stage:
         model_path = f'snapshot/{experiment_id}/{stage}/best.pth'
@@ -72,7 +69,7 @@ if __name__ == '__main__':
     data_timer, model_timer = Timer(), Timer()
 
     # Run test
-    overall_time = np.zeros(7)
+    overall_time = None
     with torch.no_grad():
         states = []
         num_batch = len(test_loader)
@@ -113,11 +110,17 @@ if __name__ == '__main__':
             rte = np.linalg.norm(trans_est[:3, 3] - trans[:3, 3])
             rre = np.arccos(np.clip((np.trace(trans_est[:3, :3].T @ trans[:3, :3]) - 1) / 2, -1 + 1e-16, 1 - 1e-16)) * 180 / math.pi
             states.append([rte < rte_thresh and rre < rre_thresh, rte, rre])
+            fail = False
 
             if rte > rte_thresh or rre > rre_thresh:
                 logger.info(f"{i}th fragment failed, RRE: {rre:.4f}, RTE: {rte:.4f}")
-
-            overall_time += np.array([data_timer.diff, model_timer.diff, *times])
+                fail = True
+            
+            curr_time = np.array([data_timer.diff, model_timer.diff, *times])
+            if overall_time is None:
+                overall_time = curr_time
+            else:
+                overall_time += curr_time
             torch.cuda.empty_cache()
 
             # logger.info progress every 100 iterations
@@ -160,7 +163,6 @@ if __name__ == '__main__':
                                                                                     gt_traj, gt_traj_cov)
                 rmse_recall.append(temp_recall)
             
-
     # logger.info summary
     logger.info("\n---------------Test Results---------------")
     logger.info(f"Recall: {recall:.8f}")

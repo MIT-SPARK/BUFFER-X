@@ -67,14 +67,14 @@ class CostVolume(nn.Module):
         return ind
 
 
-class buffer(nn.Module):
+class BufferX(nn.Module):
     def __init__(self, config):
-        super(buffer, self).__init__()
+        super(BufferX, self).__init__()
         self.config = config
         self.config.stage = config.stage
 
         self.Desc = MiniSpinNet(config)
-        self.Inlier = CostVolume(config)
+        self.Pose = CostVolume(config)
         # equivariant feature matching
         self.equi_match = EquiMatch(config)
 
@@ -172,13 +172,14 @@ class buffer(nn.Module):
                 des_r = np.random.choice(possible_values, p=probabilities)
             else:
                 des_r = cfg.patch.des_r
-
-            src = self.Desc(src_fds_pcd[None], src_kpt[None], des_r, dataset_name)
-            if self.config.stage == 'Inlier':
+            
+            is_aligned_to_global_z = data_source['is_aligned_to_global_z']
+            src = self.Desc(src_fds_pcd[None], src_kpt[None], des_r, is_aligned_to_global_z)
+            if self.config.stage == 'Pose':
                 # SO(2) augmentation
-                tgt = self.Desc(tgt_fds_pcd[None], tgt_kpt[None], des_r, dataset_name, None, True)
+                tgt = self.Desc(tgt_fds_pcd[None], tgt_kpt[None], des_r, is_aligned_to_global_z, None, True)
             else:
-                tgt = self.Desc(tgt_fds_pcd[None], tgt_kpt[None], des_r, dataset_name, None)
+                tgt = self.Desc(tgt_fds_pcd[None], tgt_kpt[None], des_r, is_aligned_to_global_z, None)
 
             if self.config.stage == 'Desc':
                 # calc matching score of equivariant feature maps
@@ -209,28 +210,32 @@ class buffer(nn.Module):
                     print(f"{data_source['src_id']} {data_source['tgt_id']} don't have enough patches")
                     return None
                 
-            pred_ind = self.Inlier(src['equi'][:, :, 1:self.config.patch.ele_n - 1],
+            pred_ind = self.Pose(src['equi'][:, :, 1:self.config.patch.ele_n - 1],
                                    tgt['equi'][:, :, 1:self.config.patch.ele_n - 1])
             # calculate gt lable in SO(2)
             lable = self.cal_so2_gt(src, tgt, gt_trans, False, aug_rotation=tgt['aug_rotation'])
 
-            if self.config.stage == 'Inlier':
+            if self.config.stage == 'Pose':
                 return {'pred_ind': pred_ind,
                         'gt_ind': lable,
                         }
 
         else:
-            #######################
+            ##################
             # inference
-            ######################
+            ##################
+            cfg = self.config
+            #######################################
+            # Geometric bootstrapping
+            #######################################
+            
+            # Sphericity-based voxelization
+            # Note: Sphericity-based voxelization has already been applied in the dataloader.
             src_fds_pcd, tgt_fds_pcd = data_source['src_fds_pcd'], data_source['tgt_fds_pcd']
 
-            dataset_name = self.config['data']['dataset']
-            cfg = self.config
-                    
+            # Density-aware radius estimation
             num_radius_estimation_points = cfg.patch.num_points_radius_estimate
-            search_radius_thresholds = cfg.patch.search_radius_thresholds
-                        
+            search_radius_thresholds = cfg.patch.search_radius_thresholds  
             num_fps = cfg.patch.num_fps
             num_scales = cfg.patch.num_scales
             
@@ -245,17 +250,14 @@ class buffer(nn.Module):
             kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
             kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
  
-            des_r_list = find_des_r(src_fds_pcd, kpts1, tgt_fds_pcd, kpts2, thresholds = search_radius_thresholds)
-                        
+            des_r_list = density_aware_radius_estimation(src_fds_pcd, kpts1, tgt_fds_pcd, kpts2, thresholds = search_radius_thresholds)
+            
+            #################################
+            # Multi-scale patch embedder
+            #################################
             ss_kpts_raw_list = [None] * num_scales
             tt_kpts_raw_list = [None] * num_scales
 
-            desc_timer = Timer()
-            desc_timer.tic()
-            mutual_matching_total = 0
-            inlier_total = 0
-            correspondence_proposal_total = 0
-            
             # Furthest point sampling 
 
             for i, des_r in enumerate(des_r_list):
@@ -265,7 +267,6 @@ class buffer(nn.Module):
 
                 kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
                 kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
-
                 ss_kpts_raw_list[i] = kpts1
                 tt_kpts_raw_list[i] = kpts2
 
@@ -274,28 +275,31 @@ class buffer(nn.Module):
 
             # Compute descriptors
             for i, des_r in enumerate(des_r_list):
-                src = self.Desc(src_fds_pcd[None], ss_kpts_raw_list[i], des_r, dataset_name)
-                tgt = self.Desc(tgt_fds_pcd[None], tt_kpts_raw_list[i], des_r, dataset_name)
+                src = self.Desc(src_fds_pcd[None], ss_kpts_raw_list[i], des_r, is_aligned_to_global_z)
+                tgt = self.Desc(tgt_fds_pcd[None], tt_kpts_raw_list[i], des_r, is_aligned_to_global_z)
                 ss_des_list[i] = src
                 tt_des_list[i] = tgt
-
+            
             R_list = [None] * num_scales
             t_list = [None] * num_scales
             ss_kpts_list = [None] * num_scales
             tt_kpts_list = [None] * num_scales
-            # Match
+            
+            #################################
+            # Hierachical inlier search
+            #################################
+            pose_time_total = 0
+            # For each scale
             for i, (src_kpts, src, tgt_kpts, tgt) in enumerate(zip(ss_kpts_raw_list, 
                                                     ss_des_list,
                                                     tt_kpts_raw_list,
                                                     tt_des_list)):
                 src_des, src_equi, s_R = src['desc'], src['equi'], src['R']
                 tgt_des, tgt_equi, t_R = tgt['desc'], tgt['equi'], tgt['R']
-
-                mutual_matching_timer = Timer()
-                mutual_matching_timer.tic()
-                # Perform mutual matching using equivariant feature maps
+                
+                # Intra-scale matching
                 s_mids, t_mids = self.mutual_matching(src_des, tgt_des)
-                                
+                
                 ss_kpts = src_kpts[0, s_mids]
                 ss_equi = src_equi[s_mids]
                 ss_R = s_R[s_mids]
@@ -303,19 +307,15 @@ class buffer(nn.Module):
                 tt_equi = tgt_equi[t_mids]
                 tt_R = t_R[t_mids]
                 
-                mutual_matching_timer.toc()   
-                mutual_matching_total += mutual_matching_timer.diff
+                pose_timer = Timer()
+                pose_timer.tic()
                 
-                inlier_timer = Timer()
-                inlier_timer.tic()
-                # Calculate inliers
-                ind = self.Inlier(ss_equi[:, :, 1:cfg.patch.ele_n - 1],
+                # Pairwise transformation estimation
+                ind = self.Pose(ss_equi[:, :, 1:cfg.patch.ele_n - 1],
                                 tt_equi[:, :, 1:cfg.patch.ele_n - 1])
-                inlier_timer.toc()
-                inlier_total += inlier_timer.diff
+                pose_timer.toc()
+                pose_time_total += pose_timer.diff
 
-                correspondence_proposal_timer = Timer()
-                correspondence_proposal_timer.tic()
                 # Recover pose
                 angle = ind * 2 * np.pi / cfg.patch.azi_n + 1e-6
                 angle_axis = torch.zeros_like(ss_kpts)
@@ -329,19 +329,13 @@ class buffer(nn.Module):
                 t_list[i] = t
                 ss_kpts_list[i] = ss_kpts
                 tt_kpts_list[i] = tt_kpts
-                correspondence_proposal_timer.toc()
-                correspondence_proposal_total += correspondence_proposal_timer.diff
-                    
-            desc_timer.toc()
+
             R = torch.cat(R_list, dim=0)
             t = torch.cat(t_list, dim=0)
             ss_kpts = torch.cat(ss_kpts_list, dim=0)
             tt_kpts = torch.cat(tt_kpts_list, dim=0)
-
-            correspondence_proposal_timer = Timer()
-            correspondence_proposal_timer.tic()     
             
-            # Find the best R and t
+            # Cross-scale consensus maximization
             tss_kpts = ss_kpts[None] @ R.transpose(-1, -2) + t[:, None]
             diffs = torch.sqrt(torch.sum((tss_kpts - tt_kpts[None]) ** 2, dim=-1))
             thr = torch.sqrt(torch.sum(ss_kpts ** 2, dim=-1)) * np.pi / cfg.patch.azi_n * cfg.match.inlier_th
@@ -349,9 +343,6 @@ class buffer(nn.Module):
             inlier_num = torch.sum(sign, dim=-1)  # Number of inliers for the current des_r (instead inlier num maximum, ratio maximum?)
             best_ind = torch.argmax(inlier_num)
             inlier_ind = torch.where(sign[best_ind] == True)[0].detach().cpu().numpy()
-            
-            correspondence_proposal_timer.toc()
-            correspondence_proposal_total += correspondence_proposal_timer.diff
 
             # use RANSAC to calculate pose
             pcd0 = make_open3d_point_cloud(ss_kpts.detach().cpu().numpy(), [1, 0.706, 0])
@@ -366,17 +357,16 @@ class buffer(nn.Module):
                  o3d.pipelines.registration.CorrespondenceCheckerBasedOnDistance(cfg.match.dist_th)],
                 o3d.pipelines.registration.RANSACConvergenceCriteria(cfg.match.iter_n,
                                                                      cfg.match.confidence))
-
             init_pose = result.transformation
             ransac_timer.toc()
             
             if cfg.test.pose_refine is True:
-                pose = self.post_refinement(torch.FloatTensor(init_pose[None]).cuda(), ss_kpts[None], tt_kpts[None], dataset_name)
+                init_pose_tensor = torch.FloatTensor(init_pose.copy()[None]).cuda()
+                pose = self.post_refinement(init_pose_tensor, ss_kpts[None], tt_kpts[None])
                 pose = pose[0].detach().cpu().numpy()
             else:
                 pose = init_pose
-            times = [desc_timer.diff, mutual_matching_total,
-                        inlier_total, correspondence_proposal_total, ransac_timer.diff]
+            times = [desc_timer.diff, pose_time_total, ransac_timer.diff]
             return pose, times
 
     def mutual_matching(self, src_des, tgt_des):
@@ -426,7 +416,7 @@ class buffer(nn.Module):
 
         return match_inds
 
-    def post_refinement(self, initial_trans, src_keypts, tgt_keypts, dataset_name=None, weights=None):
+    def post_refinement(self, initial_trans, src_keypts, tgt_keypts, weights=None):
         """
         [CVPR'21 PointDSC] (https://github.com/XuyangBai/PointDSC)
         Perform post refinement using the initial transformation matrix, only adopted during testing.
@@ -439,11 +429,9 @@ class buffer(nn.Module):
             - final_trans:   [bs, 4, 4]
         """
         assert initial_trans.shape[0] == 1
-        if dataset_name in ['3DMatch', '3DLoMatch', 'ETH']:
-            inlier_threshold_list = [0.10] * 20
-        else:  # for KITTI
-            inlier_threshold_list = [1.2] * 20
-
+        
+        inlier_threshold_list = [self.config.match.dist_th] * 20
+        
         previous_inlier_num = 0
         for inlier_threshold in inlier_threshold_list:
             warped_src_keypts = transform(src_keypts, initial_trans)
@@ -530,7 +518,7 @@ def squared_cdist(x, y):
     xy = torch.matmul(x, y.T)  # (N, M)
     return x2 + y2 - 2 * xy  # Squared Euclidean distance
 
-def find_des_r(src_fds_pts, src_kpts, tgt_fds_pts, tgt_kpts, min_r=0.0, max_r=5.0, tolerance=0.01, thresholds =[5, 2, 0.5]):
+def density_aware_radius_estimation(src_fds_pts, src_kpts, tgt_fds_pts, tgt_kpts, min_r=0.0, max_r=5.0, tolerance=0.01, thresholds =[5, 2, 0.5]):
     """
     Finds the des_r values corresponding to the given target percentages of points within the radius.
     

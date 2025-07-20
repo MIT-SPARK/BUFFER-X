@@ -8,7 +8,7 @@ class KITTIConfig(OutdoorBaseConfig):
         self._C.test.pdist = 10
                 
         self._C.train.pretrain_model = ''
-        self._C.train.all_stage = ['Desc', 'Inlier']
+        self._C.train.all_stage = ['Desc', 'Pose']
         
         self._C.test.experiment_id = 'threedmatch'
 

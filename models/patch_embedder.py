@@ -41,14 +41,14 @@ class MiniSpinNet(nn.Module):
         self.conv_net = pn.Cylindrical_Net(inchan=16, dim=32)
         # self.conv_net = pn.Cylindrical_UNet(inchan=16, dim=32)
 
-    def forward(self, pts, kpts, des_r, dataset_name, z_axis=None, is_aug=False):
+    def forward(self, pts, kpts, des_r, is_aligned_to_global_z, z_axis=None, is_aug=False):
         
         # extract patches
         init_patch = self.select_patches(pts, kpts, vicinity=des_r, patch_sample=self.patch_sample)
         init_patch = init_patch.squeeze(0)
 
         # align with reference axis
-        patches, rand_axis, R = self.axis_align(init_patch, dataset_name, z_axis)
+        patches, rand_axis, R = self.axis_align(init_patch, is_aligned_to_global_z, z_axis)
         patches = self.normalize(patches, des_r)
 
         # SO(2) augmentation
@@ -119,14 +119,11 @@ class MiniSpinNet(nn.Module):
 
         return local_patches
 
-    def axis_align(self, input, dataset, z_axis=None):
+    def axis_align(self, input, is_aligned_to_global_z, z_axis=None):
         center = input[:, -1, :3]
-        delta_x = input[:, :, :3] - center.unsqueeze(1)  # (B, npoint, 3), normalized coordinates
+        delta_x = input[:, :, :3] - center.unsqueeze(1)  # (B, npoint, 3), normalized coordinates        
         
-        z_axis_datasets = {'3DMatch', '3DLoMatch', 'Scannetpp_iphone', 'Scannetpp_faro'}
-        rand_axis_datasets = {'KITTI', 'ETH', 'WOD', 'Oxford', 'MIT'}
-        
-        if dataset in z_axis_datasets:
+        if not is_aligned_to_global_z:
             if z_axis is None:
                 z_axis = utils.common.cal_Z_axis(delta_x, ref_point=center)
                 z_axis = utils.common.l2_norm(z_axis, axis=1)

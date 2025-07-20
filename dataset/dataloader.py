@@ -46,7 +46,8 @@ def collate_fn_descriptor(list_data, config):
         'tgt_id': tgt_id,
         'voxel_sizes': batched_voxel_sizes,
         'dataset_names': batched_dataset_names,
-        'sphericity': batched_sphericity
+        'sphericity': batched_sphericity,
+        'is_aligned_to_global_z': list_data['is_aligned_to_global_z'],
     }
     
     return dict_inputs

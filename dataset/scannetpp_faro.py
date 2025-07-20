@@ -5,7 +5,7 @@ import pickle
 import open3d as o3d
 import glob
 from utils.SE3 import *
-from utils.tools import loadlog, find_voxel_size
+from utils.tools import loadlog, sphericity_based_voxel_analysis
 
 cur_path = os.path.dirname(os.path.realpath(__file__))
 split_path = cur_path + "/../config/splits"
@@ -56,7 +56,8 @@ class ScannetppFaroDataset(Data.Dataset):
         tgt_pcd = o3d.io.read_point_cloud(tgt_path + '.ply')
         tgt_pcd.paint_uniform_color([0, 0.651, 0.929])
         
-        self.config.data.downsample, sphericity = find_voxel_size(src_pcd, tgt_pcd)
+        self.config.data.downsample, sphericity, _ = sphericity_based_voxel_analysis(src_pcd, tgt_pcd)
+        is_aligned_to_global_z = self.config.patch.is_aligned_to_global_z
         src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample)
         src_pts = np.array(src_pcd.points)
         np.random.shuffle(src_pts)
@@ -109,6 +110,7 @@ class ScannetppFaroDataset(Data.Dataset):
                 'voxel_size': ds_size,
                 'dataset_name': self.config.data.dataset,
                 'sphericity': sphericity,
+                'is_aligned_to_global_z': is_aligned_to_global_z,
                 }
 
     def __len__(self):
