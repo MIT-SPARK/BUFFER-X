@@ -259,7 +259,8 @@ class BufferX(nn.Module):
             tt_kpts_raw_list = [None] * num_scales
 
             # Furthest point sampling 
-
+            desc_timer = Timer()
+            desc_timer.tic()
             for i, des_r in enumerate(des_r_list):
                 s_pts_flipped, t_pts_flipped = src_fds_pcd[None].transpose(1, 2).contiguous(), tgt_fds_pcd[None].transpose(1,2).contiguous()
                 s_fps_idx = pnt2.furthest_point_sample(src_fds_pcd[None], num_fps)
@@ -271,7 +272,8 @@ class BufferX(nn.Module):
                 tt_kpts_raw_list[i] = kpts2
 
             ss_des_list = [None] * num_scales
-            tt_des_list = [None] * num_scales        
+            tt_des_list = [None] * num_scales
+            is_aligned_to_global_z = data_source['is_aligned_to_global_z']        
 
             # Compute descriptors
             for i, des_r in enumerate(des_r_list):
@@ -279,7 +281,7 @@ class BufferX(nn.Module):
                 tgt = self.Desc(tgt_fds_pcd[None], tt_kpts_raw_list[i], des_r, is_aligned_to_global_z)
                 ss_des_list[i] = src
                 tt_des_list[i] = tgt
-            
+            desc_timer.toc()
             R_list = [None] * num_scales
             t_list = [None] * num_scales
             ss_kpts_list = [None] * num_scales
