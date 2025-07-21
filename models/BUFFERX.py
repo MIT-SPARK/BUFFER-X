@@ -316,7 +316,7 @@ class BufferX(nn.Module):
             tt_des_list = [None] * num_scales
             is_aligned_to_global_z = data_source["is_aligned_to_global_z"]
 
-            # Compute descriptors
+            # Multi-scale features by Mini-SpinNet
             for i, des_r in enumerate(des_r_list):
                 src = self.Desc(
                     src_fds_pcd[None], ss_kpts_raw_list[i], des_r, is_aligned_to_global_z
