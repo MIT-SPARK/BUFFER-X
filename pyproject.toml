@@ -1,0 +1,11 @@
+# pyproject.toml
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+# Select rules for errors (E), flake8 defaults (F), and warnings like unused variables (W)
+select = ["E", "F", "W"]
+
+[tool.ruff.format]
+# Use a formatting style compatible with Black
+quote-style = "double"
