@@ -14,7 +14,7 @@
     <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode"><img src="https://img.shields.io/badge/license-CC4.0-blue.svg" /></a>
   <br />
   <br />
-  <p align="center"><img src="https://github.com/user-attachments/assets/8cbc95e2-7dc8-46af-9691-b136eb36caad" alt="BUFFER-X" width="95%"/></p>
+  <p align="center"><img src="https://github.com/user-attachments/assets/8cbc95e2-7dc8-46af-9691-b136eb36caad" alt="BUFFER-X" width="80%"/></p>
   <p><strong><em>Towards zero-shot and beyond! 🚀 <br>
   Official repository of BUFFER-X, a zero-shot point cloud registration method<br> across diverse scenes without retraining or tuning.</em></strong></p>
 </div>
