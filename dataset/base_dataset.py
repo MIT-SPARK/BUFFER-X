@@ -1,5 +1,6 @@
 import torch.utils.data as Data
 
+
 class BaseDataset(Data.Dataset):
     """
     A general base class for different datasets.

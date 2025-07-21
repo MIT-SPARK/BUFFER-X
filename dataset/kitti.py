@@ -2,29 +2,24 @@ import torch.utils.data as Data
 import os
 import open3d as o3d
 import glob
-from utils.SE3 import *
+import numpy as np
+from utils.SE3 import rotation_matrix, integrate_trans
 from utils.common import make_open3d_point_cloud
 from utils.tools import sphericity_based_voxel_analysis
 
 cur_path = os.path.dirname(os.path.realpath(__file__))
 split_path = cur_path + "/../config/splits"
 
-class KITTIDataset(Data.Dataset):
-    DATA_FILES = {
-        'train': 'train_kitti.txt',
-        'val': 'val_kitti.txt',
-        'test': 'test_kitti.txt'
-    }
 
-    def __init__(self,
-                 split,
-                 config=None
-                 ):
+class KITTIDataset(Data.Dataset):
+    DATA_FILES = {"train": "train_kitti.txt", "val": "val_kitti.txt", "test": "test_kitti.txt"}
+
+    def __init__(self, split, config=None):
         self.config = config
-        self.pc_path = config.data.root + '/dataset'
-        self.icp_path = config.data.root + '/icp'
+        self.pc_path = config.data.root + "/dataset"
+        self.icp_path = config.data.root + "/icp"
         self.split = split
-        self.files = {'train': [], 'val': [], 'test': []}
+        self.files = {"train": [], "val": [], "test": []}
         self.poses = []
         self.length = 0
         self.pdist = config.test.pdist
@@ -32,11 +27,11 @@ class KITTIDataset(Data.Dataset):
         self.kitti_cache = {}
         self.prepare_matching_pairs(split=self.split)
 
-    def prepare_matching_pairs(self, split='train'):
+    def prepare_matching_pairs(self, split="train"):
         subset_names = open(os.path.join(split_path, self.DATA_FILES[split])).read().split()
         for dirname in subset_names:
             drive_id = int(dirname)
-            fnames = glob.glob(self.pc_path + '/sequences/%02d/velodyne/*.bin' % drive_id)
+            fnames = glob.glob(self.pc_path + "/sequences/%02d/velodyne/*.bin" % drive_id)
             assert len(fnames) > 0, f"Make sure that the path {self.pc_path} has data {dirname}"
             inames = sorted([int(os.path.split(fname)[-1][:-4]) for fname in fnames])
 
@@ -48,7 +43,7 @@ class KITTIDataset(Data.Dataset):
             more_than_10 = pdist > self.pdist
             curr_time = inames[0]
             while curr_time in inames:
-                next_time = np.where(more_than_10[curr_time][curr_time:curr_time + 100])[0]
+                next_time = np.where(more_than_10[curr_time][curr_time : curr_time + 100])[0]
                 if len(next_time) == 0:
                     curr_time += 1
                 else:
@@ -59,13 +54,12 @@ class KITTIDataset(Data.Dataset):
                     curr_time = next_time + 1
 
         # pair (8, 15, 58) is wrong.
-        if self.split == 'test':
+        if self.split == "test":
             self.files[split].remove((8, 15, 58))
 
         self.length = len(self.files[split])
 
     def __getitem__(self, index):
-
         # load meta data
         drive = self.files[self.split][index][0]
         t0, t1 = self.files[self.split][index][1], self.files[self.split][index][2]
@@ -74,7 +68,7 @@ class KITTIDataset(Data.Dataset):
         positions = [self.odometry_to_positions(odometry) for odometry in all_odometry]
         fname0 = self._get_velodyne_fn(drive, t0)
         fname1 = self._get_velodyne_fn(drive, t1)
-        
+
         # XYZ and reflectance
         xyzr0 = np.fromfile(fname0, dtype=np.float32).reshape(-1, 4)
         xyzr1 = np.fromfile(fname1, dtype=np.float32).reshape(-1, 4)
@@ -82,19 +76,27 @@ class KITTIDataset(Data.Dataset):
         xyz0 = xyzr0[:, :3]
         xyz1 = xyzr1[:, :3]
 
-        key = '%d_%d_%d' % (drive, t0, t1)
-        filename = self.icp_path + '/' + key + '.npy'
+        key = "%d_%d_%d" % (drive, t0, t1)
+        filename = self.icp_path + "/" + key + ".npy"
         if key not in self.kitti_icp_cache:
             if not os.path.exists(filename):
-                M = (self.velo2cam @ positions[0].T @ np.linalg.inv(positions[1].T)
-                     @ np.linalg.inv(self.velo2cam)).T
+                M = (
+                    self.velo2cam
+                    @ positions[0].T
+                    @ np.linalg.inv(positions[1].T)
+                    @ np.linalg.inv(self.velo2cam)
+                ).T
                 xyz0_t = self.apply_transform(xyz0, M)
                 pcd0 = make_open3d_point_cloud(xyz0_t, [0.5, 0.5, 0.5])
                 pcd1 = make_open3d_point_cloud(xyz1, [0, 1, 0])
-                reg = o3d.pipelines.registration.registration_icp(pcd0, pcd1, 0.20, np.eye(4),
-                                                                  o3d.pipelines.registration.TransformationEstimationPointToPoint(),
-                                                                  o3d.pipelines.registration.ICPConvergenceCriteria(
-                                                                      max_iteration=200))
+                reg = o3d.pipelines.registration.registration_icp(
+                    pcd0,
+                    pcd1,
+                    0.20,
+                    np.eye(4),
+                    o3d.pipelines.registration.TransformationEstimationPointToPoint(),
+                    o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=200),
+                )
                 pcd0.transform(reg.transformation)
                 M2 = M @ reg.transformation
                 # write to a file
@@ -106,7 +108,7 @@ class KITTIDataset(Data.Dataset):
             M2 = self.kitti_icp_cache[key]
         trans = M2
 
-        if self.split != 'test':
+        if self.split != "test":
             xyz0 += (np.random.rand(xyz0.shape[0], 3) - 0.5) * self.config.train.augmentation_noise
             xyz1 += (np.random.rand(xyz1.shape[0], 3) - 0.5) * self.config.train.augmentation_noise
 
@@ -114,21 +116,27 @@ class KITTIDataset(Data.Dataset):
         src_pcd = make_open3d_point_cloud(xyz0, [1, 0.706, 0])
         tgt_pcd = make_open3d_point_cloud(xyz1, [0, 0.651, 0.929])
 
-        if self.split == 'test':
-            self.config.data.downsample, sphericity, _ = sphericity_based_voxel_analysis(src_pcd, tgt_pcd)
+        if self.split == "test":
+            self.config.data.downsample, sphericity, _ = sphericity_based_voxel_analysis(
+                src_pcd, tgt_pcd
+            )
             is_aligned_to_global_z = self.config.patch.is_aligned_to_global_z
         else:
             sphericity = 0
             is_aligned_to_global_z = True
-        
-        src_pcd = o3d.geometry.PointCloud.voxel_down_sample(src_pcd, voxel_size=self.config.data.downsample) 
+
+        src_pcd = o3d.geometry.PointCloud.voxel_down_sample(
+            src_pcd, voxel_size=self.config.data.downsample
+        )
         src_pts = np.array(src_pcd.points)
         np.random.shuffle(src_pts)
 
-        tgt_pcd = o3d.geometry.PointCloud.voxel_down_sample(tgt_pcd, voxel_size=self.config.data.downsample)
+        tgt_pcd = o3d.geometry.PointCloud.voxel_down_sample(
+            tgt_pcd, voxel_size=self.config.data.downsample
+        )
         tgt_pts = np.asarray(tgt_pcd.points)
-        
-        if self.split != 'test':
+
+        if self.split != "test":
             # SO(2) augmentation
             R = rotation_matrix(1, 1)
             t = np.zeros([3, 1])
@@ -152,26 +160,31 @@ class KITTIDataset(Data.Dataset):
         np.random.shuffle(tgt_kpt)
 
         # if we get too many points, we do random downsampling
-        if (src_kpt.shape[0] > self.config.data.max_numPts):
-            idx = np.random.choice(range(src_kpt.shape[0]), self.config.data.max_numPts, replace=False)
+        if src_kpt.shape[0] > self.config.data.max_numPts:
+            idx = np.random.choice(
+                range(src_kpt.shape[0]), self.config.data.max_numPts, replace=False
+            )
             src_kpt = src_kpt[idx]
 
-        if (tgt_kpt.shape[0] > self.config.data.max_numPts):
-            idx = np.random.choice(range(tgt_kpt.shape[0]), self.config.data.max_numPts, replace=False)
-            tgt_kptw = tgt_kpt[idx]
+        if tgt_kpt.shape[0] > self.config.data.max_numPts:
+            idx = np.random.choice(
+                range(tgt_kpt.shape[0]), self.config.data.max_numPts, replace=False
+            )
+            tgt_kpt = tgt_kpt[idx]
 
-        return {'src_fds_pts': src_pts,  # first downsampling
-                'tgt_fds_pts': tgt_pts,
-                'relt_pose': relt_pose,
-                'src_sds_pts': src_kpt,  # second downsampling
-                'tgt_sds_pts': tgt_kpt,
-                'voxel_size': ds_size,
-                'src_id': '%d_%d' % (drive, t0),
-                'tgt_id': '%d_%d' % (drive, t1),
-                'dataset_name': self.config.data.dataset,
-                'sphericity': sphericity,
-                'is_aligned_to_global_z': is_aligned_to_global_z,
-                }
+        return {
+            "src_fds_pts": src_pts,  # first downsampling
+            "tgt_fds_pts": tgt_pts,
+            "relt_pose": relt_pose,
+            "src_sds_pts": src_kpt,  # second downsampling
+            "tgt_sds_pts": tgt_kpt,
+            "voxel_size": ds_size,
+            "src_id": "%d_%d" % (drive, t0),
+            "tgt_id": "%d_%d" % (drive, t1),
+            "dataset_name": self.config.data.dataset,
+            "sphericity": sphericity,
+            "is_aligned_to_global_z": is_aligned_to_global_z,
+        }
 
     def apply_transform(self, pts, trans):
         R = trans[:3, :3]
@@ -184,17 +197,26 @@ class KITTIDataset(Data.Dataset):
         try:
             velo2cam = self._velo2cam
         except AttributeError:
-            R = np.array([
-                7.533745e-03, -9.999714e-01, -6.166020e-04, 1.480249e-02, 7.280733e-04,
-                -9.998902e-01, 9.998621e-01, 7.523790e-03, 1.480755e-02
-            ]).reshape(3, 3)
+            R = np.array(
+                [
+                    7.533745e-03,
+                    -9.999714e-01,
+                    -6.166020e-04,
+                    1.480249e-02,
+                    7.280733e-04,
+                    -9.998902e-01,
+                    9.998621e-01,
+                    7.523790e-03,
+                    1.480755e-02,
+                ]
+            ).reshape(3, 3)
             T = np.array([-4.069766e-03, -7.631618e-02, -2.717806e-01]).reshape(3, 1)
             velo2cam = np.hstack([R, T])
             self._velo2cam = np.vstack((velo2cam, [0, 0, 0, 1])).T
         return self._velo2cam
 
-    def get_video_odometry(self, drive, indices=None, ext='.txt', return_all=False):
-        data_path = self.pc_path + '/poses/%02d.txt' % drive
+    def get_video_odometry(self, drive, indices=None, ext=".txt", return_all=False):
+        data_path = self.pc_path + "/poses/%02d.txt" % drive
         if data_path not in self.kitti_cache:
             self.kitti_cache[data_path] = np.genfromtxt(data_path)
         if return_all:
@@ -208,7 +230,7 @@ class KITTIDataset(Data.Dataset):
         return T_w_cam0
 
     def _get_velodyne_fn(self, drive, t):
-        fname = self.pc_path + '/sequences/%02d/velodyne/%06d.bin' % (drive, t)
+        fname = self.pc_path + "/sequences/%02d/velodyne/%06d.bin" % (drive, t)
         return fname
 
     def __len__(self):
