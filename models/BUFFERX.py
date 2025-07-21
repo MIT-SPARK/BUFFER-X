@@ -1,10 +1,11 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import models.patchnet as pn
 from models.patch_embedder import MiniSpinNet
 import pointnet2_ops.pointnet2_utils as pnt2
 from knn_cuda import KNN
-from utils.SE3 import *
+from utils.SE3 import transform, integrate_trans
 from einops import rearrange
 import kornia.geometry.conversions as Convert
 import open3d as o3d
@@ -20,7 +21,7 @@ class EquiMatch(nn.Module):
         init_index = np.arange(self.azi_n)
         index_list = []
         for i in range(self.azi_n):
-            cur_index = np.concatenate([init_index[self.azi_n - i:], init_index[:self.azi_n - i]])
+            cur_index = np.concatenate([init_index[self.azi_n - i :], init_index[: self.azi_n - i]])
             index_list.append(cur_index)
         self.index_list = np.array(index_list)
 
@@ -28,10 +29,11 @@ class EquiMatch(nn.Module):
         [B, C, K, L] = Des1.shape
         index_list = torch.from_numpy(self.index_list).to(Des1.device)
         Des1 = Des1[:, :, :, torch.reshape(index_list, [-1])].reshape(
-            [Des1.shape[0], Des1.shape[1], Des1.shape[2], self.azi_n, self.azi_n])
-        Des1 = rearrange(Des1, 'b c k n l -> b c n k l').reshape([B, C, -1, K * L])
+            [Des1.shape[0], Des1.shape[1], Des1.shape[2], self.azi_n, self.azi_n]
+        )
+        Des1 = rearrange(Des1, "b c k n l -> b c n k l").reshape([B, C, -1, K * L])
         Des2 = Des2.reshape([B, C, K * L])
-        cor = torch.einsum('bfag,bfg->ba', Des1, Des2)
+        cor = torch.einsum("bfag,bfg->ba", Des1, Des2)
         return cor
 
 
@@ -42,7 +44,7 @@ class CostVolume(nn.Module):
         init_index = np.arange(self.azi_n)
         index_list = []
         for i in range(self.azi_n):
-            cur_index = np.concatenate([init_index[self.azi_n - i:], init_index[:self.azi_n - i]])
+            cur_index = np.concatenate([init_index[self.azi_n - i :], init_index[: self.azi_n - i]])
             index_list.append(cur_index)
         self.index_list = np.array(index_list)
         self.conv = pn.CostNet(inchan=32, dim=20)
@@ -57,8 +59,9 @@ class CostVolume(nn.Module):
         """
         index_list = torch.from_numpy(self.index_list).to(Des1.device)
         Des1 = Des1[:, :, :, torch.reshape(index_list, [-1])].reshape(
-            [Des1.shape[0], Des1.shape[1], Des1.shape[2], self.azi_n, self.azi_n])
-        Des1 = rearrange(Des1, 'b c k n l -> b c n k l')
+            [Des1.shape[0], Des1.shape[1], Des1.shape[2], self.azi_n, self.azi_n]
+        )
+        Des1 = rearrange(Des1, "b c k n l -> b c n k l")
         Des2 = Des2.unsqueeze(2)
         cost = Des1 - Des2
         cost = self.conv(cost).squeeze()
@@ -79,10 +82,20 @@ class BufferX(nn.Module):
         self.equi_match = EquiMatch(config)
 
     def cal_so2_gt(self, src, tgt, gt_trans, integer=True, aug_rotation=None):
-        src_des, src_equi, s_rand_axis, s_R, s_patches = src['desc'], src['equi'], src['rand_axis'], src['R'], src[
-            'patches']
-        tgt_des, tgt_equi, _, t_R, t_patches = tgt['desc'], tgt['equi'], tgt['rand_axis'], tgt['R'], tgt[
-            'patches']
+        _, _, s_rand_axis, s_R, _ = (
+            src["desc"],
+            src["equi"],
+            src["rand_axis"],
+            src["R"],
+            src["patches"],
+        )
+        _, _, _, t_R, _ = (
+            tgt["desc"],
+            tgt["equi"],
+            tgt["rand_axis"],
+            tgt["R"],
+            tgt["patches"],
+        )
         # calculate gt lable in SO(2)
         t_rand_axis = torch.matmul(s_rand_axis[:, None], gt_trans[:3, :3].transpose(-1, -2))
         s_rand_axis = torch.matmul(s_rand_axis[:, None], s_R)
@@ -91,8 +104,11 @@ class BufferX(nn.Module):
             t_rand_axis = t_rand_axis @ aug_rotation.transpose(-1, -2)
         z_axis = torch.zeros_like(t_rand_axis)
         z_axis[:, :, -1] = 1
-        proj_t = F.normalize(t_rand_axis - torch.sum(t_rand_axis * z_axis, dim=-1, keepdim=True) * z_axis, p=2,
-                             dim=-1)
+        proj_t = F.normalize(
+            t_rand_axis - torch.sum(t_rand_axis * z_axis, dim=-1, keepdim=True) * z_axis,
+            p=2,
+            dim=-1,
+        )
         s_rand_axis = s_rand_axis.squeeze()
         proj_t = proj_t.squeeze()
         z_axis = z_axis.squeeze()
@@ -110,39 +126,43 @@ class BufferX(nn.Module):
         return lable
 
     def forward(self, data_source):
-        '''
+        """
         src_fds_pcd / tgt_fds_pcd:
         - First-level downsampled point clouds via voxelization.
         - Farthest Point Sampling (FPS) is applied on these points to obtain keypoints.
-        - Patch descriptors are then computed by sampling neighborhoods from these fds points centered at each keypoint.
+        - Patch descriptors are then computed by sampling neighborhoods from these fds points.
         - During training: downsampled using config-specified voxel size.
         - During testing: voxel size is automatically estimated for each sample.
 
         src_sds_pcd / tgt_sds_pcd:
         - Second-level downsampled point clouds via voxelization.
-        - Used only during training as sampled keypoints for patch-based supervision. (e.g., loss, correspondence).
+        - Used only during training as sampled keypoints for patch-based supervision.
+        (e.g., loss, correspondence).
         - Always downsampled using config-specified voxel size.
-        '''
-        
-        src_fds_pcd, tgt_fds_pcd = data_source['src_fds_pcd'], data_source['tgt_fds_pcd']
+        """
 
-        if self.config.stage != 'test':
-            
-            src_sds_pts, tgt_sds_pts = data_source['src_sds_pcd'], data_source['tgt_sds_pcd']
+        src_fds_pcd, tgt_fds_pcd = data_source["src_fds_pcd"], data_source["tgt_fds_pcd"]
+
+        if self.config.stage != "test":
+            src_sds_pts, tgt_sds_pts = data_source["src_sds_pcd"], data_source["tgt_sds_pcd"]
             # find positive correspondences
-            gt_trans = data_source['relt_pose']   
-            match_inds = self.get_matching_indices(src_sds_pts, tgt_sds_pts, gt_trans, data_source['voxel_sizes'][0])
+            gt_trans = data_source["relt_pose"]
+            match_inds = self.get_matching_indices(
+                src_sds_pts, tgt_sds_pts, gt_trans, data_source["voxel_sizes"][0]
+            )
 
-            dataset_name = self.config['data']['dataset']
+            dataset_name = self.config["data"]["dataset"]
             cfg = self.config
 
             # randomly sample some positive pairs to speed up the training
             if match_inds.shape[0] > self.config.train.pos_num:
-                rand_ind = np.random.choice(range(match_inds.shape[0]), self.config.train.pos_num, replace=False)
+                rand_ind = np.random.choice(
+                    range(match_inds.shape[0]), self.config.train.pos_num, replace=False
+                )
                 match_inds = match_inds[rand_ind]
             src_kpt = src_sds_pts[match_inds[:, 0]]
             tgt_kpt = tgt_sds_pts[match_inds[:, 1]]
-            
+
             if src_kpt.shape[0] == 0 or tgt_kpt.shape[0] == 0:
                 print(f"{data_source['src_id']} {data_source['tgt_id']} has no keypts")
                 return None
@@ -150,14 +170,16 @@ class BufferX(nn.Module):
             # training descriptor
             #######################
             # calculate feature descriptor
-            if dataset_name == '3DMatch':
+            if dataset_name == "3DMatch":
                 center = cfg.patch.des_r
                 lower_bound = center * 0.5
                 upper_bound = center * 1.5
                 std_dev = (upper_bound - lower_bound) / 6
-                des_r = np.round(np.clip(np.random.normal(center, std_dev, 1), lower_bound, upper_bound), 2)[0]
-                
-            elif dataset_name == 'KITTI':
+                des_r = np.round(
+                    np.clip(np.random.normal(center, std_dev, 1), lower_bound, upper_bound), 2
+                )[0]
+
+            elif dataset_name == "KITTI":
                 # Define the range of possible values based on the center
                 center = cfg.patch.des_r
                 if center == 3.0:
@@ -172,53 +194,63 @@ class BufferX(nn.Module):
                 des_r = np.random.choice(possible_values, p=probabilities)
             else:
                 des_r = cfg.patch.des_r
-            
-            is_aligned_to_global_z = data_source['is_aligned_to_global_z']
-            src = self.Desc(src_fds_pcd[None], src_kpt[None], des_r, is_aligned_to_global_z)
-            if self.config.stage == 'Pose':
-                # SO(2) augmentation
-                tgt = self.Desc(tgt_fds_pcd[None], tgt_kpt[None], des_r, is_aligned_to_global_z, None, True)
-            else:
-                tgt = self.Desc(tgt_fds_pcd[None], tgt_kpt[None], des_r, is_aligned_to_global_z, None)
 
-            if self.config.stage == 'Desc':
+            is_aligned_to_global_z = data_source["is_aligned_to_global_z"]
+            src = self.Desc(src_fds_pcd[None], src_kpt[None], des_r, is_aligned_to_global_z)
+            if self.config.stage == "Pose":
+                # SO(2) augmentation
+                tgt = self.Desc(
+                    tgt_fds_pcd[None], tgt_kpt[None], des_r, is_aligned_to_global_z, None, True
+                )
+            else:
+                tgt = self.Desc(
+                    tgt_fds_pcd[None], tgt_kpt[None], des_r, is_aligned_to_global_z, None
+                )
+
+            if self.config.stage == "Desc":
                 # calc matching score of equivariant feature maps
-                equi_score = self.equi_match(src['equi'], tgt['equi'])
+                equi_score = self.equi_match(src["equi"], tgt["equi"])
 
                 # if number of patches is less than 2, return None
-                if src['rand_axis'].shape[0] < 2 or tgt['rand_axis'].shape[0] < 2:
-                    print(f"{data_source['src_id']} {data_source['tgt_id']} don't have enough patches")
+                if src["rand_axis"].shape[0] < 2 or tgt["rand_axis"].shape[0] < 2:
+                    print(
+                        f"{data_source['src_id']} {data_source['tgt_id']} don't have enough patches"
+                    )
                     return None
-                
+
                 # calculate gt lable in SO(2)
                 lable = self.cal_so2_gt(src, tgt, gt_trans)
 
-                return {'src_kpt': src_kpt,
-                        'tgt_kpt': tgt_kpt,
-                        'src_des': src['desc'],
-                        'tgt_des': tgt['desc'],
-                        'equi_score': equi_score,
-                        'gt_label': lable,
-                        }
+                return {
+                    "src_kpt": src_kpt,
+                    "tgt_kpt": tgt_kpt,
+                    "src_des": src["desc"],
+                    "tgt_des": tgt["desc"],
+                    "equi_score": equi_score,
+                    "gt_label": lable,
+                }
 
             #######################
             # training matching
             #######################
             # predict index of SO(2) rotation
             # only consider part of elements along the elevation to speed up
-            if src['rand_axis'].shape[0] < 2 or tgt['rand_axis'].shape[0] < 2:
-                    print(f"{data_source['src_id']} {data_source['tgt_id']} don't have enough patches")
-                    return None
-                
-            pred_ind = self.Pose(src['equi'][:, :, 1:self.config.patch.ele_n - 1],
-                                   tgt['equi'][:, :, 1:self.config.patch.ele_n - 1])
-            # calculate gt lable in SO(2)
-            lable = self.cal_so2_gt(src, tgt, gt_trans, False, aug_rotation=tgt['aug_rotation'])
+            if src["rand_axis"].shape[0] < 2 or tgt["rand_axis"].shape[0] < 2:
+                print(f"{data_source['src_id']} {data_source['tgt_id']} don't have enough patches")
+                return None
 
-            if self.config.stage == 'Pose':
-                return {'pred_ind': pred_ind,
-                        'gt_ind': lable,
-                        }
+            pred_ind = self.Pose(
+                src["equi"][:, :, 1 : self.config.patch.ele_n - 1],
+                tgt["equi"][:, :, 1 : self.config.patch.ele_n - 1],
+            )
+            # calculate gt lable in SO(2)
+            lable = self.cal_so2_gt(src, tgt, gt_trans, False, aug_rotation=tgt["aug_rotation"])
+
+            if self.config.stage == "Pose":
+                return {
+                    "pred_ind": pred_ind,
+                    "gt_ind": lable,
+                }
 
         else:
             ##################
@@ -228,41 +260,50 @@ class BufferX(nn.Module):
             #######################################
             # Geometric bootstrapping
             #######################################
-            
+
             # Sphericity-based voxelization
             # Note: Sphericity-based voxelization has already been applied in the dataloader.
-            src_fds_pcd, tgt_fds_pcd = data_source['src_fds_pcd'], data_source['tgt_fds_pcd']
+            src_fds_pcd, tgt_fds_pcd = data_source["src_fds_pcd"], data_source["tgt_fds_pcd"]
 
             # Density-aware radius estimation
             num_radius_estimation_points = cfg.patch.num_points_radius_estimate
-            search_radius_thresholds = cfg.patch.search_radius_thresholds  
+            search_radius_thresholds = cfg.patch.search_radius_thresholds
             num_fps = cfg.patch.num_fps
             num_scales = cfg.patch.num_scales
-            
-            assert num_scales == len(search_radius_thresholds), \
-                f"num_scales {num_scales} != len(search_radius_thresholds) {len(search_radius_thresholds)}"
-            
+
+            assert num_scales == len(
+                search_radius_thresholds
+            ), f"num_scales {num_scales} != num_thresholds {len(search_radius_thresholds)}"
+
             # NOTE(hlim): It only takes < ~ 0.0002 sec, which is negligible
-            s_pts_flipped, t_pts_flipped = src_fds_pcd[None].transpose(1, 2).contiguous(), tgt_fds_pcd[None].transpose(1,2).contiguous()
+            s_pts_flipped, t_pts_flipped = (
+                src_fds_pcd[None].transpose(1, 2).contiguous(),
+                tgt_fds_pcd[None].transpose(1, 2).contiguous(),
+            )
             s_fps_idx = pnt2.furthest_point_sample(src_fds_pcd[None], num_radius_estimation_points)
             t_fps_idx = pnt2.furthest_point_sample(tgt_fds_pcd[None], num_radius_estimation_points)
 
             kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
             kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
- 
-            des_r_list = density_aware_radius_estimation(src_fds_pcd, kpts1, tgt_fds_pcd, kpts2, thresholds = search_radius_thresholds)
-            
+
+            des_r_list = density_aware_radius_estimation(
+                src_fds_pcd, kpts1, tgt_fds_pcd, kpts2, thresholds=search_radius_thresholds
+            )
+
             #################################
             # Multi-scale patch embedder
             #################################
             ss_kpts_raw_list = [None] * num_scales
             tt_kpts_raw_list = [None] * num_scales
 
-            # Furthest point sampling 
+            # Furthest point sampling
             desc_timer = Timer()
             desc_timer.tic()
             for i, des_r in enumerate(des_r_list):
-                s_pts_flipped, t_pts_flipped = src_fds_pcd[None].transpose(1, 2).contiguous(), tgt_fds_pcd[None].transpose(1,2).contiguous()
+                s_pts_flipped, t_pts_flipped = (
+                    src_fds_pcd[None].transpose(1, 2).contiguous(),
+                    tgt_fds_pcd[None].transpose(1, 2).contiguous(),
+                )
                 s_fps_idx = pnt2.furthest_point_sample(src_fds_pcd[None], num_fps)
                 t_fps_idx = pnt2.furthest_point_sample(tgt_fds_pcd[None], num_fps)
 
@@ -273,12 +314,16 @@ class BufferX(nn.Module):
 
             ss_des_list = [None] * num_scales
             tt_des_list = [None] * num_scales
-            is_aligned_to_global_z = data_source['is_aligned_to_global_z']        
+            is_aligned_to_global_z = data_source["is_aligned_to_global_z"]
 
             # Compute descriptors
             for i, des_r in enumerate(des_r_list):
-                src = self.Desc(src_fds_pcd[None], ss_kpts_raw_list[i], des_r, is_aligned_to_global_z)
-                tgt = self.Desc(tgt_fds_pcd[None], tt_kpts_raw_list[i], des_r, is_aligned_to_global_z)
+                src = self.Desc(
+                    src_fds_pcd[None], ss_kpts_raw_list[i], des_r, is_aligned_to_global_z
+                )
+                tgt = self.Desc(
+                    tgt_fds_pcd[None], tt_kpts_raw_list[i], des_r, is_aligned_to_global_z
+                )
                 ss_des_list[i] = src
                 tt_des_list[i] = tgt
             desc_timer.toc()
@@ -286,35 +331,35 @@ class BufferX(nn.Module):
             t_list = [None] * num_scales
             ss_kpts_list = [None] * num_scales
             tt_kpts_list = [None] * num_scales
-            
+
             #################################
             # Hierachical inlier search
             #################################
             pose_time_total = 0
             # For each scale
-            for i, (src_kpts, src, tgt_kpts, tgt) in enumerate(zip(ss_kpts_raw_list, 
-                                                    ss_des_list,
-                                                    tt_kpts_raw_list,
-                                                    tt_des_list)):
-                src_des, src_equi, s_R = src['desc'], src['equi'], src['R']
-                tgt_des, tgt_equi, t_R = tgt['desc'], tgt['equi'], tgt['R']
-                
+            for i, (src_kpts, src, tgt_kpts, tgt) in enumerate(
+                zip(ss_kpts_raw_list, ss_des_list, tt_kpts_raw_list, tt_des_list)
+            ):
+                src_des, src_equi, s_R = src["desc"], src["equi"], src["R"]
+                tgt_des, tgt_equi, t_R = tgt["desc"], tgt["equi"], tgt["R"]
+
                 # Intra-scale matching
                 s_mids, t_mids = self.mutual_matching(src_des, tgt_des)
-                
+
                 ss_kpts = src_kpts[0, s_mids]
                 ss_equi = src_equi[s_mids]
                 ss_R = s_R[s_mids]
                 tt_kpts = tgt_kpts[0, t_mids]
                 tt_equi = tgt_equi[t_mids]
                 tt_R = t_R[t_mids]
-                
+
                 pose_timer = Timer()
                 pose_timer.tic()
-                
+
                 # Pairwise transformation estimation
-                ind = self.Pose(ss_equi[:, :, 1:cfg.patch.ele_n - 1],
-                                tt_equi[:, :, 1:cfg.patch.ele_n - 1])
+                ind = self.Pose(
+                    ss_equi[:, :, 1 : cfg.patch.ele_n - 1], tt_equi[:, :, 1 : cfg.patch.ele_n - 1]
+                )
                 pose_timer.toc()
                 pose_time_total += pose_timer.diff
 
@@ -324,7 +369,7 @@ class BufferX(nn.Module):
                 angle_axis[:, -1] = 1
                 angle_axis = angle_axis * angle[:, None]
                 azi_R = Convert.axis_angle_to_rotation_matrix(angle_axis)
-                
+
                 R = tt_R @ azi_R @ ss_R.transpose(-1, -2)
                 t = tt_kpts - (R @ ss_kpts.unsqueeze(-1)).squeeze()
                 R_list[i] = R
@@ -336,15 +381,20 @@ class BufferX(nn.Module):
             t = torch.cat(t_list, dim=0)
             ss_kpts = torch.cat(ss_kpts_list, dim=0)
             tt_kpts = torch.cat(tt_kpts_list, dim=0)
-            
+
             # Cross-scale consensus maximization
             tss_kpts = ss_kpts[None] @ R.transpose(-1, -2) + t[:, None]
             diffs = torch.sqrt(torch.sum((tss_kpts - tt_kpts[None]) ** 2, dim=-1))
-            thr = torch.sqrt(torch.sum(ss_kpts ** 2, dim=-1)) * np.pi / cfg.patch.azi_n * cfg.match.inlier_th
+            thr = (
+                torch.sqrt(torch.sum(ss_kpts**2, dim=-1))
+                * np.pi
+                / cfg.patch.azi_n
+                * cfg.match.inlier_th
+            )
             sign = diffs < thr[None]
-            inlier_num = torch.sum(sign, dim=-1)  # Number of inliers for the current des_r (instead inlier num maximum, ratio maximum?)
+            inlier_num = torch.sum(sign, dim=-1)  # Number of inliers for the current des_r
             best_ind = torch.argmax(inlier_num)
-            inlier_ind = torch.where(sign[best_ind] == True)[0].detach().cpu().numpy()
+            inlier_ind = torch.where(sign[best_ind])[0].detach().cpu().numpy()
 
             # use RANSAC to calculate pose
             pcd0 = make_open3d_point_cloud(ss_kpts.detach().cpu().numpy(), [1, 0.706, 0])
@@ -353,15 +403,27 @@ class BufferX(nn.Module):
             ransac_timer = Timer()
             ransac_timer.tic()
             result = o3d.pipelines.registration.registration_ransac_based_on_correspondence(
-                pcd0, pcd1, corr, cfg.match.dist_th,
-                o3d.pipelines.registration.TransformationEstimationPointToPoint(False), 3,
-                [o3d.pipelines.registration.CorrespondenceCheckerBasedOnEdgeLength(cfg.match.similar_th),
-                 o3d.pipelines.registration.CorrespondenceCheckerBasedOnDistance(cfg.match.dist_th)],
-                o3d.pipelines.registration.RANSACConvergenceCriteria(cfg.match.iter_n,
-                                                                     cfg.match.confidence))
+                pcd0,
+                pcd1,
+                corr,
+                cfg.match.dist_th,
+                o3d.pipelines.registration.TransformationEstimationPointToPoint(False),
+                3,
+                [
+                    o3d.pipelines.registration.CorrespondenceCheckerBasedOnEdgeLength(
+                        cfg.match.similar_th
+                    ),
+                    o3d.pipelines.registration.CorrespondenceCheckerBasedOnDistance(
+                        cfg.match.dist_th
+                    ),
+                ],
+                o3d.pipelines.registration.RANSACConvergenceCriteria(
+                    cfg.match.iter_n, cfg.match.confidence
+                ),
+            )
             init_pose = result.transformation
             ransac_timer.toc()
-            
+
             if cfg.test.pose_refine is True:
                 init_pose_tensor = torch.FloatTensor(init_pose.copy()[None]).cuda()
                 pose = self.post_refinement(init_pose_tensor, ss_kpts[None], tt_kpts[None])
@@ -421,7 +483,7 @@ class BufferX(nn.Module):
     def post_refinement(self, initial_trans, src_keypts, tgt_keypts, weights=None):
         """
         [CVPR'21 PointDSC] (https://github.com/XuyangBai/PointDSC)
-        Perform post refinement using the initial transformation matrix, only adopted during testing.
+        Post refinement using the initial transformation matrix, only adopted during testing.
         Input
             - initial_trans: [bs, 4, 4]
             - src_keypts:    [bs, num_corr, 3]
@@ -431,9 +493,9 @@ class BufferX(nn.Module):
             - final_trans:   [bs, 4, 4]
         """
         assert initial_trans.shape[0] == 1
-        
+
         inlier_threshold_list = [self.config.match.dist_th] * 20
-        
+
         previous_inlier_num = 0
         for inlier_threshold in inlier_threshold_list:
             warped_src_keypts = transform(src_keypts, initial_trans)
@@ -476,9 +538,11 @@ def rigid_transform_3d(A, B, weights=None, weight_threshold=0):
 
     # find mean of point cloud
     centroid_A = torch.sum(A * weights[:, :, None], dim=1, keepdim=True) / (
-            torch.sum(weights, dim=1, keepdim=True)[:, :, None] + 1e-6)
+        torch.sum(weights, dim=1, keepdim=True)[:, :, None] + 1e-6
+    )
     centroid_B = torch.sum(B * weights[:, :, None], dim=1, keepdim=True) / (
-            torch.sum(weights, dim=1, keepdim=True)[:, :, None] + 1e-6)
+        torch.sum(weights, dim=1, keepdim=True)[:, :, None] + 1e-6
+    )
 
     # subtract mean
     Am = A - centroid_A
@@ -504,6 +568,7 @@ def rigid_transform_3d(A, B, weights=None, weight_threshold=0):
 # TODO
 # Modify this functions for calculating des_r
 
+
 def squared_cdist(x, y):
     """
     Computes the squared Euclidean distance between two sets of points.
@@ -520,10 +585,21 @@ def squared_cdist(x, y):
     xy = torch.matmul(x, y.T)  # (N, M)
     return x2 + y2 - 2 * xy  # Squared Euclidean distance
 
-def density_aware_radius_estimation(src_fds_pts, src_kpts, tgt_fds_pts, tgt_kpts, min_r=0.0, max_r=5.0, tolerance=0.01, thresholds =[5, 2, 0.5]):
+
+def density_aware_radius_estimation(
+    src_fds_pts,
+    src_kpts,
+    tgt_fds_pts,
+    tgt_kpts,
+    min_r=0.0,
+    max_r=5.0,
+    tolerance=0.01,
+    thresholds=[5, 2, 0.5],
+):
     """
-    Finds the des_r values corresponding to the given target percentages of points within the radius.
-    
+    This function calculates the radius (des_r) for each keypoint such that the percentage of points
+    within that radius matches the specified thresholds.
+
     Args:
         src_fds_pts (torch.Tensor): Source points of shape (N, 3).
         src_kpts (torch.Tensor): Keypoints of shape (b, num_keypts, 3).
@@ -531,7 +607,7 @@ def density_aware_radius_estimation(src_fds_pts, src_kpts, tgt_fds_pts, tgt_kpts
         tgt_kpts (torch.Tensor): Keypoints of shape (b, num_keypts, 3).
         min_r (float): Minimum radius threshold.
         max_r (float): Maximum radius threshold.
-    
+
     Returns:
         list: The calculated des_r values for the given percentages.
     """
@@ -541,30 +617,35 @@ def density_aware_radius_estimation(src_fds_pts, src_kpts, tgt_fds_pts, tgt_kpts
         pts = src_fds_pts
         kpts = src_kpts
     else:
-        pts = tgt_fds_pts    
+        pts = tgt_fds_pts
         kpts = tgt_kpts
 
     num_pts = pts.shape[0]
     num_kpts = kpts.shape[1]
-        
-    if pts.shape[0] > 200000:
-            pts = pts[torch.randint(0, pts.shape[0], (200000,))]
-    
-    dists_sqr = squared_cdist(kpts, pts) 
 
-    # NOTE(hlim): This filtering reduces unnecessary computations by pre-dividing with the maximum possible radius 
+    if pts.shape[0] > 200000:
+        pts = pts[torch.randint(0, pts.shape[0], (200000,))]
+
+    dists_sqr = squared_cdist(kpts, pts)
+
+    # NOTE(hlim): This filtering reduces unnecessary computations by
+    # pre-dividing with the maximum possible radius
 
     dists_sqr = dists_sqr[dists_sqr <= max_r * max_r]
-    
+
     for threshold in thresholds:
         low, high = min_r, max_r  # Start with a wide search range for des_r
         des_r = 0.0
         while high - low > 1e-3:  # Precision threshold
             des_r = (low + high) / 2.0
-            points_within_radius = (dists_sqr < des_r * des_r).int()  # Binary mask for points within radius
-            percentage = points_within_radius.sum().float() / (num_pts * num_kpts) * 100  # Percentage per keypoint
+            points_within_radius = (
+                dists_sqr < des_r * des_r
+            ).int()  # Binary mask for points within radius
+            percentage = (
+                points_within_radius.sum().float() / (num_pts * num_kpts) * 100
+            )  # Percentage per keypoint
             percentage = percentage.item()
-            
+
             if percentage < threshold - tolerance:
                 low = des_r  # Increase des_r to capture more points
             elif percentage > threshold + tolerance:
@@ -573,5 +654,5 @@ def density_aware_radius_estimation(src_fds_pts, src_kpts, tgt_fds_pts, tgt_kpts
                 break  # Close enough to the percentage
 
         des_r_values.append(round(des_r, 2))  # Round to 2 decimal places for consistency
-        
+
     return des_r_values
