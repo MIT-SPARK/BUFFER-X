@@ -10,6 +10,7 @@ from .kaist_config import make_cfg as make_kaist_cfg
 from .eth_config import make_cfg as make_eth_cfg
 from .oxford_config import make_cfg as make_oxford_cfg
 
+
 def make_cfg(dataset_name):
     """
     Generalized function to return the appropriate configuration based on dataset name.

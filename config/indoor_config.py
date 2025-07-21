@@ -1,13 +1,14 @@
 from easydict import EasyDict as edict
 
+
 class IndoorBaseConfig:
     def __init__(self):
         self._C = edict()
 
         # Data
         self._C.data = edict()
-        self._C.data.dataset = ''
-        self._C.data.root = ''
+        self._C.data.dataset = ""
+        self._C.data.root = ""
         self._C.data.downsample = 0.02
         self._C.data.voxel_size_0 = 0.035
         self._C.data.voxel_size_1 = self._C.data.voxel_size_0
@@ -22,12 +23,12 @@ class IndoorBaseConfig:
         self._C.train.num_workers = 0
         self._C.train.pos_num = 512
         self._C.train.augmentation_noise = 0.001
-        self._C.train.pretrain_model = ''
-        self._C.train.all_stage = ['Desc', 'Pose']
+        self._C.train.pretrain_model = ""
+        self._C.train.all_stage = ["Desc", "Pose"]
 
         # Test
         self._C.test = edict()
-        self._C.test.experiment_id = 'threedmatch'
+        self._C.test.experiment_id = "threedmatch"
         self._C.test.pose_refine = False
 
         # Evaluation thresholds
@@ -36,14 +37,14 @@ class IndoorBaseConfig:
 
         # Optimizer
         self._C.optim = edict()
-        self._C.optim.lr = {'Desc': 0.001, 'Pose': 0.001}
+        self._C.optim.lr = {"Desc": 0.001, "Pose": 0.001}
         self._C.optim.lr_decay = 0.50
         self._C.optim.weight_decay = 1e-6
-        self._C.optim.scheduler_interval = {'Desc': 2, 'Pose': 1}
+        self._C.optim.scheduler_interval = {"Desc": 2, "Pose": 1}
 
         # Multi-scale patch embedder
         self._C.patch = edict()
-        self._C.patch.des_r = 0.3 # For training
+        self._C.patch.des_r = 0.3  # For training
         self._C.patch.num_points_per_patch = 512
         self._C.patch.num_fps = 1500
         self._C.patch.rad_n = 3
@@ -53,7 +54,7 @@ class IndoorBaseConfig:
         self._C.patch.voxel_sample = 10
         self._C.patch.num_scales = 3
         self._C.patch.is_aligned_to_global_z = False
-        
+
         # Threshold should be setted in decreasing order
         self._C.patch.search_radius_thresholds = [5, 2, 0.5]
         self._C.patch.num_points_radius_estimate = 2000
@@ -61,7 +62,7 @@ class IndoorBaseConfig:
         # Hierarchical inlier search & RANSAC
         self._C.match = edict()
         self._C.match.dist_th = 0.10
-        self._C.match.inlier_th = 1/3
+        self._C.match.inlier_th = 1 / 3
         self._C.match.similar_th = 0.8
         self._C.match.confidence = 0.999
         self._C.match.iter_n = 50000
