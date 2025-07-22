@@ -101,7 +101,7 @@ def run(args, timestr, experiment_id, dataset_name):
             rre = compute_rre(trans_est, trans)
             states.append([rte < rte_thresh and rre < rre_thresh, rte, rre])
 
-            if rte > rte_thresh or rre > rre_thresh:
+            if (rte > rte_thresh or rre > rre_thresh) and args.verbose:
                 logger.info(f"{i}th fragment failed, RRE: {rre:.4f}, RTE: {rte:.4f}")
 
             curr_time = np.array([data_timer.diff, model_timer.diff, *times])
@@ -112,7 +112,7 @@ def run(args, timestr, experiment_id, dataset_name):
             torch.cuda.empty_cache()
 
             # logger.info progress every 100 iterations
-            if (i + 1) % 100 == 0 or i == num_batch - 1:
+            if ((i + 1) % 100 == 0 or i == num_batch - 1) and args.verbose:
                 temp_states = np.array(states)
                 temp_recall = temp_states[:, 0].sum() / temp_states.shape[0]
                 temp_te = temp_states[temp_states[:, 0] == 1, 1].mean()
@@ -198,6 +198,11 @@ if __name__ == "__main__":
             "Oxford",
         ],
         help="Dataset to test on",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="If set, print detailed progress messages during testing",
     )
     parser.add_argument(
         "--experiment_id",
