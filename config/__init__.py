@@ -23,7 +23,7 @@ def make_cfg(dataset_name):
         return make_scannetpp_iphone_cfg()
     elif dataset_name == "Scannetpp_faro":
         return make_scannetpp_faro_cfg()
-    elif dataset_name == "Tiers":
+    elif dataset_name == "TIERS":
         return make_tiers_cfg()
     elif dataset_name == "KITTI":
         return make_kitti_cfg()

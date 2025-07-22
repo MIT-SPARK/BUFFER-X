@@ -1,6 +1,7 @@
 import torch
-import random
 import numpy as np
+import math
+
 
 def rotation_matrix(num_axis, augment_rotation):
     """
@@ -12,22 +13,35 @@ def rotation_matrix(num_axis, augment_rotation):
         - R: [3, 3] rotation matrix
     """
     assert num_axis == 1 or num_axis == 3 or num_axis == 0
-    if  num_axis == 0:
+    if num_axis == 0:
         return np.eye(3)
     angles = np.random.rand(3) * 2 * np.pi * augment_rotation
-    Rx = np.array([[1, 0, 0],
-                   [0, np.cos(angles[0]), -np.sin(angles[0])],
-                   [0, np.sin(angles[0]), np.cos(angles[0])]])
-    Ry = np.array([[np.cos(angles[1]), 0, np.sin(angles[1])],
-                   [0, 1, 0],
-                   [-np.sin(angles[1]), 0, np.cos(angles[1])]])
-    Rz = np.array([[np.cos(angles[2]), -np.sin(angles[2]), 0],
-                   [np.sin(angles[2]), np.cos(angles[2]), 0],
-                   [0, 0, 1]])
+    Rx = np.array(
+        [
+            [1, 0, 0],
+            [0, np.cos(angles[0]), -np.sin(angles[0])],
+            [0, np.sin(angles[0]), np.cos(angles[0])],
+        ]
+    )
+    Ry = np.array(
+        [
+            [np.cos(angles[1]), 0, np.sin(angles[1])],
+            [0, 1, 0],
+            [-np.sin(angles[1]), 0, np.cos(angles[1])],
+        ]
+    )
+    Rz = np.array(
+        [
+            [np.cos(angles[2]), -np.sin(angles[2]), 0],
+            [np.sin(angles[2]), np.cos(angles[2]), 0],
+            [0, 0, 1],
+        ]
+    )
     # R = Rx @ Ry @ Rz
     if num_axis == 1:
         return Rz
     return Rx @ Ry @ Rz
+
 
 def translation_matrix(augment_translation):
     """
@@ -39,10 +53,12 @@ def translation_matrix(augment_translation):
     """
     T = np.random.rand(3) * augment_translation
     return T.reshape(3, 1)
-    
+
+
 def transform(pts, trans):
     """
-    Applies the SE3 transformations, support torch.Tensor and np.ndarry.  Equation: trans_pts = R @ pts + t
+    Applies the SE3 transformations, support torch.Tensor and np.ndarry.
+    Equation: trans_pts = R @ pts + t
     Input
         - pts: [num_pts, 3] or [bs, num_pts, 3], pts to be transformed
         - trans: [4, 4] or [bs, 4, 4], SE3 transformation matrix
@@ -50,11 +66,12 @@ def transform(pts, trans):
         - pts: [num_pts, 3] or [bs, num_pts, 3] transformed pts
     """
     if len(pts.shape) == 3:
-        trans_pts = trans[:, :3, :3] @ pts.permute(0,2,1) + trans[:, :3, 3:4]
-        return trans_pts.permute(0,2,1)
+        trans_pts = trans[:, :3, :3] @ pts.permute(0, 2, 1) + trans[:, :3, 3:4]
+        return trans_pts.permute(0, 2, 1)
     else:
         trans_pts = trans[:3, :3] @ pts.T + trans[:3, 3:4]
         return trans_pts.T
+
 
 def decompose_trans(trans):
     """
@@ -69,7 +86,8 @@ def decompose_trans(trans):
         return trans[:, :3, :3], trans[:, :3, 3:4]
     else:
         return trans[:3, :3], trans[:3, 3:4]
-    
+
+
 def integrate_trans(R, t):
     """
     Integrate SE3 transformations from R and t, support torch.Tensor and np.ndarry.
@@ -95,6 +113,7 @@ def integrate_trans(R, t):
         trans[:3, 3:4] = t
     return trans
 
+
 def concatenate(trans1, trans2):
     """
     Concatenate two SE3 transformations, support torch.Tensor and np.ndarry.
@@ -103,10 +122,44 @@ def concatenate(trans1, trans2):
         - trans2: [4, 4] or [bs, 4, 4], SE3 transformation matrix
     Output:
         - trans1 @ trans2
-    """    
+    """
     R1, t1 = decompose_trans(trans1)
     R2, t2 = decompose_trans(trans2)
     R_cat = R1 @ R2
     t_cat = R1 @ t2 + t1
     trans_cat = integrate_trans(R_cat, t_cat)
     return trans_cat
+
+
+def compute_rte(trans_est, trans_gt):
+    """
+    Compute Relative Translation Error (RTE)
+    between estimated and ground truth transforms.
+    Input:
+        - trans_est: [4, 4] estimated SE3 transformation (numpy)
+        - trans_gt: [4, 4] ground-truth SE3 transformation (numpy)
+    Output:
+        - rte: float, Euclidean distance of translation vectors
+    """
+    t_est = trans_est[:3, 3]
+    t_gt = trans_gt[:3, 3]
+    rte = np.linalg.norm(t_est - t_gt)
+    return rte
+
+
+def compute_rre(trans_est, trans_gt):
+    """
+    Compute Relative Rotation Error (RRE) in **degrees**
+    between estimated and ground truth transforms.
+    Input:
+        - trans_est: [4, 4] estimated SE3 transformation (numpy)
+        - trans_gt: [4, 4] ground-truth SE3 transformation (numpy)
+    Output:
+        - rre: float, rotation error in degrees
+    """
+    R_est = trans_est[:3, :3]
+    R_gt = trans_gt[:3, :3]
+    cos_theta = (np.trace(R_est.T @ R_gt) - 1) / 2
+    cos_theta_clipped = np.clip(cos_theta, -1 + 1e-16, 1 - 1e-16)
+    rre = np.arccos(cos_theta_clipped) * 180 / math.pi
+    return rre
