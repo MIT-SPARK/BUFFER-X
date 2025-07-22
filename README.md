@@ -40,7 +40,7 @@ ______________________________________________________________________
 Make sure the basic packages are installed by using this command:
 
 ```
-sudo apt-get install -y gcc g++ build-essential python3-pip python3-dev cmake git ninja-build
+sudo apt-get install -y gcc g++ build-essential python3-pip python3-dev cmake git ninja-build unzip
 ```
 
 This code has been tested with Python 3.8, Pytorch 1.9.1, CUDA 11.1 on Ubuntu 22.04.
