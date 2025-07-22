@@ -123,7 +123,7 @@ Next, to evaluate **BUFFER-X** on a specific dataset, use the `test.py` script w
   - `3DLoMatch`
   - `Scannetpp_iphone`
   - `Scannetpp_faro`
-  - `Tiers`
+  - `TIERS`
   - `KITTI`
   - `WOD`
   - `MIT`

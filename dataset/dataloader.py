@@ -64,8 +64,8 @@ def get_dataloader(dataset, split, config, num_workers=16, shuffle=True, drop_la
         from .scannetpp_iphone import ScannetppIphoneDataset as Dataset
     elif dataset == "Scannetpp_faro":
         from .scannetpp_faro import ScannetppFaroDataset as Dataset
-    elif dataset == "Tiers":
-        from .tiers import TiersDataset as Dataset
+    elif dataset == "TIERS":
+        from .tiers import TIERSDataset as Dataset
     elif dataset == "KITTI":
         from .kitti import KITTIDataset as Dataset
     elif dataset == "WOD":

@@ -11,7 +11,7 @@ cur_path = os.path.dirname(os.path.realpath(__file__))
 split_path = cur_path + "/../config/splits"
 
 
-class TiersDataset(Data.Dataset):
+class TIERSDataset(Data.Dataset):
     DATA_FILES = {"train": "train_tiers.txt", "val": "val_tiers.txt", "test": "test_tiers.txt"}
 
     def __init__(self, split, config=None):

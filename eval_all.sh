@@ -12,7 +12,7 @@ DATASETS=(
   "3DLoMatch"
   "Scannetpp_iphone"
   "Scannetpp_faro"
-  "Tiers"
+  "TIERS"
   "KITTI"
   "WOD"
   "MIT"
