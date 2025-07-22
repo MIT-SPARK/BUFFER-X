@@ -9,7 +9,7 @@ class TiersConfig(OutdoorBaseConfig):
     def __init__(self):
         super().__init__()
         self._C.data.dataset = "Tiers"
-        self._C.data.root = "../datasets/250212_tiers"
+        self._C.data.root = "../datasets/tiers_indoor"
         self._C.test.pdist = 2
         self._C.test.experiment_id = "threedmatch"
 
