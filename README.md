@@ -19,14 +19,6 @@
   Official repository of BUFFER-X, a zero-shot point cloud registration method<br> across diverse scenes without retraining or tuning.</em></strong></p>
 </div>
 
-## 📚 Table of Contents
-
-- [🧭 Structure Overview](#Structure-Overview)
-- [💻 Installation](#Installation-of-BUFFER-X)
-- [🚀 Quick Start](#quick-start)
-- [📝 Paper Citation](#citation)
-- [🙏 Acknowledgements](#acknowledgements)
-
 ______________________________________________________________________
 
 ## 🧭 Structure Overview
@@ -83,7 +75,7 @@ Due to the large number and variety of datasets used in our experiments, we prov
 BUFFER-X supports training on either the **3DMatch** or **KITTI** dataset. As un example, run the following command to train the model:
 
 ```
-CUDA_VISIBLE_DEVICES=0 python train.py --dataset 3DMatch
+python train.py --dataset 3DMatch
 ```
 
 ______________________________________________________________________
@@ -115,7 +107,28 @@ The structure should be as follows:
 
 </details>
 
-Next, to evaluate **BUFFER-X** on a specific dataset, use the `test.py` script with the following arguments:
+Next, to evaluate **BUFFER-X** in diverse scenes, please download the preprocessed data by running the following command. it requires around 130 GB.
+However, to include all other datasets (i.e., `KITTI`, `Scannetpp_iphone`, `Scannetpp_faro`), it requires approximately 150 GB more.
+
+```
+./scripts/download_all_data.sh
+
+```
+
+Then, you can run the below command as follows:
+
+```
+python test.py --dataset <LIST OF DATASET NAMES>
+```
+
+e.g.,
+
+```
+python test.py --dataset 3DMatch TIERS Oxford MIT
+```
+
+<details>
+  <summary><strong>Detailed explanation about configuration</a></strong></summary>
 
 - `--dataset`: The name of the dataset to test on. Must be one of:
 
@@ -133,19 +146,7 @@ Next, to evaluate **BUFFER-X** on a specific dataset, use the `test.py` script w
 
 - `--experiment_id`: The ID of the experiment to use for testing.
 
-#### Example
-
-Evaluate a model with the experiment ID `threedmatch` on the `KITTI` dataset:
-
-```
-CUDA_VISIBLE_DEVICES=0 python test.py --dataset KITTI --experiment_id threedmatch
-```
-
-You can also run evaluation on all supported datasets with a single script:
-
-```bash
-./eval_all.sh EXPERIMENT_ID
-```
+</details>
 
 ______________________________________________________________________
 
