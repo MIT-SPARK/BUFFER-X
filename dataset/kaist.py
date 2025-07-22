@@ -3,6 +3,7 @@ import os
 import open3d as o3d
 import glob
 import numpy as np
+
 from utils.SE3 import rotation_matrix, integrate_trans
 from utils.common import make_open3d_point_cloud
 from utils.tools import sphericity_based_voxel_analysis
@@ -17,7 +18,6 @@ class KAISTDataset(Data.Dataset):
     def __init__(self, split, config=None):
         self.config = config
         self.pc_path = config.data.root
-        self.icp_path = config.data.root + "/icp"
         self.split = split
         self.files = {"train": [], "val": [], "test": []}
         self.poses = []
@@ -30,7 +30,7 @@ class KAISTDataset(Data.Dataset):
         subset_names = open(os.path.join(split_path, self.DATA_FILES[split])).read().split()
         for dirname in subset_names:
             drive_id = str(dirname)
-            fnames = glob.glob(self.pc_path + "/%s/velodyne/*.bin" % drive_id)
+            fnames = glob.glob(str(self.pc_path) + "/%s/velodyne/*.bin" % drive_id)
             assert len(fnames) > 0, f"Make sure that the path {self.pc_path} has data {dirname}"
             inames = sorted([int(os.path.split(fname)[-1][:-4]) for fname in fnames])
 
@@ -154,7 +154,7 @@ class KAISTDataset(Data.Dataset):
         return pts
 
     def get_video_odometry(self, drive, indices=None, ext=".txt", return_all=False):
-        data_path = self.pc_path + "/%s/poses.txt" % drive
+        data_path = self.pc_path / f"{drive}" / "poses.txt"
         if data_path not in self.kaist_cache:
             self.kaist_cache[data_path] = np.genfromtxt(data_path)
         if return_all:
@@ -168,7 +168,7 @@ class KAISTDataset(Data.Dataset):
         return T_w_cam0
 
     def _get_velodyne_fn(self, drive, t):
-        fname = self.pc_path + "/%s/velodyne/%06d.bin" % (drive, t)
+        fname = self.pc_path / f"{drive}" / "velodyne" / f"{t:06d}.bin"
         return fname
 
     def __len__(self):

@@ -21,7 +21,7 @@ def run(args, timestr, experiment_id, dataset_name):
     logger.info(f"Start testing on {dataset_name}...")
 
     # Load dataset-specific config
-    cfg = make_cfg(dataset_name)
+    cfg = make_cfg(dataset_name, args.root_dir)
     cfg[cfg.data.dataset] = cfg.copy()
     cfg.stage = "test"
 
@@ -179,6 +179,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Generalized Testing Script for Registration Models"
     )
+    parser.add_argument(
+        "--root_dir", type=str, default="../datasets", help="Root directory for all datasets"
+    )
+
     parser.add_argument(
         "--dataset",
         type=str,

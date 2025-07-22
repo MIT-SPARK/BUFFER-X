@@ -16,8 +16,8 @@ class KITTIDataset(Data.Dataset):
 
     def __init__(self, split, config=None):
         self.config = config
-        self.pc_path = config.data.root + "/dataset"
-        self.icp_path = config.data.root + "/icp"
+        self.pc_path = config.data.root / "dataset"
+        self.icp_path = config.data.root / "icp"
         self.split = split
         self.files = {"train": [], "val": [], "test": []}
         self.poses = []
@@ -31,7 +31,7 @@ class KITTIDataset(Data.Dataset):
         subset_names = open(os.path.join(split_path, self.DATA_FILES[split])).read().split()
         for dirname in subset_names:
             drive_id = int(dirname)
-            fnames = glob.glob(self.pc_path + "/sequences/%02d/velodyne/*.bin" % drive_id)
+            fnames = glob.glob(str(self.pc_path) + "/sequences/%02d/velodyne/*.bin" % drive_id)
             assert len(fnames) > 0, f"Make sure that the path {self.pc_path} has data {dirname}"
             inames = sorted([int(os.path.split(fname)[-1][:-4]) for fname in fnames])
 
@@ -77,7 +77,7 @@ class KITTIDataset(Data.Dataset):
         xyz1 = xyzr1[:, :3]
 
         key = "%d_%d_%d" % (drive, t0, t1)
-        filename = self.icp_path + "/" + key + ".npy"
+        filename = self.icp_path / (key + ".npy")
         if key not in self.kitti_icp_cache:
             if not os.path.exists(filename):
                 M = (
@@ -216,7 +216,7 @@ class KITTIDataset(Data.Dataset):
         return self._velo2cam
 
     def get_video_odometry(self, drive, indices=None, ext=".txt", return_all=False):
-        data_path = self.pc_path + "/poses/%02d.txt" % drive
+        data_path = str(self.pc_path / "poses" / f"{drive:02d}.txt")
         if data_path not in self.kitti_cache:
             self.kitti_cache[data_path] = np.genfromtxt(data_path)
         if return_all:
@@ -229,9 +229,11 @@ class KITTIDataset(Data.Dataset):
         T_w_cam0 = np.vstack((T_w_cam0, [0, 0, 0, 1]))
         return T_w_cam0
 
+    # NOTE(hlim): Some versions of Open3D do not support pathlib.Path,
+    # so the path is returned as a string.
     def _get_velodyne_fn(self, drive, t):
-        fname = self.pc_path + "/sequences/%02d/velodyne/%06d.bin" % (drive, t)
-        return fname
+        fname = self.pc_path / "sequences" / f"{drive:02d}" / "velodyne" / f"{t:06d}.bin"
+        return str(fname)
 
     def __len__(self):
         return self.length

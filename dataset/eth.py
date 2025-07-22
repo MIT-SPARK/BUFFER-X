@@ -25,7 +25,7 @@ class ETHDataset(Data.Dataset):
         self.poses = []
         for scene in scene_list:
             pcdpath = f"{scene}/"
-            gtpath = self.root + f"/{scene}/"
+            gtpath = self.root / scene
             gtLog = loadlog(gtpath)
             for key in gtLog.keys():
                 id1 = key.split("_")[0]

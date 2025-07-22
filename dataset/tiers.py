@@ -17,7 +17,6 @@ class TIERSDataset(Data.Dataset):
     def __init__(self, split, config=None):
         self.config = config
         self.pc_path = config.data.root
-        self.icp_path = config.data.root + "/icp"
         self.split = split
         self.files = {"train": [], "val": [], "test": []}
         self.poses = []
@@ -32,7 +31,7 @@ class TIERSDataset(Data.Dataset):
             drive_id = str(dirname)
             sensor_types = os.listdir(os.path.join(self.pc_path, dirname))
             for sensor in sensor_types:
-                fnames = glob.glob(self.pc_path + "/%s/%s/scans/*.pcd" % (drive_id, sensor))
+                fnames = glob.glob(str(self.pc_path / f"{drive_id}" / f"{sensor}/scans/*.pcd"))
                 assert len(fnames) > 0, f"Make sure that the path {self.pc_path} has data {dirname}"
                 inames = sorted([int(os.path.split(fname)[-1][:-4]) for fname in fnames])
 
@@ -158,7 +157,7 @@ class TIERSDataset(Data.Dataset):
         return pts
 
     def get_video_odometry(self, drive, sensor, indices=None, ext=".txt", return_all=False):
-        data_path = self.pc_path + "/%s/%s/poses_kitti.txt" % (drive, sensor)
+        data_path = self.pc_path / f"{drive}" / f"{sensor}" / "poses_kitti.txt"
         if data_path not in self.tiers_cache:
             self.tiers_cache[data_path] = np.genfromtxt(data_path)
         if return_all:
@@ -172,8 +171,8 @@ class TIERSDataset(Data.Dataset):
         return T_w_cam0
 
     def _get_velodyne_fn(self, drive, sensor, t):
-        fname = self.pc_path + "/%s/%s/scans/%06d.pcd" % (drive, sensor, t)
-        return fname
+        fname = self.pc_path / f"{drive}" / f"{sensor}" / "scans" / f"{t:06d}.pcd"
+        return str(fname)
 
     def __len__(self):
         return self.length

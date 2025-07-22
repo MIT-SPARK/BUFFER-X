@@ -17,7 +17,6 @@ class OxfordDataset(Data.Dataset):
     def __init__(self, split, config=None):
         self.config = config
         self.pc_path = config.data.root
-        self.icp_path = config.data.root + "/icp"
         self.split = split
         self.files = {"train": [], "val": [], "test": []}
         self.poses = []
@@ -30,7 +29,7 @@ class OxfordDataset(Data.Dataset):
         subset_names = open(os.path.join(split_path, self.DATA_FILES[split])).read().split()
         for dirname in subset_names:
             drive_id = str(dirname)
-            fnames = glob.glob(self.pc_path + "/%s/scans/*.pcd" % drive_id)
+            fnames = glob.glob(str(self.pc_path) + "/%s/scans/*.pcd" % drive_id)
             assert len(fnames) > 0, f"Make sure that the path {self.pc_path} has data {dirname}"
             inames = sorted([int(os.path.split(fname)[-1][:-4]) for fname in fnames])
 
@@ -155,7 +154,7 @@ class OxfordDataset(Data.Dataset):
         return pts
 
     def get_video_odometry(self, drive, indices=None, ext=".txt", return_all=False):
-        data_path = self.pc_path + "/%s/poses_kitti.txt" % drive
+        data_path = self.pc_path / f"{drive}" / "poses_kitti.txt"
         if data_path not in self.oxford_cache:
             self.oxford_cache[data_path] = np.genfromtxt(data_path)
         if return_all:
@@ -168,9 +167,11 @@ class OxfordDataset(Data.Dataset):
         T_w_cam0 = np.vstack((T_w_cam0, [0, 0, 0, 1]))
         return T_w_cam0
 
+    # NOTE(hlim): Some versions of Open3D do not support pathlib.Path,
+    # so the path is returned as a string.
     def _get_velodyne_fn(self, drive, t):
-        fname = self.pc_path + "/%s/scans/%06d.pcd" % (drive, t)
-        return fname
+        fname = self.pc_path / f"{drive}" / "scans" / f"{t:06d}.pcd"
+        return str(fname)
 
     def __len__(self):
         return self.length

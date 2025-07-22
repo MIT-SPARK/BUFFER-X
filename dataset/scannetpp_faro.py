@@ -25,7 +25,7 @@ class ScannetppFaroDataset(Data.Dataset):
 
         self.poses = []
         for scene in self.scene_list:
-            gtpath = self.root + f"/data/{scene}/scans"
+            gtpath = self.root / "data" / f"{scene}" / "scans"
             gtLog = loadlog(gtpath)
             for key in gtLog.keys():
                 id1 = key.split("_")[0]

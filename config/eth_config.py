@@ -1,11 +1,12 @@
 from .outdoor_config import OutdoorBaseConfig
+from pathlib import Path
 
 
 class ETHConfig(OutdoorBaseConfig):
-    def __init__(self):
+    def __init__(self, root_dir=Path("../datasets")):
         super().__init__()
         self._C.data.dataset = "ETH"
-        self._C.data.root = "../datasets/ETH"
+        self._C.data.root = root_dir / "ETH"
         self._C.test.experiment_id = "threedmatch"
 
         self._C.match.dist_th = 0.20
@@ -18,5 +19,5 @@ class ETHConfig(OutdoorBaseConfig):
         self._C.test.rre_thresh = 2.0
 
 
-def make_cfg():
-    return ETHConfig().get_cfg()
+def make_cfg(root_dir):
+    return ETHConfig(root_dir).get_cfg()
