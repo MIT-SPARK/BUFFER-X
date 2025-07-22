@@ -11,51 +11,23 @@ from utils.tools import evaluate_registration, read_trajectory, read_trajectory_
 from config import make_cfg
 from dataset.dataloader import get_dataloader
 from models.BUFFERX import BufferX
+from tabulate import tabulate
 
-# Argument parser
-parser = argparse.ArgumentParser(description="Generalized Testing Script for Registration Models")
-parser.add_argument(
-    "--dataset",
-    type=str,
-    required=True,
-    choices=[
-        "3DMatch",
-        "3DLoMatch",
-        "Scannetpp_iphone",
-        "Scannetpp_faro",
-        "TIERS",
-        "KITTI",
-        "WOD",
-        "MIT",
-        "KAIST",
-        "ETH",
-        "Oxford",
-    ],
-    help="Dataset to test on",
-)
-parser.add_argument(
-    "--experiment_id",
-    type=str,
-    default=None,
-    help="Optional experiment ID (default: uses config.test.experiment_id)",
-)
-args = parser.parse_args()
 
-if __name__ == "__main__":
-    timestr = time.strftime("%m%d%H%M")
-    # NOTE(hlim): We employ the model trained 3DMatch as a default mode.
-    experiment_id = args.experiment_id if args.experiment_id else "threedmatch"
-    log_file = f"logs/test/{experiment_id}/{args.dataset}_{timestr}.log"
+def run(args, timestr, experiment_id, dataset_name):
+    log_file = f"logs/test/{experiment_id}/{dataset_name}_{timestr}.log"
     os.makedirs(f"logs/test/{experiment_id}", exist_ok=True)
     logger = setup_logger(log_file)
-    logger.info(f"Start testing on {args.dataset}...")
+    logger.info(f"Start testing on {dataset_name}...")
 
     # Load dataset-specific config
-    cfg = make_cfg(args.dataset)
+    cfg = make_cfg(dataset_name)
     cfg[cfg.data.dataset] = cfg.copy()
     cfg.stage = "test"
 
     # Initialize model
+    # TODO(hlim): If `cfg` specifies a different model, the model can be changed.
+    # We might need an option to fix the model across all scenes.
     model = BufferX(cfg)
     # Load model weights
     for stage in cfg.train.all_stage:
@@ -75,7 +47,7 @@ if __name__ == "__main__":
     model.eval()
 
     # Load test dataset
-    load_dataset = "3DMatch" if args.dataset == "3DLoMatch" else args.dataset
+    load_dataset = "3DMatch" if dataset_name == "3DLoMatch" else dataset_name
     test_loader = get_dataloader(
         dataset=load_dataset,
         split="test",
@@ -93,7 +65,6 @@ if __name__ == "__main__":
         states = []
         num_batch = len(test_loader)
         data_iter = iter(test_loader)
-        est_poses = {}
 
         for i in range(num_batch):
             data_timer.tic()
@@ -129,11 +100,9 @@ if __name__ == "__main__":
             rte = compute_rte(trans_est, trans)
             rre = compute_rre(trans_est, trans)
             states.append([rte < rte_thresh and rre < rre_thresh, rte, rre])
-            fail = False
 
             if rte > rte_thresh or rre > rre_thresh:
                 logger.info(f"{i}th fragment failed, RRE: {rre:.4f}, RTE: {rte:.4f}")
-                fail = True
 
             curr_time = np.array([data_timer.diff, model_timer.diff, *times])
             if overall_time is None:
@@ -176,7 +145,6 @@ if __name__ == "__main__":
             os.makedirs(f"scene_recall/{experiment_id}")
         with open(scene_recall_path, "w") as f:
             for idx, scene in enumerate(scene_names):
-                scene_name = scene.split("/")[-1]
                 # ground truth info
                 gt_pairs, gt_traj = read_trajectory(os.path.join(scene, "gt.log"))
                 n_fragments, gt_traj_cov = read_trajectory_info(os.path.join(scene, "gt.info"))
@@ -192,7 +160,7 @@ if __name__ == "__main__":
                 rmse_recall.append(temp_recall)
 
     # logger.info summary
-    logger.info("\n---------------Test Results---------------")
+    logger.info(f"\n---------------Results for {dataset_name}---------------")
     logger.info(f"Recall: {recall:.8f}")
     if cfg.data.dataset == "3DMatch":
         logger.info(f"Registration Recall (3DMatch setting): {np.array(rmse_recall).mean():.8f}")
@@ -202,3 +170,64 @@ if __name__ == "__main__":
     average_times = overall_time / num_batch
     logger.info(f"Average data_time: {average_times[0]:.4f}s ")
     logger.info(f"Average model_time: {average_times[1]:.4f}s ")
+
+    return recall, rte_mean, rre_mean, average_times[0], average_times[1]
+
+
+if __name__ == "__main__":
+    # Argument parser
+    parser = argparse.ArgumentParser(
+        description="Generalized Testing Script for Registration Models"
+    )
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        required=True,
+        nargs="+",
+        choices=[
+            "3DMatch",
+            "3DLoMatch",
+            "Scannetpp_iphone",
+            "Scannetpp_faro",
+            "TIERS",
+            "KITTI",
+            "WOD",
+            "MIT",
+            "KAIST",
+            "ETH",
+            "Oxford",
+        ],
+        help="Dataset to test on",
+    )
+    parser.add_argument(
+        "--experiment_id",
+        type=str,
+        default=None,
+        help="Optional experiment ID (default: uses config.test.experiment_id)",
+    )
+    args = parser.parse_args()
+
+    timestr = time.strftime("%m%d%H%M")
+    # NOTE(hlim): We employ the model trained 3DMatch as a default mode.
+    experiment_id = args.experiment_id if args.experiment_id else "threedmatch"
+    results = []
+
+    for dataset_name in args.dataset:
+        recall, rte_mean, rre_mean, avg_data_time, avg_model_time = run(
+            args, timestr, experiment_id, dataset_name
+        )
+
+        results.append(
+            [
+                dataset_name,
+                f"{recall:.4f}",
+                f"{rte_mean * 100:.4f}",
+                f"{rre_mean:.4f}",
+                f"{avg_data_time:.4f}s",
+                f"{avg_model_time:.4f}s",
+            ]
+        )
+
+    print("\n\033[1;32m========== Final Results Summary ==========")
+    headers = ["Scene", "Recall", "RTE (cm)", "RRE (deg)", "Avg data t", "Avg model t"]
+    print(tabulate(results, headers=headers, tablefmt="grid"), "\033[0m")
