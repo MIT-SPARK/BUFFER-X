@@ -1,3 +1,6 @@
+*/.DS_Store
+snapshot/
+
 *cmake-build-debug*/
 *cmake-build-release*/
 *build*/
