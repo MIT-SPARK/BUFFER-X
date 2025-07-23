@@ -118,13 +118,13 @@ However, to include all other datasets (i.e., `KITTI`, `Scannetpp_iphone`, `Scan
 Then, you can run the below command as follows:
 
 ```
-python test.py --dataset <LIST OF DATASET NAMES>
+python test.py --dataset <LIST OF DATASET NAMES> --verbose
 ```
 
 e.g.,
 
 ```
-python test.py --dataset 3DMatch TIERS Oxford MIT
+python test.py --dataset 3DMatch TIERS Oxford MIT --verbose
 ```
 
 <details>
