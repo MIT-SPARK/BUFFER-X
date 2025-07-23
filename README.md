@@ -29,60 +29,35 @@ ______________________________________________________________________
 
 #### Set up environment
 
-Make sure the basic packages are installed by using this command:
-
-```
-sudo apt-get install -y gcc g++ build-essential python3-pip python3-dev cmake git ninja-build unzip
-```
-
-This code has been tested with Python 3.8, Pytorch 1.9.1, CUDA 11.1 on Ubuntu 22.04.
-
-- Clone the repository
+After cloning this repository:
 
 ```
 git clone https://github.com/MIT-SPARK/BUFFER-X && cd BUFFER-X
 ```
 
-- Setup conda virtual environment
+Setup your own virtual environment and install the required libraries. We preset some shellscripts as follows.
+
+**\[Python 3.8, Pytorch 1.9.1, CUDA 11.1 on Ubuntu 22.04\]**
 
 ```
-conda create -n bufferx python=3.8
-source activate bufferx
-pip install torch==1.9.1+cu111 torchvision==0.10.1+cu111 torchaudio==0.9.1 -f https://download.pytorch.org/whl/torch_stable.html
-pip install open3d==0.13.0
-
-export CUDA_HOME=/your/cuda/home/directory/
-pip install "git+git://github.com/erikwijmans/Pointnet2_PyTorch.git#egg=pointnet2_ops&subdirectory=pointnet2_ops_lib"
-pip install --upgrade https://github.com/unlimblue/KNN_CUDA/releases/download/0.2/KNN_CUDA-0.2-py3-none-any.whl
-pip install ninja kornia einops easydict tensorboard tensorboardX
-pip install nibabel -i http://pypi.douban.com/simple --trusted-host pypi.douban.com
-cd cpp_wrappers && sh compile_wrappers.sh && cd ..
-git clone https://github.com/KinglittleQ/torch-batch-svd.git && cd torch-batch-svd && python setup.py install && cd .. && sudo rm -rf torch-batch-svd/
+./scripts/install_py3_8_cuda11_1.sh
 ```
 
-#### Datasets
-
-Due to the large number and variety of datasets used in our experiments, we provide detailed download instructions and folder structures in a separate document:
-
-[DATASETS.md](dataset/DATASETS.md)
-
-## 🚀 Quick Start
-
-### Training and Testing
-
-#### Training
-
-BUFFER-X supports training on either the **3DMatch** or **KITTI** dataset. As un example, run the following command to train the model:
+**\[Python 3.10, Pytorch 2.7.1, CUDA 11.8, Cudnn 9.1.0 on Ubuntu 24.04\]**
 
 ```
-python train.py --dataset 3DMatch
+./scripts/install_py3_10_cuda11_8.sh
 ```
 
 ______________________________________________________________________
 
-#### Testing
+## 🚀 Quick Start
 
-First, download the model using the following script:
+### Training and Test
+
+#### Test on Our Generalization Benchmark
+
+You can easily run our **generalization benchmark** with BUFFER-X. First, download the model using the following script:
 
 ```
 ./scripts/download_pretrained_models.sh
@@ -106,14 +81,24 @@ The structure should be as follows:
   - ...
 
 </details>
+<br>
 
 Next, to evaluate **BUFFER-X** in diverse scenes, please download the preprocessed data by running the following command. it requires around 130 GB.
 However, to include all other datasets (i.e., `KITTI`, `Scannetpp_iphone`, `Scannetpp_faro`), it requires approximately 150 GB more.
 
 ```
 ./scripts/download_all_data.sh
-
 ```
+
+<details>
+  <summary><strong>Detailed explanation about datasets</a></strong></summary>
+
+Due to the large number and variety of datasets used in our experiments, we provide detailed download instructions and folder structures in a separate document:
+
+[DATASETS.md](dataset/DATASETS.md)
+
+</details>
+<br>
 
 Then, you can run the below command as follows:
 
@@ -146,7 +131,20 @@ python test.py --dataset 3DMatch TIERS Oxford MIT --verbose
 
 - `--experiment_id`: The ID of the experiment to use for testing.
 
+Due to the large number and variety of datasets used in our experiments, we provide detailed download instructions and folder structures in a separate document:
+
+[DATASETS.md](dataset/DATASETS.md)
+
 </details>
+<br>
+
+#### Training
+
+BUFFER-X supports training on either the **3DMatch** or **KITTI** dataset. As un example, run the following command to train the model:
+
+```
+python train.py --dataset 3DMatch
+```
 
 ______________________________________________________________________
 
