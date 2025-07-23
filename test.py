@@ -133,9 +133,9 @@ def run(args, timestr, experiment_id, dataset_name):
 
     if cfg.data.dataset == "3DMatch":
         if cfg.data.benchmark == "3DMatch":
-            gtpath = cfg.data.root + f"/test/{cfg.data.benchmark}/gt_result"
+            gtpath = cfg.data.root / "test" / cfg.data.benchmark / "gt_result"
         elif cfg.data.benchmark == "3DLoMatch":
-            gtpath = cfg.data.root + f"/test/{cfg.data.benchmark}"
+            gtpath = cfg.data.root / "test" / cfg.data.benchmark
         scenes = sorted(os.listdir(gtpath))
         scene_names = [os.path.join(gtpath, ele) for ele in scenes]
         rmse_recall = []
