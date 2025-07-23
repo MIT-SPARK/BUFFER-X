@@ -27,6 +27,9 @@ class KITTIDataset(Data.Dataset):
         self.kitti_cache = {}
         self.prepare_matching_pairs(split=self.split)
 
+        if not self.icp_path.exists():
+            self.icp_path.mkdir(parents=True, exist_ok=True)
+
     def prepare_matching_pairs(self, split="train"):
         subset_names = open(os.path.join(split_path, self.DATA_FILES[split])).read().split()
         for dirname in subset_names:
