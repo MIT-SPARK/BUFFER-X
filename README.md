@@ -35,7 +35,7 @@ After cloning this repository:
 git clone https://github.com/MIT-SPARK/BUFFER-X && cd BUFFER-X
 ```
 
-Setup your own virtual environment and install the required libraries. We preset some shellscripts as follows.
+Setup your **own virtual environment** (e.g., `conda create -n bufferx python=3.x` or setting your Nvidia Docker env.) and then install the required libraries. We present some shellscripts as follows.
 
 **\[Python 3.8, Pytorch 1.9.1, CUDA 11.1 on Ubuntu 22.04\]**
 
@@ -47,6 +47,12 @@ Setup your own virtual environment and install the required libraries. We preset
 
 ```
 ./scripts/install_py3_10_cuda11_8.sh
+```
+
+**\[Python 3.11, Pytorch 2.6.0, CUDA 12.4, Cudnn 9.1.0 on Ubuntu 24.04\]**
+
+```
+./scripts/install_py3_11_cuda12_4.sh
 ```
 
 ______________________________________________________________________
