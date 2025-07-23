@@ -21,6 +21,12 @@ wget -O "$ROOT_DIR/$DATASET_NAME.zip" "https://www.dropbox.com/scl/fi/5nwj9322c1
 unzip "$ROOT_DIR/$DATASET_NAME.zip" -d "$ROOT_DIR"
 rm "$ROOT_DIR/$DATASET_NAME.zip"
 
+# KITTI
+DATASET_NAME="kitti"
+wget -O "$ROOT_DIR/$DATASET_NAME.zip" "https://www.dropbox.com/scl/fi/w4odsfngu5q961k5m5mg5/kitti.zip?rlkey=snhfdwapxcsc252m9me1kzppl&st=jeohoe7g&dl=1"
+unzip "$ROOT_DIR/$DATASET_NAME.zip" -d "$ROOT_DIR"
+rm "$ROOT_DIR/$DATASET_NAME.zip"
+
 # WOD
 DATASET_NAME="WOD"
 wget -O "$ROOT_DIR/$DATASET_NAME.zip" "https://www.dropbox.com/scl/fi/45lzbcb5xndt93ot7pn05/WOD.zip?rlkey=rntndreq6eif0rokegyh25vmm&st=6onhudk8&dl=1"
