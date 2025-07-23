@@ -21,7 +21,7 @@ fi
 # Install basic packages
 # -----------------------
 $SUDO apt-get update -y
-$SUDO apt-get install -y gcc g++ build-essential python3-pip python3-dev cmake git ninja-build unzip libgl1 libtbb-dev libeigen3-dev
+$SUDO apt-get install -y gcc g++ build-essential python3-pip python3-dev cmake git ninja-build unzip libgl1 libtbb-dev libeigen3-dev libc++1 libc++-dev libc++abi-dev
 
 # ------------------------
 # Install Python packages
