@@ -17,7 +17,7 @@ rm "$ROOT_DIR/$DATASET_NAME.zip"
 
 # TIERS
 DATASET_NAME="tiers_indoor"
-wget -O "$ROOT_DIR/$DATASET_NAME.zip" "https://www.dropbox.com/scl/fi/9avecjbqva0sjmzk4mbrn/tiers_indoor.zip?rlkey=ksw2z4vgynez38mobwi9hlj1o&st=mj0k9w91&dl=1"
+wget -O "$ROOT_DIR/$DATASET_NAME.zip" "https://www.dropbox.com/scl/fi/5nwj9322c1udqjksmxnw7/tiers_indoor.zip?rlkey=3ye4k5jensmutvnvdb7ogrzx1&st=n30vbr0q&dl=1"
 unzip "$ROOT_DIR/$DATASET_NAME.zip" -d "$ROOT_DIR"
 rm "$ROOT_DIR/$DATASET_NAME.zip"
 
