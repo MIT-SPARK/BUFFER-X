@@ -83,19 +83,21 @@ def process_scene(scene_path, voxel_size=0.05):
 # Main entry point: process only scenes listed in the split file
 if __name__ == "__main__":
     base_path = "/root/dataset/scannetpp/scannet-plusplus/data"
-    split_path = "../../config/splits/test_scannetpp.txt"
 
-    with open(split_path, "w") as f:
-        for scene_id in tqdm(sorted(os.listdir(base_path))):
-            scene_dir = os.path.join(base_path, scene_id)
-            if not os.path.isdir(scene_dir):
-                continue
+    # Load scene IDs from the test split file
+    split_file_path = os.path.join("..", "..", "config", "splits", "test_scannetpp_faro.txt")
+    with open(split_file_path, "r") as f:
+        target_scene_ids = [line.strip() for line in f if line.strip()]
 
-            scene_path = os.path.join(scene_dir, "scans")
-            print(f"Processing scene {scene_id} at {scene_path}")
-            if not os.path.exists(os.path.join(scene_path, f"{ply_prefix}_0.ply")):
-                break
+    for scene_id in tqdm(sorted(target_scene_ids)):
+        scene_dir = os.path.join(base_path, scene_id)
+        if not os.path.isdir(scene_dir):
+            continue
 
-            trans_scene(scene_path)
-            process_scene(scene_path)
-            f.write(f"{scene_id}\n")
+        scene_path = os.path.join(scene_dir, "scans")
+        print(f"Processing scene {scene_id} at {scene_path}")
+        if not os.path.exists(os.path.join(scene_path, f"{ply_prefix}_0.ply")):
+            break
+
+        trans_scene(scene_path)
+        process_scene(scene_path)
