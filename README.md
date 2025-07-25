@@ -89,8 +89,8 @@ The structure should be as follows:
 </details>
 <br>
 
-Next, to evaluate **BUFFER-X** in diverse scenes, please download the preprocessed data by running the following command. it requires around 130 GB.
-However, to include all other datasets (i.e., `KITTI`, `Scannetpp_iphone`, `Scannetpp_faro`), it requires approximately 150 GB more.
+Next, to evaluate **BUFFER-X** in diverse scenes, please download the preprocessed data by running the following command. It requires around 130 GB.
+However, to include all other datasets (i.e., `Scannetpp_iphone`, `Scannetpp_faro`), approximately 150 GB more storage is required.
 
 ```
 ./scripts/download_all_data.sh
