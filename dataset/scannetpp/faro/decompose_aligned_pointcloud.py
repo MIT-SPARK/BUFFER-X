@@ -10,7 +10,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 data_path = os.path.join("..", "..", "..", "datasets", "scannetpp", "scannet-plusplus", "data")
 
 # Load scene IDs from the test split file
-split_file_path = os.path.join("..", "..", "config", "splits", "test_scannetpp.txt")
+split_file_path = os.path.join("..", "..", "config", "splits", "test_scannetpp_faro.txt")
 with open(split_file_path, "r") as f:
     target_scene_ids = [line.strip() for line in f if line.strip()]
 
