@@ -24,9 +24,11 @@ repos:
     hooks:
       # Code formatting (replaces black and isort)
       - id: ruff-format
+        exclude: ^dataset/scannetpp/
       # Linting and auto-fixing (replaces flake8)
       - id: ruff
         args: [--fix]
+        exclude: ^dataset/scannetpp/
 
   # # For Python import sorting
   # - repo: https://github.com/pycqa/isort
