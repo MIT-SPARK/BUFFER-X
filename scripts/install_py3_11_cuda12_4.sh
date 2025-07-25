@@ -26,7 +26,7 @@ $SUDO apt-get install -y gcc g++ build-essential python3-pip python3-dev cmake g
 # ------------------------
 # Install Python packages
 # ------------------------
-pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 pip3 install open3d==0.18.0
 
 # NOTE(hlim): In numpy 2.x version, PyObject* {aka _object*}-relevant error happens
@@ -36,7 +36,9 @@ pip3 install numpy==1.26.3
 
 export CUDA_HOME=$(dirname $(dirname $(which nvcc)))
 # Install `pointnet2-ops`
-git clone https://github.com/erikwijmans/Pointnet2_PyTorch.git
+# NOTE(hlim): With Newer GPU architecture, CUDA compatibilities and architecture versions should be updated
+# So we clone modified version of `Pointnet2_PyTorch`
+git clone https://github.com/LucasColas/Pointnet2_PyTorch.git
 cd Pointnet2_PyTorch/ && pip3 install pointnet2_ops_lib/. --verbose
 cd ..
 rm -rf Pointnet2_PyTorch/

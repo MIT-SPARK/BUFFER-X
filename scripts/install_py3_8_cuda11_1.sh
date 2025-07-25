@@ -21,18 +21,13 @@ fi
 # Install basic packages
 # -----------------------
 $SUDO apt-get update -y
-$SUDO apt-get install -y gcc g++ build-essential python3-pip python3-dev cmake git ninja-build unzip libgl1 libtbb-dev libeigen3-dev
+$SUDO apt-get install -y gcc g++ build-essential python3-pip python3-dev cmake git ninja-build unzip libgl1 libtbb-dev libeigen3-dev libc++1 libc++-dev libc++abi-dev
 
 # ------------------------
 # Install Python packages
 # ------------------------
-pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-pip3 install open3d==0.18.0
-
-# NOTE(hlim): In numpy 2.x version, PyObject* {aka _object*}-relevant error happens
-# in running `cd cpp_wrappers && sh compile_wrappers.sh && cd ..` line
-# So, we need to downgrade the numpy version.
-pip3 install numpy==1.26.3
+pip install torch==1.9.1+cu111 torchvision==0.10.1+cu111 torchaudio==0.9.1 -f https://download.pytorch.org/whl/torch_stable.html
+pip install open3d==0.13.0
 
 export CUDA_HOME=$(dirname $(dirname $(which nvcc)))
 # Install `pointnet2-ops`
