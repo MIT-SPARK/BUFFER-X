@@ -108,8 +108,7 @@ void createDirectoryIfNotExists(const std::string& path) {
 // Main function
 int main(int argc, char * argv[]) {
   // Parent directory containing all subdirectories (0a7cc12c0e, 0a76e06478, etc.)
-  // std::string root_data_path = "/root/dataset/ScanNetpp_Iphone";
-  std::string root_data_path = "/root/dataset/data_iphone_only";
+  std::string root_data_path = "/root/datasets/Scannetpp_iphone/test";
 
   std::vector<std::string> subdirectories = getSubdirectories(root_data_path);
 

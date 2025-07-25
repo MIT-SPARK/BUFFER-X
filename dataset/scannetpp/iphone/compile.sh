@@ -15,4 +15,4 @@ CUDNN_INC_DIR=/usr/local/cudnn/v5.1/include
 # if use opencv, add this into the command line
 # `pkg-config --cflags --libs opencv`
 
-nvcc -std=c++11 -O3 -o scannetpp scannetpp.cu -I/usr/local/cuda/include -I$CUDNN_INC_DIR -L$CUDA_LIB_DIR -L$CUDNN_LIB_DIR -lcudart -lcublas -lcudnn -lcurand -D_MWAITXINTRIN_H_INCLUDED `pkg-config --cflags --libs opencv4`
+nvcc -std=c++11 -O3 -o iphone/scannetpp iphone/scannetpp.cu -I/usr/local/cuda/include -I$CUDNN_INC_DIR -L$CUDA_LIB_DIR -L$CUDNN_LIB_DIR -lcudart -lcublas -lcudnn -lcurand -D_MWAITXINTRIN_H_INCLUDED `pkg-config --cflags --libs opencv4`

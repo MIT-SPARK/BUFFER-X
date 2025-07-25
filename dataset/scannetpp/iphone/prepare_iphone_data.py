@@ -132,18 +132,7 @@ def main(args):
     # get the scenes to process
     if cfg.get("scene_ids"):
         scene_ids = cfg.scene_ids
-    # elif cfg.get('splits'):
-    #     scene_ids = []
-    #     for split in cfg.splits:
-    #         split_path = Path(cfg.data_root) / 'splits' / f'{split}.txt'
-    #         scene_ids += read_txt_list(split_path)
 
-    # get all scene directories from the data root
-    # data_root = Path(cfg.data_root)
-    # scene_dirs = [d for d in data_root.iterdir() if d.is_dir()]
-    # scene_dirs = sorted([d.name for d in scene_dirs])
-
-    # get the options to process
     # go through each scene
     for scene_id in tqdm(scene_ids, desc="scene"):
         # scene = ScannetppScene_Release(scene_id, data_root=Path(cfg.data_root) / 'data')
