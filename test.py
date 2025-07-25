@@ -163,7 +163,9 @@ def run(args, timestr, experiment_id, dataset_name):
     logger.info(f"\n---------------Results for {dataset_name}---------------")
     logger.info(f"Recall: {recall:.8f}")
     if cfg.data.dataset == "3DMatch":
-        logger.info(f"Registration Recall (3DMatch setting): {np.array(rmse_recall).mean():.8f}")
+        logger.info(f"RMSE Recall (3DMatch Evaluation): {np.array(rmse_recall).mean():.8f}")
+        # For 3DMatch evaluation, replace the recall with RMSE-based recall
+        recall = np.array(rmse_recall).mean()
     logger.info(f"RTE: {rte_mean * 100:.8f}")
     logger.info(f"RRE: {rre_mean:.8f}")
 
