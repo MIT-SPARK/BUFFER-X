@@ -14,7 +14,6 @@ def compute_overlap_ratio(pcd0, pcd1, trans, voxel_size):
     overlap1 = len(matching10) / len(pcd1_down.points)
     return max(overlap0, overlap1)
 
-
 def get_matching_indices(source, target, trans, search_voxel_size, K=None):
     source_copy = copy.deepcopy(source)
     target_copy = copy.deepcopy(target)

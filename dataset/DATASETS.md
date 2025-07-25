@@ -4,6 +4,31 @@ This document provides an overview of the datasets used in our experiments. The 
 
 You can click the links below to jump to each dataset section.
 
+## 🚀 Quick Start
+
+Except for the 'ScanNet++ iPhone' and 'ScanNet++ Faro' datasets, all other datasets can be downloaded in a single command. To download the datasets, run the following command:
+
+```bash
+bash download_all_data.sh
+```
+
+This script will download all datasets and place them in the `datasets` directory. The expected folder structure is as follows:
+
+```
+- `BUFFER-X`
+- `datasets`
+  - `ThreeDMatch`
+  - `tiers_indoor`
+  - `kitti`
+  - `WOD`
+  - `helipr_kaist05`
+  - `kimera-multi`
+  - `ETH`
+  - `newer-college`
+```
+
+For ScanNet++ iPhone and Faro datasets, please follow the instructions in their respective sections below.
+
 ### 📌 Indoor Datasets
 
 - [1. 3DMatch](#1-3dmatch)
@@ -48,11 +73,54 @@ Then the structure should be as follows:
 
 ### (3) ScanNet++ iPhone
 
-Due to dataset sharing policies, we are unable to provide the preprocessed ScanNet++ iPhone and FARO data. Please download the raw ScanNet++ dataset directly from the official source and run our preprocessing scripts (to be released soon).
+Due to dataset sharing policies, we are unable to provide the preprocessed ScanNet++ iPhone and FARO data. Please download the raw ScanNet++ dataset directly from the official source and run our preprocessing scripts.
+
+Place the downloaded ScanNet++ dataset into the `datasets` directory. The expected folder structure is as follows:
+
+```
+- `BUFFER-X`
+- `datasets`
+  - `scannetpp`
+    - `scannet-plusplus`
+      - `data`
+        - `0a5c013435`
+          - `iphone`
+          - `scans`
+```
+
+Then run the following commands to set up the environment.
+Make sure you Setup your own virtual environment (e.g., conda create -n scannetpp_process python=3.8 && conda activate scannetpp_process).
+
+```bash
+cd dataset/scannetpp
+./env_setup.sh
+```
+
+Then run the preprocessing script to generate the required data structure:
+
+```bash
+./scannetpp_iphone_preprocess.sh
+```
 
 ### (4) ScanNet++ Faro
 
-Due to dataset sharing policies, we are unable to provide the preprocessed ScanNet++ iPhone and FARO data. Please download the raw ScanNet++ dataset directly from the official source and run our preprocessing scripts (to be released soon).
+Similar to the iPhone dataset, the Faro dataset requires you to download the raw ScanNet++ dataset and run our preprocessing scripts. ScanNet++ Faro shares environment created in the previous step.
+
+Then run the preprocessing script to generate the required data structure:
+
+```bash
+cd dataset/scannetpp
+./scannetpp_iphone_preprocess.sh
+```
+
+### (4) ScanNet++ Faro
+
+Then run the preprocessing script to generate the required data structure:
+
+```bash
+cd dataset/scannetpp
+./scannetpp_faro_preprocess.sh
+```
 
 ### (5) TIERS
 
