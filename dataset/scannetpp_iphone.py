@@ -7,6 +7,9 @@ import random
 from utils.SE3 import rotation_matrix, integrate_trans
 from utils.tools import loadlog, sphericity_based_voxel_analysis
 
+cur_path = os.path.dirname(os.path.realpath(__file__))
+split_path = cur_path + "/../config/splits"
+
 
 class ScannetppIphoneDataset(Data.Dataset):
     def __init__(self, split, config=None):
@@ -22,7 +25,9 @@ class ScannetppIphoneDataset(Data.Dataset):
             self.root = join(self.root, "train")
         else:
             self.root = join(self.root, f"{split}")
-        self.scene_list = open(join(self.root, f"{self.split}_scannetpp.txt")).read().split()
+        self.scene_list = (
+            open(join(split_path, f"{self.split}_scannetpp_iphone.txt")).read().split()
+        )
 
         self.poses = []
         for scene in self.scene_list:
