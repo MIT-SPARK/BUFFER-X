@@ -7,9 +7,7 @@ from tqdm import tqdm
 import time
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-
-data_root = "/root/dataset"
-data_path = os.path.join(data_root, "scannetpp", "scannet-plusplus", "data")
+data_path = os.path.join("..", "..", "..", "datasets", "scannetpp", "scannet-plusplus", "data")
 
 # Load scene IDs from the test split file
 split_file_path = os.path.join("..", "..", "config", "splits", "test_scannetpp.txt")
@@ -26,9 +24,10 @@ for scene_id in sorted(target_scene_ids):
         print(f"Scene directory not found: {scene_path}. Skipping.")
         continue
 
-    ply_path = os.path.join(scene_path, "scans", "pc_aligned.ply")
-    pose_path = os.path.join(scene_path, "scans", "scanner_poses.json")
-    output_path = os.path.join(scene_path, "scans")
+    scan_path = os.path.join(scene_path, "scans")
+    ply_path = os.path.join(scan_path, "pc_aligned.ply")
+    pose_path = os.path.join(scan_path, "scanner_poses.json")
+    output_path = scan_path
 
     pcd = o3d.io.read_point_cloud(ply_path)
     pcd_points = torch.tensor(np.asarray(pcd.points), device="cuda", dtype=torch.float32)
