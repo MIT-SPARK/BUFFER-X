@@ -21,7 +21,6 @@
 
 ______________________________________________________________________
 
-
 # Generalization Benchmark in BUFFER-X
 
 This document provides an overview of the datasets used in our experiments. The datasets are categorized into indoor and outdoor datasets. Each entry includes brief instructions and expected folder structures for proper use.
@@ -33,32 +32,64 @@ You can click the links below to jump to each dataset section.
 Except for the 'ScanNet++ iPhone' and 'ScanNet++ Faro' datasets, all other datasets can be downloaded in a single command. To download the datasets, run the following command:
 
 ```bash
-bash download_all_data.sh
+./scripts/download_all_data.sh
 ```
 
 This script will download all datasets and place them in the `datasets` directory. The expected folder structure is as follows:
 
 ```
-- `BUFFER-X`
-- `datasets`
-  - `ThreeDMatch`
-  - `tiers_indoor`
-  - `kitti`
-  - `WOD`
-  - `helipr_kaist05`
-  - `kimera-multi`
-  - `ETH`
-  - `newer-college`
+├── BUFFER-X/
+└── datasets/
+    ├── ThreeDMatch/
+    ├── tiers_indoor/
+    ├── kitti/
+    ├── WOD/
+    ├── helipr_kaist05/
+    ├── kimera-multi/
+    ├── ETH/
+    └── newer-college/
 ```
 
 For ScanNet++ iPhone and Faro datasets, please follow the instructions in their respective sections below.
 
-## How to Parse ScanNet++ Datasets
+## 🛠️ How to Parse ScanNet++ Datasets
 
-TBU 
----
+Due to dataset sharing policies (i.e., redistribution of modified files by third parties is not allowed), we are unable to provide the preprocessed ScanNet++ iPhone and FARO data. Please download the raw ScanNet++ dataset directly from the official source and run our preprocessing scripts.
 
-## Additional Explanations About Datasets 
+Place the downloaded ScanNet++ dataset into the `datasets` directory. The expected folder structure is as follows:
+
+```
+├── BUFFER-X/
+└── datasets/
+    └── scannetpp/
+        └── scannet-plusplus/
+            └── data/
+                ├── 0a5c013435/
+                │   ├── iphone/
+                │   └── scans/
+                └── ...
+```
+
+Setup your **own virtual environment** (e.g., `conda create -n scannetpp_process python=3.x` or setting your Nvidia Docker env.) and then install the required libraries.
+Then run the following commands to set up the environment.
+
+```bash
+cd dataset/scannetpp
+./env_setup.sh
+```
+
+Then run the preprocessing script to generate the required data structure:
+
+```bash
+./scannetpp_iphone_preprocess.sh
+./scannetpp_faro_preprocess.sh
+```
+
+This process takes a very long time — approximately 6 to 10 hours depending on your hardware. Please ensure you have enough time and resources before starting.
+
+______________________________________________________________________
+
+## 📂 Additional Explanations About Datasets
 
 ### 📌 Indoor Datasets
 
@@ -85,17 +116,19 @@ Following [Predator](https://github.com/prs-eth/OverlapPredator.git), we provide
 
 The structure should be as follows:
 
-- `datasets`
-  - `ThreeDMatch`
-    - `train`
-      - `7-scenes-chess`
-      - ...
-      - `3DMatch_train_overlap.pkl`
-      - `train_3dmatch.txt`
-      - `val_3dmatch.txt`
-    - `test`
-      - `3DLoMatch`
-      - `3DMatch`
+```
+datasets/
+└── ThreeDMatch/
+    ├── train/
+    │   ├── 7-scenes-chess/
+    │   ├── ...
+    │   ├── 3DMatch_train_overlap.pkl
+    │   ├── train_3dmatch.txt
+    │   └── val_3dmatch.txt
+    └── test/
+        ├── 3DLoMatch/
+        └── 3DMatch/
+```
 
 ### (2) 3DLoMatch
 
@@ -103,172 +136,158 @@ The structure should be as follows:
 
 ### (3) ScanNet++ iPhone
 
-Due to dataset sharing policies, we are unable to provide the preprocessed ScanNet++ iPhone and FARO data. Please download the raw ScanNet++ dataset directly from the official source and run our preprocessing scripts.
-
-Place the downloaded ScanNet++ dataset into the `datasets` directory. The expected folder structure is as follows:
+After running the preprocessing script, the structure should be as follows:
 
 ```
-- `BUFFER-X`
-- `datasets`
-  - `scannetpp`
-    - `scannet-plusplus`
-      - `data`
-        - `0a5c013435`
-          - `iphone`
-          - `scans`
-```
-
-Then run the following commands to set up the environment.
-Make sure you Setup your own virtual environment, e.g., run
-
-```
-conda create -n scannetpp_process python=3.8
-conda activate scannetpp_process
-```
-
-```bash
-cd dataset/scannetpp
-./env_setup.sh
-```
-
-Then run the preprocessing script to generate the required data structure:
-
-```bash
-./scannetpp_iphone_preprocess.sh
+datasets/
+└── Scannetpp_iphone/
+    └── test/
+        ├── 0a5c013435/
+        │   └── iphone/
+        │       ├── tsdf/
+        │       │   ├── cloud_bin_0.ply
+        │       │   └── ...
+        │       └── gt.log
+        └── ...
 ```
 
 ### (4) ScanNet++ Faro
 
-Similar to the iPhone dataset, the Faro dataset requires you to download the raw ScanNet++ dataset and run our preprocessing scripts. ScanNet++ Faro shares environment created in the previous step.
+After running the preprocessing script, the structure should be as follows:
 
-Then run the preprocessing script to generate the required data structure:
-
-```bash
-cd dataset/scannetpp
-./scannetpp_iphone_preprocess.sh
 ```
-
-### (4) ScanNet++ Faro
-
-Then run the preprocessing script to generate the required data structure:
-
-```bash
-cd dataset/scannetpp
-./scannetpp_faro_preprocess.sh
+datasets/
+└── scannetpp/
+    └── scannet-plusplus/
+        ├── 0a5c013435/
+        │   └── scans/
+        │       ├── gt.log
+        │       ├── trans_faro_1800x900_scanner_0.ply
+        │       └── ...
+        └── ...
 ```
 
 ### (5) TIERS
 
 The original dataset is available at the official [TIERS GitHub repository](https://github.com/TIERS/tiers-lidars-dataset). In our experiments, we only use the indoor sequences from the TIERS dataset.
-
 The structure should be as follows:
 
-- `datasets`
-  - `TIERS`
-    - `tiers_indoor06`
-      - `os0_128`
-        - `scans`
-          - `000000.pcd`
-          - ...
-        - `poses_kitti.txt`
-      - `os1_64`
-      - `vel16`
-    - `tiers_indoor08`
-    - `tiers_indoor09`
-    - `tiers_indoor10`
-    - `tiers_indoor11`
+```
+datasets/
+└── TIERS/
+    ├── tiers_indoor06/
+    │   ├── os0_128/
+    │   │   ├── scans/
+    │   │   │   ├── 000000.pcd
+    │   │   │   └── ...
+    │   │   └── poses_kitti.txt
+    │   ├── os1_64/
+    │   └── vel16/
+    ├── tiers_indoor08/
+    ├── tiers_indoor09/
+    ├── tiers_indoor10/
+    └── tiers_indoor11/
+```
 
 ## Outdoor Datasets
 
 ### (6) KITTI
 
-the structure is as follows:
+The structure should be as follows:
 
-- `datasets`
-  - `KITTI`
-    - `dataset`
-      - `pose`
-        - `00.txt`
-        - ...
-      - `sequences`
-        - `00`
-        - ...
+```
+datasets/
+└── kitti/
+    └── dataset/
+        ├── pose/
+        │   ├── 00.txt
+        │   └── ...
+        └── sequences/
+            ├── 00/
+            └── ...
+```
 
 ### (7) Waymo Open Dataset
 
 Following [EYOC](https://github.com/liuQuan98/EYOC), we provide the processed WOD dataset.
-
 The structure should be as follows:
 
-- `datasets`
-  - `WOD`
-    - `test`
-      - `sequences`
-        - `2601205676330128831_4880_000_4900_000`
-          - `scans`
-            - `000000.bin`
-            - ...
-          - `poses.txt`
-        - ...
+```
+datasets/
+└── WOD/
+    └── test/
+        └── sequences/
+            ├── 2601205676330128831_4880_000_4900_000/
+            │   ├── scans/
+            │   │   ├── 000000.bin
+            │   │   └── ...
+            │   └── poses.txt
+            └── ...
+```
 
 ### (8) KAIST
 
 This dataset is derived from the **HeliPR dataset**, using only the **KAIST sequence** for our experiments. The original HeliPR dataset can be downloaded from the [official website](https://sites.google.com/view/heliprdataset).
-
 The structure should be as follows:
 
-- `datasets`
-  - `KAIST`
-    - `Aeva`
-      - `velodyne`
-        - `000000.bin`
-        - ...
-      - `calib.txt`
-      - `poses.txt`
-    - `Avia`
-    - `Ouster`
+```
+datasets/
+└── helipr_kaist05/
+    ├── Aeva/
+    │   ├── velodyne/
+    │   │   ├── 000000.bin
+    │   │   └── ...
+    │   ├── calib.txt
+    │   └── poses.txt
+    ├── Avia/
+    └── Ouster/
+```
 
 ### (9) MIT
 
 This dataset is derived from the Kimera-Multi dataset, using only the **MIT sequence** for our experiments. The original dataset can be downloaded from the [official website](https://github.com/MIT-SPARK/Kimera-Multi).
-
 The structure should be as follows:
 
-- `datasets`
-  - `MIT`
-    - `acl_jackal`
-      - `scans`
-        - `000000.pcd`
-        - ...
-      - `kimera_multi1_map.pcd`
-      - `poses_kitti.txt`
-      - `poses_tum.txt`
+```
+datasets/
+└── kimera-multi/
+    └── acl_jackal/
+        ├── scans/
+        │   ├── 000000.pcd
+        │   └── ...
+        ├── kimera_multi1_map.pcd
+        ├── poses_kitti.txt
+        └── poses_tum.txt
+```
 
 ### (10) ETH
 
 The structure should be as follows:
 
-- `datasets`
-  - `ETH`
-    - `gazebo_summer`
-    - `gazebo_winter`
-    - `wood_autmn`
-    - `wood_summer`
+```
+datasets/
+└── ETH/
+    ├── gazebo_summer/
+    ├── gazebo_winter/
+    ├── wood_autmn/
+    └── wood_summer/
+```
 
 ### (11) Oxford
 
 This dataset is based on the [Newer College Dataset](https://ori-drs.github.io/newer-college-dataset/). We use selected sequences from the dataset for evaluation.
-
 The structure should be as follows:
 
-- `datasets`
-  - `Oxford`
-    - `01_short_experiments`
-      - `scans`
-        - `000000.pcd`
-        - ...
-      - `01_short_experiments_map.pcd`
-      - `poses_kitti.txt`
-      - `poses_tum.txt`
-    - `05_quad_with_dynamics`
-    - `07_parkland_mound`
+```
+datasets/
+└── newer-college/
+    ├── 01_short_experiments/
+    │   ├── scans/
+    │   │   ├── 000000.pcd
+    │   │   └── ...
+    │   ├── 01_short_experiments_map.pcd
+    │   ├── poses_kitti.txt
+    │   └── poses_tum.txt
+    ├── 05_quad_with_dynamics/
+    └── 07_parkland_mound/
+```

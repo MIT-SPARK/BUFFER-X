@@ -5,6 +5,7 @@ import re
 from tqdm import tqdm
 from pointcloud import compute_overlap_ratio
 import random
+import argparse
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
@@ -114,14 +115,20 @@ def process_scene(base_path, valid_files, voxel_size=0.05):
     print(f"Processed all pairs: Saved {len(valid_pairs)} valid pairs to {valid_pairs_path}")
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Process all iPhone scenes in a base directory.")
+    parser.add_argument(
+        "--base_path",
+        type=str,
+        default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../../../datasets/Scannetpp_iphone/test"),
+        help="Base directory containing scene folders with 'iphone' subdirectories"
+    )
+    args = parser.parse_args()
 
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    base_path = os.path.join(script_dir, "../../../../datasets/Scannetpp_iphone/test")
     # use tqdm
-    for scene_id in tqdm(os.listdir(base_path)):
-        if not os.path.isdir(os.path.join(base_path, scene_id)):
+    for scene_id in tqdm(os.listdir(args.base_path)):
+        if not os.path.isdir(os.path.join(args.base_path, scene_id)):
             continue
-        scene_path = os.path.join(base_path, scene_id, 'iphone')
+        scene_path = os.path.join(args.base_path, scene_id, 'iphone')
         print(f"Processing scene {scene_id} at {scene_path}")
         valid_files = filter_point_clouds(scene_path)
         process_scene(scene_path, valid_files)

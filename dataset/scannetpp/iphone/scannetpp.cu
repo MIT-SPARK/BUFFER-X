@@ -8,6 +8,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "utils.hpp"
+#include <filesystem>
+namespace fs = std::filesystem;
 
 #define checkCUDA(call) {                                           \
     cudaError_t err = call;                                         \
@@ -108,7 +110,11 @@ void createDirectoryIfNotExists(const std::string& path) {
 // Main function
 int main(int argc, char * argv[]) {
   // Parent directory containing all subdirectories (0a7cc12c0e, 0a76e06478, etc.)
-  std::string root_data_path = "/root/datasets/Scannetpp_iphone/test";
+  fs::path current_file(__FILE__);
+  fs::path base_path = current_file.parent_path();
+  fs::path dataset_path = base_path / "../../../../datasets/Scannetpp_iphone/test";
+  dataset_path = fs::canonical(dataset_path);
+  std::string root_data_path = dataset_path.string();
 
   std::vector<std::string> subdirectories = getSubdirectories(root_data_path);
 

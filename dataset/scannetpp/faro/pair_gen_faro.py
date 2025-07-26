@@ -5,6 +5,7 @@ import re
 from tqdm import tqdm
 from pointcloud import compute_overlap_ratio
 import json
+import argparse
 
 # Set CUDA device
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
@@ -82,15 +83,26 @@ def process_scene(scene_path, voxel_size=0.05):
 
 # Main entry point: process only scenes listed in the split file
 if __name__ == "__main__":
-    base_path = "/root/dataset/scannetpp/scannet-plusplus/data"
+    parser = argparse.ArgumentParser(description="FARO-style scanner simulation for ScanNet++ scenes")
+    parser.add_argument(
+        "--data_path",
+        type=str,
+        default=os.path.join("..", "..", "..", "datasets", "scannetpp", "scannet-plusplus", "data"),
+        help="Path to the ScanNet++ dataset",
+    )
+    parser.add_argument(
+        "--split_file_path",
+        type=str,
+        default=os.path.join("..", "..", "config", "splits", "test_scannetpp_faro.txt"),
+        help="Path to the split file listing scene IDs to process",
+    )
+    args = parser.parse_args()
 
-    # Load scene IDs from the test split file
-    split_file_path = os.path.join("..", "..", "config", "splits", "test_scannetpp_faro.txt")
-    with open(split_file_path, "r") as f:
+    with open(args.split_file_path, "r") as f:
         target_scene_ids = [line.strip() for line in f if line.strip()]
 
     for scene_id in tqdm(sorted(target_scene_ids)):
-        scene_dir = os.path.join(base_path, scene_id)
+        scene_dir = os.path.join(args.data_path, scene_id)
         if not os.path.isdir(scene_dir):
             continue
 

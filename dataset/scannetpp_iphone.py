@@ -7,8 +7,8 @@ import random
 from utils.SE3 import rotation_matrix, integrate_trans
 from utils.tools import loadlog, sphericity_based_voxel_analysis
 
-cur_path = os.path.dirname(os.path.realpath(__file__))
-split_path = cur_path + "/../config/splits"
+curr_path = os.path.dirname(os.path.realpath(__file__))
+split_path = curr_path + "/../config/splits"
 
 
 class ScannetppIphoneDataset(Data.Dataset):

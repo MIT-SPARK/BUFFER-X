@@ -1,5 +1,5 @@
 <div align="center">
-    <h1>BUFFER-X</h1>
+    <h1>BUFFER-X (ICCV 2025, Highlight)</h1>
     <p align="center">
       <a href="https://scholar.google.com/citations?user=esoiHnYAAAAJ&hl=en">Minkyun Seo*</a>,
       <a href="https://scholar.google.com/citations?user=S1A3nbIAAAAJ&hl=en">Hyungtae Lim*</a>,
@@ -91,7 +91,7 @@ The structure should be as follows:
 
 Next, to evaluate **BUFFER-X** in diverse scenes, please download the preprocessed data by running the following command. It requires around 130 GB.
 However, to include all other datasets (i.e., `Scannetpp_iphone`, `Scannetpp_faro`), approximately 150 GB more storage is required.
-Due to the data copyrights, we cannot provide preprocessed data for ScanNet++, so if you want to reproduce whole results, please refer to [here](dataset/DATASETS.md)
+Due to the data copyrights, we cannot provide preprocessed data for ScanNet++, so if you want to reproduce whole results, please refer to [here](dataset/README.md)
 
 ```
 ./scripts/download_all_data.sh
@@ -100,13 +100,21 @@ Due to the data copyrights, we cannot provide preprocessed data for ScanNet++, s
 Then, you can run the below command as follows:
 
 ```
-python test.py --dataset <LIST OF DATASET NAMES> --verbose
+python test.py --dataset <LIST OF DATASET NAMES> --experiment_id <EXPERIMENT ID> --verbose
 ```
+
+Experiment ID refers to the saved model’s filename. Provided snapshots include `threedmatch` and `kitti`, each trained on the corresponding dataset.
 
 e.g.,
 
 ```
-python test.py --dataset 3DMatch TIERS Oxford MIT --verbose
+python test.py --dataset 3DMatch TIERS Oxford MIT --experiment_id threedmatch --verbose
+```
+
+You can also run the evaluation script for all datasets at once by using the provided script:
+
+```
+./scripts/eval_all.sh <EXPERIMENT ID>
 ```
 
 <details>
@@ -181,4 +189,5 @@ ______________________________________________________________________
 
 ### Updates
 
-- 25/06/2025: This paper has been accepted by ICCV 2025!
+- 25/07/2025: This work is selected as a **Highlight** paper at ICCV 2025.
+- 25/06/2025: This work is accepted by ICCV 2025.

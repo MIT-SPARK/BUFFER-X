@@ -21,6 +21,6 @@ DATASETS=(
   "Oxford"
 )
 
-for DATASET in "${DATASETS[@]}"; do
-  CUDA_VISIBLE_DEVICES=0 python test.py --dataset "$DATASET" --experiment_id "$EXPERIMENT_ID"
-done
+DATASET_ARGS="${DATASETS[@]}"
+
+CUDA_VISIBLE_DEVICES=0 python test.py --dataset $DATASET_ARGS --experiment_id "$EXPERIMENT_ID" --verbose
