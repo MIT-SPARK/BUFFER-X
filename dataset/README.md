@@ -1,5 +1,5 @@
 <div align="center">
-    <h1>BUFFER-X</h1>
+    <h1>BUFFER-X (ICCV 2025, 🌟Highlighted🌟)</h1>
     <p align="center">
       <a href="https://scholar.google.com/citations?user=esoiHnYAAAAJ&hl=en">Minkyun Seo*</a>,
       <a href="https://scholar.google.com/citations?user=S1A3nbIAAAAJ&hl=en">Hyungtae Lim*</a>,
