@@ -17,7 +17,7 @@ def make_cfg(dataset_name, root_dir=None):
     Generalized function to return the appropriate configuration based on dataset name.
     """
     if root_dir is None:
-        root_dir = Path("../dataset")
+        root_dir = Path("../datasets")
     elif not isinstance(root_dir, Path):
         root_dir = Path(root_dir)
 
