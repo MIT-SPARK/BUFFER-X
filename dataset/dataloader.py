@@ -78,6 +78,8 @@ def get_dataloader(dataset, split, config, num_workers=16, shuffle=True, drop_la
         from .eth import ETHDataset as Dataset
     elif dataset == "Oxford":
         from .oxford import OxfordDataset as Dataset
+    elif dataset == "ModelNet40":
+        from .modelnet40 import ModelNet40Dataset as Dataset
     else:
         raise ValueError(f"Unsupported dataset: {dataset}")
 

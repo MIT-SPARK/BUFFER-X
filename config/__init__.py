@@ -10,6 +10,7 @@ from .mit_config import make_cfg as make_mit_cfg
 from .kaist_config import make_cfg as make_kaist_cfg
 from .eth_config import make_cfg as make_eth_cfg
 from .oxford_config import make_cfg as make_oxford_cfg
+from .modelnet40_config import make_cfg as make_modelnet40_cfg
 
 
 def make_cfg(dataset_name, root_dir=None):
@@ -43,5 +44,7 @@ def make_cfg(dataset_name, root_dir=None):
         return make_eth_cfg(root_dir)
     elif dataset_name == "Oxford":
         return make_oxford_cfg(root_dir)
+    elif dataset_name == "ModelNet40":
+        return make_modelnet40_cfg(root_dir)
     else:
         raise ValueError(f"Unknown dataset: {dataset_name}")

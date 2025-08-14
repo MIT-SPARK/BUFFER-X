@@ -202,6 +202,7 @@ if __name__ == "__main__":
             "KAIST",
             "ETH",
             "Oxford",
+            "ModelNet40",
         ],
         help="Dataset to test on",
     )
