@@ -25,10 +25,14 @@ def run(args, timestr, experiment_id, dataset_name):
     cfg[cfg.data.dataset] = cfg.copy()
     cfg.stage = "test"
 
+    if dataset_name.endswith("_hetero"):
+        logger.info(f"Heterogeneous evaluation: {cfg.data.src_sensor} -> {cfg.data.tgt_sensor}")
+
     # Initialize model
     # TODO(hlim): If `cfg` specifies a different model, the model can be changed.
     # We might need an option to fix the model across all scenes.
     model = BufferX(cfg)
+
     # Load model weights
     for stage in cfg.train.all_stage:
         model_path = f"snapshot/{experiment_id}/{stage}/best.pth"
@@ -200,6 +204,7 @@ if __name__ == "__main__":
             "WOD",
             "MIT",
             "KAIST",
+            "KAIST_hetero",
             "ETH",
             "Oxford",
             "ModelNet40",

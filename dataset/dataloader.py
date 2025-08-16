@@ -74,6 +74,8 @@ def get_dataloader(dataset, split, config, num_workers=16, shuffle=True, drop_la
         from .mit import MITDataset as Dataset
     elif dataset == "KAIST":
         from .kaist import KAISTDataset as Dataset
+    elif dataset == "KAIST_hetero":
+        from .kaist import KAISTHeteroDataset as Dataset
     elif dataset == "ETH":
         from .eth import ETHDataset as Dataset
     elif dataset == "Oxford":

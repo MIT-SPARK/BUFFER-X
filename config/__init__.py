@@ -8,6 +8,7 @@ from .kitti_config import make_cfg as make_kitti_cfg
 from .wod_config import make_cfg as make_wod_cfg
 from .mit_config import make_cfg as make_mit_cfg
 from .kaist_config import make_cfg as make_kaist_cfg
+from .kaist_hetero_config import make_cfg as make_kaist_hetero_cfg
 from .eth_config import make_cfg as make_eth_cfg
 from .oxford_config import make_cfg as make_oxford_cfg
 from .modelnet40_config import make_cfg as make_modelnet40_cfg
@@ -40,6 +41,8 @@ def make_cfg(dataset_name, root_dir=None):
         return make_mit_cfg(root_dir)
     elif dataset_name == "KAIST":
         return make_kaist_cfg(root_dir)
+    elif dataset_name == "KAIST_hetero":
+        return make_kaist_hetero_cfg(root_dir)
     elif dataset_name == "ETH":
         return make_eth_cfg(root_dir)
     elif dataset_name == "Oxford":
