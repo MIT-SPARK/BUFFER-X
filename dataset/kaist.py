@@ -4,7 +4,6 @@ import open3d as o3d
 import glob
 import numpy as np
 
-from utils.SE3 import rotation_matrix, integrate_trans
 from utils.common import make_open3d_point_cloud
 from utils.tools import sphericity_based_voxel_analysis
 
@@ -71,11 +70,7 @@ class KAISTDataset(Data.Dataset):
         xyz0 = xyzr0[:, :3]
         xyz1 = xyzr1[:, :3]
 
-        trans = np.linalg.inv(positions[1]) @ positions[0]
-
-        if self.split != "test":
-            xyz0 += (np.random.rand(xyz0.shape[0], 3) - 0.5) * self.config.train.augmentation_noise
-            xyz1 += (np.random.rand(xyz1.shape[0], 3) - 0.5) * self.config.train.augmentation_noise
+        relt_pose = np.linalg.inv(positions[1]) @ positions[0]
 
         # process point clouds
         src_pcd = make_open3d_point_cloud(xyz0, [1, 0.706, 0])
@@ -96,18 +91,6 @@ class KAISTDataset(Data.Dataset):
             tgt_pcd, voxel_size=self.config.data.downsample
         )
         tgt_pts = np.asarray(tgt_pcd.points)
-
-        if self.split != "test":
-            # SO(2) augmentation
-            R = rotation_matrix(1, 1)
-            t = np.zeros([3, 1])
-            aug_trans = integrate_trans(R, t)
-            tgt_pcd.transform(aug_trans)
-            relt_pose = aug_trans @ trans
-        else:
-            relt_pose = trans
-
-        tgt_pts = np.array(tgt_pcd.points)
         np.random.shuffle(tgt_pts)
 
         # second sample
@@ -173,3 +156,129 @@ class KAISTDataset(Data.Dataset):
 
     def __len__(self):
         return self.length
+
+
+class KAISTHeteroDataset(KAISTDataset):
+    def __init__(self, split, config=None):
+        # 'Aeva', 'Avia', 'Ouster'
+        self.src_sensor = config.data.src_sensor
+        self.tgt_sensor = config.data.tgt_sensor
+        super().__init__(split, config)
+        self.files = {"train": [], "val": [], "test": []}
+        self.prepare_matching_pairs(split=self.split)
+
+    def prepare_matching_pairs(self, split="train"):
+        src_dir = os.path.join(self.pc_path, self.src_sensor, "velodyne")
+        tgt_dir = os.path.join(self.pc_path, self.tgt_sensor, "velodyne")
+
+        src_fnames = glob.glob(os.path.join(src_dir, "*.bin"))
+        tgt_fnames = glob.glob(os.path.join(tgt_dir, "*.bin"))
+
+        assert (
+            len(src_fnames) > 0 and len(tgt_fnames) > 0
+        ), f"Missing data in {src_dir} or {tgt_dir}"
+
+        src_inames = sorted([int(os.path.splitext(os.path.basename(f))[0]) for f in src_fnames])
+        tgt_inames = sorted([int(os.path.splitext(os.path.basename(f))[0]) for f in tgt_fnames])
+
+        inames = sorted(set(src_inames) & set(tgt_inames))
+        src_odo = self.get_video_odometry(self.src_sensor, return_all=True)
+        tgt_odo = self.get_video_odometry(self.tgt_sensor, return_all=True)
+        frame_to_index = {frame: idx for idx, frame in enumerate(inames)}
+
+        min_len = min(len(inames), len(src_odo), len(tgt_odo))
+        inames = inames[:min_len]
+
+        src_positions = np.array(
+            [self.odometry_to_positions(src_odo[frame_to_index[f]]) for f in inames]
+        )
+        tgt_positions = np.array(
+            [self.odometry_to_positions(tgt_odo[frame_to_index[f]]) for f in inames]
+        )
+
+        Ts_src = src_positions[:, :3, 3]
+        Ts_tgt = tgt_positions[:, :3, 3]
+
+        pdist = np.linalg.norm(Ts_src[:, None, :] - Ts_tgt[None, :, :], axis=-1)
+        valid_pairs = pdist > self.pdist
+
+        curr_time = inames[0]
+        while curr_time in inames:
+            curr_idx = frame_to_index[curr_time]
+            next_mask = valid_pairs[curr_idx][curr_idx : curr_idx + 100]
+            next_offset = np.where(next_mask)[0]
+
+            if len(next_offset) == 0:
+                curr_time += 1
+                continue
+
+            next_idx = curr_idx + next_offset[0]
+            if next_idx >= len(inames):
+                break
+
+            next_time = inames[next_idx]
+            self.files[split].append((self.src_sensor, self.tgt_sensor, curr_time, next_time))
+            curr_time = next_time + 1
+        self.length = len(self.files[split])
+
+    def __getitem__(self, index):
+        src_sensor, tgt_sensor, t0, t1 = self.files[self.split][index]
+
+        src_pose = self.odometry_to_positions(self.get_video_odometry(src_sensor, [t0])[0])
+        tgt_pose = self.odometry_to_positions(self.get_video_odometry(tgt_sensor, [t1])[0])
+        relt_pose = np.linalg.inv(tgt_pose) @ src_pose
+
+        fname0 = self._get_velodyne_fn(src_sensor, t0)
+        fname1 = self._get_velodyne_fn(tgt_sensor, t1)
+
+        # XYZ and reflectance
+        xyzr0 = np.fromfile(fname0, dtype=np.float32).reshape(-1, 4)
+        xyzr1 = np.fromfile(fname1, dtype=np.float32).reshape(-1, 4)
+
+        xyz0 = xyzr0[:, :3]
+        xyz1 = xyzr1[:, :3]
+
+        src_pcd = make_open3d_point_cloud(xyz0, [1, 0.706, 0])
+        tgt_pcd = make_open3d_point_cloud(xyz1, [0, 0.651, 0.929])
+
+        self.config.data.downsample, sphericity, _ = sphericity_based_voxel_analysis(
+            src_pcd, tgt_pcd
+        )
+        is_aligned_to_global_z = self.config.patch.is_aligned_to_global_z
+        src_pcd = src_pcd.voxel_down_sample(voxel_size=self.config.data.downsample)
+        tgt_pcd = tgt_pcd.voxel_down_sample(voxel_size=self.config.data.downsample)
+        src_pts = np.array(src_pcd.points)
+        tgt_pts = np.array(tgt_pcd.points)
+        np.random.shuffle(src_pts)
+        np.random.shuffle(tgt_pts)
+
+        # Second downsampling
+        ds_size = self.config.data.voxel_size_0
+        src_kpt = np.array(src_pcd.voxel_down_sample(ds_size).points)
+        tgt_kpt = np.array(tgt_pcd.voxel_down_sample(ds_size).points)
+        np.random.shuffle(src_kpt)
+        np.random.shuffle(tgt_kpt)
+
+        if src_kpt.shape[0] > self.config.data.max_numPts:
+            src_kpt = src_kpt[
+                np.random.choice(len(src_kpt), self.config.data.max_numPts, replace=False)
+            ]
+        if tgt_kpt.shape[0] > self.config.data.max_numPts:
+            tgt_kpt = tgt_kpt[
+                np.random.choice(len(tgt_kpt), self.config.data.max_numPts, replace=False)
+            ]
+
+        return {
+            "src_fds_pts": src_pts,
+            "tgt_fds_pts": tgt_pts,
+            "relt_pose": relt_pose,
+            "src_sds_pts": src_kpt,
+            "tgt_sds_pts": tgt_kpt,
+            "voxel_size": ds_size,
+            "src_id": f"{t0}",
+            "tgt_id": f"{t1}",
+            "dataset_name": self.config.data.dataset,
+            "sphericity": sphericity,
+            "is_aligned_to_global_z": is_aligned_to_global_z,
+            "sensor": f"{src_sensor}->{tgt_sensor}",
+        }
