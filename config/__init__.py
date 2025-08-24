@@ -4,6 +4,7 @@ from .threedlomatch_config import make_cfg as make_3dlomatch_cfg
 from .scannetpp_iphone_config import make_cfg as make_scannetpp_iphone_cfg
 from .scannetpp_faro_config import make_cfg as make_scannetpp_faro_cfg
 from .tiers_config import make_cfg as make_tiers_cfg
+from .tiers_hetero_config import make_cfg as make_tiers_hetero_cfg
 from .kitti_config import make_cfg as make_kitti_cfg
 from .wod_config import make_cfg as make_wod_cfg
 from .mit_config import make_cfg as make_mit_cfg
@@ -33,6 +34,8 @@ def make_cfg(dataset_name, root_dir=None):
         return make_scannetpp_faro_cfg(root_dir)
     elif dataset_name == "TIERS":
         return make_tiers_cfg(root_dir)
+    elif dataset_name == "TIERS_hetero":
+        return make_tiers_hetero_cfg(root_dir)
     elif dataset_name == "KITTI":
         return make_kitti_cfg(root_dir)
     elif dataset_name == "WOD":

@@ -200,6 +200,7 @@ if __name__ == "__main__":
             "Scannetpp_iphone",
             "Scannetpp_faro",
             "TIERS",
+            "TIERS_hetero",
             "KITTI",
             "WOD",
             "MIT",
