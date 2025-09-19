@@ -199,7 +199,7 @@ class TIERSHeteroDataset(TIERSDataset):
         cache_dir = os.path.join(self.pc_path, "overlap_pairs")
         os.makedirs(cache_dir, exist_ok=True)
         cache_file = os.path.join(
-            cache_dir, f"{self.src_sensor}->{self.tgt_sensor}_overlap_pairs.pkl"
+            cache_dir, f"{self.src_sensor}_to_{self.tgt_sensor}_overlap_pairs.pkl"
         )
         overlap_voxel_size = self.overlap_voxel_size
         overlap_thresh = self.overlap_thresh
