@@ -61,11 +61,15 @@ class OutdoorBaseConfig:
 
         # Hierarchical inlier search & RANSAC
         self._C.match = edict()
+        self._C.match.pose_estimator = "ransac"  # Options: "ransac" or "kiss_matcher"
         self._C.match.dist_th = 0.30
         self._C.match.inlier_th = 2.0
         self._C.match.similar_th = 0.9
         self._C.match.confidence = 1.0
         self._C.match.iter_n = 50000
+
+        # KISS-Matcher settings
+        self._C.match.kiss_resolution = 0.3  # Voxel size for KISS-Matcher (outdoor)
 
     def get_cfg(self):
         return self._C

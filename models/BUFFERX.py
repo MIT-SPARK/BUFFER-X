@@ -396,36 +396,68 @@ class BufferX(nn.Module):
             best_ind = torch.argmax(inlier_num)
             inlier_ind = torch.where(sign[best_ind])[0].detach().cpu().numpy()
 
-            # use RANSAC to calculate pose
-            pcd0 = make_open3d_point_cloud(ss_kpts.detach().cpu().numpy(), [1, 0.706, 0])
-            pcd1 = make_open3d_point_cloud(tt_kpts.detach().cpu().numpy(), [0, 0.651, 0.929])
-            corr = o3d.utility.Vector2iVector(np.array([inlier_ind, inlier_ind]).T)
-            ransac_timer = Timer()
-            ransac_timer.tic()
-            result = o3d.pipelines.registration.registration_ransac_based_on_correspondence(
-                pcd0,
-                pcd1,
-                corr,
-                cfg.match.dist_th,
-                o3d.pipelines.registration.TransformationEstimationPointToPoint(False),
-                3,
-                [
-                    o3d.pipelines.registration.CorrespondenceCheckerBasedOnEdgeLength(
-                        cfg.match.similar_th
-                    ),
-                    o3d.pipelines.registration.CorrespondenceCheckerBasedOnDistance(
-                        cfg.match.dist_th
-                    ),
-                ],
-                o3d.pipelines.registration.RANSACConvergenceCriteria(
-                    cfg.match.iter_n, cfg.match.confidence
-                ),
-            )
-            init_pose = result.transformation
-            ransac_timer.toc()
+            # Pose estimation using RANSAC or KISS-Matcher
+            pose_timer = Timer()
+            pose_timer.tic()
 
-            # Get final inlier count from RANSAC result
-            num_inliers = len(result.correspondence_set)
+            if cfg.match.pose_estimator == "kiss_matcher":
+                # Use KISS-Matcher for pose estimation
+                try:
+                    from kiss_matcher import KISSMatcherConfig, KISSMatcher
+
+                    # Prepare point clouds (use inlier correspondences)
+                    src_pts = ss_kpts.detach().cpu().numpy()[inlier_ind]
+                    tgt_pts = tt_kpts.detach().cpu().numpy()[inlier_ind]
+
+                    # Configure and run KISS-Matcher
+                    kiss_config = KISSMatcherConfig(cfg.match.kiss_resolution)
+                    matcher = KISSMatcher(kiss_config)
+                    result = matcher.solve(src_pts.transpose(), tgt_pts.transpose())
+
+                    # Build transformation matrix
+                    init_pose = np.eye(4)
+                    init_pose[:3, :3] = result.rotation
+                    init_pose[:3, 3] = result.translation
+
+                    # Get inlier count
+                    num_inliers = matcher.get_num_final_inliers()
+
+                except ImportError:
+                    print(
+                        "Warning: KISS-Matcher not installed. "
+                        "Falling back to RANSAC. "
+                        "Install with: pip install kiss-matcher"
+                    )
+                    cfg.match.pose_estimator = "ransac"
+
+            if cfg.match.pose_estimator == "ransac":
+                # Use RANSAC for pose estimation
+                pcd0 = make_open3d_point_cloud(ss_kpts.detach().cpu().numpy(), [1, 0.706, 0])
+                pcd1 = make_open3d_point_cloud(tt_kpts.detach().cpu().numpy(), [0, 0.651, 0.929])
+                corr = o3d.utility.Vector2iVector(np.array([inlier_ind, inlier_ind]).T)
+                result = o3d.pipelines.registration.registration_ransac_based_on_correspondence(
+                    pcd0,
+                    pcd1,
+                    corr,
+                    cfg.match.dist_th,
+                    o3d.pipelines.registration.TransformationEstimationPointToPoint(False),
+                    3,
+                    [
+                        o3d.pipelines.registration.CorrespondenceCheckerBasedOnEdgeLength(
+                            cfg.match.similar_th
+                        ),
+                        o3d.pipelines.registration.CorrespondenceCheckerBasedOnDistance(
+                            cfg.match.dist_th
+                        ),
+                    ],
+                    o3d.pipelines.registration.RANSACConvergenceCriteria(
+                        cfg.match.iter_n, cfg.match.confidence
+                    ),
+                )
+                init_pose = result.transformation
+                num_inliers = len(result.correspondence_set)
+
+            pose_timer.toc()
 
             if cfg.test.pose_refine is True:
                 init_pose_tensor = torch.FloatTensor(init_pose.copy()[None]).cuda()
@@ -433,7 +465,7 @@ class BufferX(nn.Module):
                 pose = pose[0].detach().cpu().numpy()
             else:
                 pose = init_pose
-            times = [desc_timer.diff, pose_time_total, ransac_timer.diff]
+            times = [desc_timer.diff, pose_time_total, pose_timer.diff]
             return pose, times, num_inliers
 
     def mutual_matching(self, src_des, tgt_des):

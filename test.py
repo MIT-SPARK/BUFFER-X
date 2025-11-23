@@ -42,6 +42,9 @@ def run(args, timestr, experiment_id, dataset_name):
     if args.search_radius_thresholds is not None:
         cfg.patch.search_radius_thresholds = args.search_radius_thresholds
         logger.info(f"Overwriting search_radius_thresholds: {args.search_radius_thresholds}")
+    if args.pose_estimator is not None:
+        cfg.match.pose_estimator = args.pose_estimator
+        logger.info(f"Overwriting pose_estimator: {args.pose_estimator}")
 
     # Initialize model
     # TODO(hlim): If `cfg` specifies a different model, the model can be changed.
@@ -171,9 +174,11 @@ def run(args, timestr, experiment_id, dataset_name):
         f"{cfg.patch.num_points_per_patch}_{cfg.patch.num_scales}_{cfg.patch.num_fps}.txt"
     )
     with open(per_sample_file, "w") as f:
+        pose_method = cfg.match.pose_estimator.upper()
         header = (
+            f"# Pose Estimator: {pose_method}\n"
             "# Sample_ID\tSuccess\tRTE(m)\tRRE(deg)\tNum_Inliers\t"
-            "Data_time(s)\tModel_time(s)\tDesc_time(s)\tPose_time(s)\tRANSAC_time(s)\n"
+            "Data_time(s)\tModel_time(s)\tDesc_time(s)\tPose_time(s)\tPoseEst_time(s)\n"
         )
         f.write(header)
         for idx, state in enumerate(states):
@@ -222,6 +227,7 @@ def run(args, timestr, experiment_id, dataset_name):
     logger.info(f"RTE: {rte_mean * 100:.8f} ± {rte_std * 100:.8f}")
     logger.info(f"RRE: {rre_mean:.8f} ± {rre_std:.8f}")
     logger.info(f"Inliers: {inliers_mean:.2f} ± {inliers_std:.2f}")
+    logger.info(f"Pose Estimator: {cfg.match.pose_estimator}")
 
     all_times = np.array(all_times)
     average_times = overall_time / num_batch
@@ -326,6 +332,13 @@ if __name__ == "__main__":
             "Search radius thresholds in decreasing order "
             "(e.g., --search_radius_thresholds 5 2 0.5)"
         ),
+    )
+    parser.add_argument(
+        "--pose_estimator",
+        type=str,
+        default=None,
+        choices=["ransac", "kiss_matcher"],
+        help='Pose estimation method: "ransac" or "kiss_matcher" (default: uses config value)',
     )
     args = parser.parse_args()
 

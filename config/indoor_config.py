@@ -61,11 +61,15 @@ class IndoorBaseConfig:
 
         # Hierarchical inlier search & RANSAC
         self._C.match = edict()
+        self._C.match.pose_estimator = "ransac"  # Options: "ransac" or "kiss_matcher"
         self._C.match.dist_th = 0.10
         self._C.match.inlier_th = 1 / 3
         self._C.match.similar_th = 0.8
         self._C.match.confidence = 0.999
         self._C.match.iter_n = 50000
+
+        # KISS-Matcher settings
+        self._C.match.kiss_resolution = 0.3  # Voxel size for KISS-Matcher
 
     def get_cfg(self):
         return self._C
