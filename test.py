@@ -5,6 +5,7 @@ import time
 import torch
 import torch.nn as nn
 import numpy as np
+from scipy.io import savemat
 from utils.timer import Timer
 from utils.SE3 import compute_rte, compute_rre
 from utils.tools import evaluate_registration, read_trajectory, read_trajectory_info, setup_logger
@@ -27,6 +28,20 @@ def run(args, timestr, experiment_id, dataset_name):
 
     if dataset_name.endswith("_hetero"):
         logger.info(f"Heterogeneous evaluation: {cfg.data.src_sensor} -> {cfg.data.tgt_sensor}")
+
+    # Overwrite config with command-line arguments if provided
+    if args.num_points_per_patch is not None:
+        cfg.patch.num_points_per_patch = args.num_points_per_patch
+        logger.info(f"Overwriting num_points_per_patch: {args.num_points_per_patch}")
+    if args.num_scales is not None:
+        cfg.patch.num_scales = args.num_scales
+        logger.info(f"Overwriting num_scales: {args.num_scales}")
+    if args.num_fps is not None:
+        cfg.patch.num_fps = args.num_fps
+        logger.info(f"Overwriting num_fps: {args.num_fps}")
+    if args.search_radius_thresholds is not None:
+        cfg.patch.search_radius_thresholds = args.search_radius_thresholds
+        logger.info(f"Overwriting search_radius_thresholds: {args.search_radius_thresholds}")
 
     # Initialize model
     # TODO(hlim): If `cfg` specifies a different model, the model can be changed.
@@ -63,8 +78,13 @@ def run(args, timestr, experiment_id, dataset_name):
     logger.info(f"Test set size: {len(test_loader.dataset)}")
     data_timer, model_timer = Timer(), Timer()
 
+    # Create directory for per-sample results
+    results_dir = f"per_sample_results/{experiment_id}"
+    os.makedirs(results_dir, exist_ok=True)
+
     # Run test
     overall_time = None
+    all_times = []
     with torch.no_grad():
         states = []
         num_batch = len(test_loader)
@@ -76,7 +96,7 @@ def run(args, timestr, experiment_id, dataset_name):
             data_timer.toc()
 
             model_timer.tic()
-            trans_est, times = model(data_source)
+            trans_est, times, num_inliers = model(data_source)
             model_timer.toc()
 
             trans_est = trans_est if trans_est is not None else np.eye(4)
@@ -103,7 +123,12 @@ def run(args, timestr, experiment_id, dataset_name):
             trans = data_source["relt_pose"].numpy()
             rte = compute_rte(trans_est, trans)
             rre = compute_rre(trans_est, trans)
-            states.append([rte < rte_thresh and rre < rre_thresh, rte, rre])
+            success = rte < rte_thresh and rre < rre_thresh
+
+            # Store per-sample results with timing
+            states.append(
+                [success, rte, rre, num_inliers, data_timer.diff, model_timer.diff, *times]
+            )
 
             if (rte > rte_thresh or rre > rre_thresh) and args.verbose:
                 logger.info(f"{i}th fragment failed, RRE: {rre:.4f}, RTE: {rte:.4f}")
@@ -113,6 +138,7 @@ def run(args, timestr, experiment_id, dataset_name):
                 overall_time = curr_time
             else:
                 overall_time += curr_time
+            all_times.append(curr_time)
             torch.cuda.empty_cache()
 
             # logger.info progress every 100 iterations
@@ -134,6 +160,29 @@ def run(args, timestr, experiment_id, dataset_name):
     recall = states[:, 0].sum() / states.shape[0]
     rte_mean = states[states[:, 0] == 1, 1].mean()
     rre_mean = states[states[:, 0] == 1, 2].mean()
+    rte_std = states[states[:, 0] == 1, 1].std()
+    rre_std = states[states[:, 0] == 1, 2].std()
+    inliers_mean = states[:, 3].mean()
+    inliers_std = states[:, 3].std()
+
+    # Save per-sample results to txt file (using parameters for ablation studies)
+    per_sample_file = (
+        f"{results_dir}/{experiment_id}_{timestr}_{dataset_name}_"
+        f"{cfg.patch.num_points_per_patch}_{cfg.patch.num_scales}_{cfg.patch.num_fps}.txt"
+    )
+    with open(per_sample_file, "w") as f:
+        header = (
+            "# Sample_ID\tSuccess\tRTE(m)\tRRE(deg)\tNum_Inliers\t"
+            "Data_time(s)\tModel_time(s)\tDesc_time(s)\tPose_time(s)\tRANSAC_time(s)\n"
+        )
+        f.write(header)
+        for idx, state in enumerate(states):
+            success_flag = int(state[0])
+            f.write(
+                f"{idx}\t{success_flag}\t{state[1]:.6f}\t{state[2]:.6f}\t{int(state[3])}\t"
+                f"{state[4]:.6f}\t{state[5]:.6f}\t{state[6]:.6f}\t{state[7]:.6f}\t{state[8]:.6f}\n"
+            )
+    logger.info(f"Per-sample results saved to {per_sample_file}")
 
     if cfg.data.dataset == "3DMatch":
         if cfg.data.benchmark == "3DMatch":
@@ -170,14 +219,41 @@ def run(args, timestr, experiment_id, dataset_name):
         logger.info(f"RMSE Recall (3DMatch Evaluation): {np.array(rmse_recall).mean():.8f}")
         # For 3DMatch evaluation, replace the recall with RMSE-based recall
         recall = np.array(rmse_recall).mean()
-    logger.info(f"RTE: {rte_mean * 100:.8f}")
-    logger.info(f"RRE: {rre_mean:.8f}")
+    logger.info(f"RTE: {rte_mean * 100:.8f} ± {rte_std * 100:.8f}")
+    logger.info(f"RRE: {rre_mean:.8f} ± {rre_std:.8f}")
+    logger.info(f"Inliers: {inliers_mean:.2f} ± {inliers_std:.2f}")
 
+    all_times = np.array(all_times)
     average_times = overall_time / num_batch
-    logger.info(f"Average data_time: {average_times[0]:.4f}s ")
-    logger.info(f"Average model_time: {average_times[1]:.4f}s ")
 
-    return recall, rte_mean, rre_mean, average_times[0], average_times[1]
+    # Exclude first few iterations (warmup) from std calculation to avoid inflation
+    warmup_iters = min(
+        5, num_batch // 10
+    )  # Skip first 5 iters or 10% of batches, whichever is smaller
+    if len(all_times) > warmup_iters:
+        std_times = all_times[warmup_iters:].std(axis=0)
+    else:
+        std_times = all_times.std(axis=0)
+
+    logger.info(f"Average data_time: {average_times[0]:.4f}s ± {std_times[0]:.4f}s")
+    logger.info(f"Average model_time: {average_times[1]:.4f}s ± {std_times[1]:.4f}s")
+
+    return (
+        recall,
+        rte_mean,
+        rre_mean,
+        rte_std,
+        rre_std,
+        inliers_mean,
+        inliers_std,
+        average_times[0],
+        average_times[1],
+        std_times[0],
+        std_times[1],
+        cfg.patch.num_points_per_patch,
+        cfg.patch.num_scales,
+        cfg.patch.num_fps,
+    )
 
 
 if __name__ == "__main__":
@@ -223,29 +299,122 @@ if __name__ == "__main__":
         default=None,
         help="Optional experiment ID (default: uses config.test.experiment_id)",
     )
+    parser.add_argument(
+        "--num_points_per_patch",
+        type=int,
+        default=None,
+        help="Number of points per patch (default: uses config value)",
+    )
+    parser.add_argument(
+        "--num_scales",
+        type=int,
+        default=None,
+        help="Number of scales for multi-scale patch embedder (default: uses config value)",
+    )
+    parser.add_argument(
+        "--num_fps",
+        type=int,
+        default=None,
+        help="Number of FPS (Farthest Point Sampling) points (default: uses config value)",
+    )
+    parser.add_argument(
+        "--search_radius_thresholds",
+        type=float,
+        nargs="+",
+        default=None,
+        help=(
+            "Search radius thresholds in decreasing order "
+            "(e.g., --search_radius_thresholds 5 2 0.5)"
+        ),
+    )
     args = parser.parse_args()
 
     timestr = time.strftime("%m%d%H%M")
     # NOTE(hlim): We employ the model trained 3DMatch as a default mode.
     experiment_id = args.experiment_id if args.experiment_id else "threedmatch"
     results = []
+    num_points_per_patch = None
+    num_scales = None
+    num_fps = None
 
     for dataset_name in args.dataset:
-        recall, rte_mean, rre_mean, avg_data_time, avg_model_time = run(
-            args, timestr, experiment_id, dataset_name
-        )
+        (
+            recall,
+            rte_mean,
+            rre_mean,
+            rte_std,
+            rre_std,
+            inliers_mean,
+            inliers_std,
+            avg_data_time,
+            avg_model_time,
+            std_data_time,
+            std_model_time,
+            npp,
+            ns,
+            nfps,
+        ) = run(args, timestr, experiment_id, dataset_name)
+
+        # Store config values from first dataset for filename
+        if num_points_per_patch is None:
+            num_points_per_patch = npp
+            num_scales = ns
+            num_fps = nfps
 
         results.append(
             [
                 dataset_name,
                 f"{recall:.4f}",
                 f"{rte_mean * 100:.4f}",
+                f"{rte_std * 100:.4f}",
                 f"{rre_mean:.4f}",
+                f"{rre_std:.4f}",
+                f"{inliers_mean:.2f}",
+                f"{inliers_std:.2f}",
                 f"{avg_data_time:.4f}s",
+                f"{std_data_time:.4f}s",
                 f"{avg_model_time:.4f}s",
+                f"{std_model_time:.4f}s",
             ]
         )
 
     print("\n\033[1;32m========== Final Results Summary ==========")
-    headers = ["Scene", "Recall", "RTE (cm)", "RRE (deg)", "Avg data t", "Avg model t"]
+    headers = [
+        "Scene",
+        "Recall",
+        "RTE (cm)",
+        "RTE std (cm)",
+        "RRE (deg)",
+        "RRE std (deg)",
+        "Inliers",
+        "Inliers std",
+        "Avg data t",
+        "Std data t",
+        "Avg model t",
+        "Std model t",
+    ]
     print(tabulate(results, headers=headers, tablefmt="grid"), "\033[0m")
+
+    # Save results to .mat file for Matlab
+    matlab_results = {
+        "datasets": [r[0] for r in results],
+        "recall": np.array([float(r[1]) for r in results]),
+        "rte_mean_cm": np.array([float(r[2]) for r in results]),
+        "rte_std_cm": np.array([float(r[3]) for r in results]),
+        "rre_mean_deg": np.array([float(r[4]) for r in results]),
+        "rre_std_deg": np.array([float(r[5]) for r in results]),
+        "inliers_mean": np.array([float(r[6]) for r in results]),
+        "inliers_std": np.array([float(r[7]) for r in results]),
+        "avg_data_time_s": np.array([float(r[8].replace("s", "")) for r in results]),
+        "std_data_time_s": np.array([float(r[9].replace("s", "")) for r in results]),
+        "avg_model_time_s": np.array([float(r[10].replace("s", "")) for r in results]),
+        "std_model_time_s": np.array([float(r[11].replace("s", "")) for r in results]),
+        "experiment_id": experiment_id,
+        "timestamp": timestr,
+    }
+
+    mat_file_path = (
+        f"results_{experiment_id}_{timestr}_{num_points_per_patch}_{num_scales}_{num_fps}.mat"
+    )
+    savemat(mat_file_path, matlab_results)
+    print(f"\n\033[1;34mResults saved to {mat_file_path} for Matlab\033[0m")

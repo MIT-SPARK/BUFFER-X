@@ -424,6 +424,9 @@ class BufferX(nn.Module):
             init_pose = result.transformation
             ransac_timer.toc()
 
+            # Get final inlier count from RANSAC result
+            num_inliers = len(result.correspondence_set)
+
             if cfg.test.pose_refine is True:
                 init_pose_tensor = torch.FloatTensor(init_pose.copy()[None]).cuda()
                 pose = self.post_refinement(init_pose_tensor, ss_kpts[None], tt_kpts[None])
@@ -431,7 +434,7 @@ class BufferX(nn.Module):
             else:
                 pose = init_pose
             times = [desc_timer.diff, pose_time_total, ransac_timer.diff]
-            return pose, times
+            return pose, times, num_inliers
 
     def mutual_matching(self, src_des, tgt_des):
         """
