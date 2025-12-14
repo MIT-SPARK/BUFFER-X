@@ -460,7 +460,8 @@ class BufferX(nn.Module):
             pose_timer.toc()
 
             if cfg.test.pose_refine is True:
-                init_pose_tensor = torch.FloatTensor(init_pose.copy()[None]).cuda()
+                device = ss_kpts.device
+                init_pose_tensor = torch.FloatTensor(init_pose.copy()[None]).to(device)
                 pose = self.post_refinement(init_pose_tensor, ss_kpts[None], tt_kpts[None])
                 pose = pose[0].detach().cpu().numpy()
             else:
@@ -481,15 +482,18 @@ class BufferX(nn.Module):
         ref = tgt_des.unsqueeze(0)
         query = src_des.unsqueeze(0)
         s_dis, s_idx = KNN(k=1, transpose_mode=True)(ref, query)
-        sourceNNidx = s_idx[0, :, 0].detach().cpu().numpy()
+        sourceNNidx = s_idx[0, :, 0]
 
         ref = src_des.unsqueeze(0)
         query = tgt_des.unsqueeze(0)
         t_dis, t_idx = KNN(k=1, transpose_mode=True)(ref, query)
-        targetNNidx = t_idx[0, :, 0].detach().cpu().numpy()
+        targetNNidx = t_idx[0, :, 0]
 
-        # find mutual correspondences
-        s_mids = np.where((targetNNidx[sourceNNidx] - np.arange(sourceNNidx.shape[0])) == 0)[0]
+        # find mutual correspondences (keep on GPU)
+        mutual_mask = targetNNidx[sourceNNidx] == torch.arange(
+            sourceNNidx.shape[0], device=sourceNNidx.device
+        )
+        s_mids = torch.where(mutual_mask)[0]
         t_mids = sourceNNidx[s_mids]
 
         return s_mids, t_mids
@@ -509,7 +513,10 @@ class BufferX(nn.Module):
         query = source.unsqueeze(0)
         s_dis, s_idx = KNN(k=1, transpose_mode=True)(ref, query)
         sourceNNidx = s_idx[0]
-        min_ind = torch.cat([torch.arange(source.shape[0])[:, None].cuda(), sourceNNidx], dim=-1)
+        device = source.device
+        min_ind = torch.cat(
+            [torch.arange(source.shape[0])[:, None].to(device), sourceNNidx], dim=-1
+        )
         min_val = s_dis.view(-1)
         match_inds = min_ind[min_val < search_voxel_size]
 
@@ -587,11 +594,10 @@ def rigid_transform_3d(A, B, weights=None, weight_threshold=0):
     Weight = torch.diag_embed(weights)
     H = Am.permute(0, 2, 1) @ Weight @ Bm
 
-    # find rotation
-    U, S, Vt = torch.svd(H.cpu())
-    U, S, Vt = U.to(weights.device), S.to(weights.device), Vt.to(weights.device)
+    # find rotation (keep on GPU)
+    U, S, Vt = torch.svd(H)
     delta_UV = torch.det(Vt @ U.permute(0, 2, 1))
-    eye = torch.eye(3)[None, :, :].repeat(bs, 1, 1).to(A.device)
+    eye = torch.eye(3, device=A.device, dtype=A.dtype)[None].repeat(bs, 1, 1)
     eye[:, -1, -1] = delta_UV
     R = Vt @ eye @ U.permute(0, 2, 1)
     t = centroid_B.permute(0, 2, 1) - R @ centroid_A.permute(0, 2, 1)
