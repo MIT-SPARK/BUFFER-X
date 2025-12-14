@@ -16,8 +16,13 @@ from tabulate import tabulate
 
 
 def run(args, timestr, experiment_id, dataset_name):
-    log_file = f"logs/test/{experiment_id}/{dataset_name}_{timestr}.log"
-    os.makedirs(f"logs/test/{experiment_id}", exist_ok=True)
+    # Set default CUDA device
+    torch.cuda.set_device(args.gpu)
+
+    exp_name = experiment_id.rsplit("/", 1)[-1]
+
+    log_file = f"logs/test/{exp_name}/{dataset_name}_{timestr}.log"
+    os.makedirs(f"logs/test/{exp_name}", exist_ok=True)
     logger = setup_logger(log_file)
     logger.info(f"Start testing on {dataset_name}...")
 
@@ -44,7 +49,7 @@ def run(args, timestr, experiment_id, dataset_name):
         logger.info(f"Overwriting search_radius_thresholds: {args.search_radius_thresholds}")
     if args.pose_estimator is not None:
         cfg.match.pose_estimator = args.pose_estimator
-        logger.info(f"Overwriting pose_estimator: {args.pose_estimator}")
+        logger.info(f"\033[1;32mOverwriting pose_estimator: {args.pose_estimator}\033[0m")
 
     # Initialize model
     # TODO(hlim): If `cfg` specifies a different model, the model can be changed.
@@ -52,20 +57,26 @@ def run(args, timestr, experiment_id, dataset_name):
     model = BufferX(cfg)
 
     # Load model weights
+    device = f"cuda:{args.gpu}"
     for stage in cfg.train.all_stage:
         model_path = f"snapshot/{experiment_id}/{stage}/best.pth"
-        state_dict = torch.load(model_path, map_location="cuda")
+        state_dict = torch.load(model_path, map_location=device)
         new_dict = {k: v for k, v in state_dict.items() if stage in k}
         model_dict = model.state_dict()
         model_dict.update(new_dict)
         model.load_state_dict(model_dict)
         logger.info(f"Loaded {stage} model from {model_path}")
 
+    logger.info(f"Using GPU: {args.gpu}")
+
+    # Move model to the specified GPU
+    model = model.to(device)
+
     # Model Parameter Info
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logger.info(f"Total number of trainable parameters: {total_params / 1e6:.2f}M")
 
-    model = nn.DataParallel(model, device_ids=[0])
+    model = nn.DataParallel(model, device_ids=[args.gpu])
     model.eval()
 
     # Load test dataset
@@ -82,7 +93,7 @@ def run(args, timestr, experiment_id, dataset_name):
     data_timer, model_timer = Timer(), Timer()
 
     # Create directory for per-sample results
-    results_dir = f"per_sample_results/{experiment_id}"
+    results_dir = f"per_sample_results/{exp_name}"
     os.makedirs(results_dir, exist_ok=True)
 
     # Run test
@@ -170,8 +181,8 @@ def run(args, timestr, experiment_id, dataset_name):
 
     # Save per-sample results to txt file (using parameters for ablation studies)
     per_sample_file = (
-        f"{results_dir}/{experiment_id}_{timestr}_{dataset_name}_"
-        f"{cfg.patch.num_points_per_patch}_{cfg.patch.num_scales}_{cfg.patch.num_fps}.txt"
+        f"{results_dir}/{exp_name}_{dataset_name}_"
+        f"{cfg.patch.num_points_per_patch}_{cfg.patch.num_scales}_{cfg.patch.num_fps}_{timestr}.txt"
     )
     with open(per_sample_file, "w") as f:
         pose_method = cfg.match.pose_estimator.upper()
@@ -198,9 +209,9 @@ def run(args, timestr, experiment_id, dataset_name):
         scene_names = [os.path.join(gtpath, ele) for ele in scenes]
         rmse_recall = []
 
-        scene_recall_path = f"scene_recall/{experiment_id}/{timestr}.txt"
-        if not os.path.exists(f"scene_recall/{experiment_id}"):
-            os.makedirs(f"scene_recall/{experiment_id}")
+        scene_recall_path = f"scene_recall/{exp_name}/{timestr}.txt"
+        if not os.path.exists(f"scene_recall/{exp_name}"):
+            os.makedirs(f"scene_recall/{exp_name}")
         with open(scene_recall_path, "w") as f:
             for idx, scene in enumerate(scene_names):
                 # ground truth info
@@ -340,6 +351,13 @@ if __name__ == "__main__":
         choices=["ransac", "kiss_matcher"],
         help='Pose estimation method: "ransac" or "kiss_matcher" (default: uses config value)',
     )
+    parser.add_argument(
+        "--gpu",
+        type=int,
+        default=0,
+        choices=[0, 1],
+        help="GPU device to use: 0 or 1 (default: 0)",
+    )
     args = parser.parse_args()
 
     timestr = time.strftime("%m%d%H%M")
@@ -425,9 +443,9 @@ if __name__ == "__main__":
         "experiment_id": experiment_id,
         "timestamp": timestr,
     }
-
+    exp_name = experiment_id.rsplit("/", 1)[-1]
     mat_file_path = (
-        f"results_{experiment_id}_{timestr}_{num_points_per_patch}_{num_scales}_{num_fps}.mat"
+        f"results_{exp_name}_{num_points_per_patch}_{num_scales}_{num_fps}_{timestr}.mat"
     )
     savemat(mat_file_path, matlab_results)
     print(f"\n\033[1;34mResults saved to {mat_file_path} for Matlab\033[0m")
