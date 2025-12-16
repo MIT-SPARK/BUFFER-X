@@ -75,7 +75,7 @@ class OutdoorBaseConfig:
         # BUFFER-X++ Early Exit settings
         self._C.match.enable_early_exit = True  # Enable confidence-aware early exit
         self._C.match.early_exit_min_inliers = (
-            20  # Minimum absolute inlier count for early exit (higher for outdoor)
+            50  # Minimum absolute inlier count for early exit (higher for outdoor)
         )
 
     def get_cfg(self):
