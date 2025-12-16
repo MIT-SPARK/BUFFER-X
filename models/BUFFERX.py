@@ -277,7 +277,8 @@ class BufferX(nn.Module):
                 search_radius_thresholds
             ), f"num_scales {num_scales} != num_thresholds {len(search_radius_thresholds)}"
 
-            # NOTE(hlim): It only takes < ~ 0.0002 sec, which is negligible
+            # Sample keypoints for density-aware radius estimation
+            # These keypoints are reused for all scales to maintain consistency
             s_pts_flipped, t_pts_flipped = (
                 src_fds_pcd[None].transpose(1, 2).contiguous(),
                 tgt_fds_pcd[None].transpose(1, 2).contiguous(),
@@ -287,10 +288,6 @@ class BufferX(nn.Module):
 
             kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
             kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
-
-            des_r_list = density_aware_radius_estimation(
-                src_fds_pcd, kpts1, tgt_fds_pcd, kpts2, thresholds=search_radius_thresholds
-            )
 
             #################################
             # BUFFER-X++: Incremental multi-scale processing with early exit
@@ -320,9 +317,17 @@ class BufferX(nn.Module):
 
             # Process scales incrementally (only extract keypoints/descriptors when needed)
             should_exit = False
-            for i, des_r in enumerate(des_r_list):
+            for i in range(num_scales):
                 if enable_timing:
                     desc_timer.tic()
+
+                #################################
+                # Density-aware radius estimation for this scale
+                #################################
+                des_r = density_aware_radius_estimation(
+                    src_fds_pcd, kpts1, tgt_fds_pcd, kpts2, thresholds=[search_radius_thresholds[i]]
+                )[0]  # Returns list with single element, extract it
+
                 #################################
                 # Extract keypoints for this scale
                 #################################
