@@ -30,6 +30,7 @@ class OutdoorBaseConfig:
         self._C.test = edict()
         self._C.test.experiment_id = "threedmatch"
         self._C.test.pose_refine = False
+        self._C.test.enable_timing = False  # Enable/disable timing (set False for max speed)
 
         # Evaluation thresholds
         self._C.test.rte_thresh = 2.0  # RTE threshold for outdoor datasets
@@ -70,6 +71,12 @@ class OutdoorBaseConfig:
 
         # KISS-Matcher settings
         self._C.match.kiss_resolution = 0.3  # Voxel size for KISS-Matcher (outdoor)
+
+        # BUFFER-X++ Early Exit settings
+        self._C.match.enable_early_exit = True  # Enable confidence-aware early exit
+        self._C.match.early_exit_min_inliers = (
+            20  # Minimum absolute inlier count for early exit (higher for outdoor)
+        )
 
     def get_cfg(self):
         return self._C

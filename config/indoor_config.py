@@ -30,6 +30,7 @@ class IndoorBaseConfig:
         self._C.test = edict()
         self._C.test.experiment_id = "threedmatch"
         self._C.test.pose_refine = False
+        self._C.test.enable_timing = False  # Enable/disable timing (set False for max speed)
 
         # Evaluation thresholds
         self._C.test.rte_thresh = 0.3  # RTE threshold for indoor datasets
@@ -70,6 +71,10 @@ class IndoorBaseConfig:
 
         # KISS-Matcher settings
         self._C.match.kiss_resolution = 0.3  # Voxel size for KISS-Matcher
+
+        # BUFFER-X++ Early Exit settings
+        self._C.match.enable_early_exit = True  # Enable confidence-aware early exit
+        self._C.match.early_exit_min_inliers = 50  # Minimum absolute inlier count for early exit
 
     def get_cfg(self):
         return self._C
