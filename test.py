@@ -7,12 +7,15 @@ import torch.nn as nn
 import numpy as np
 from scipy.io import savemat
 from utils.timer import Timer
+from utils.gpu_timer import GPUTimer
 from utils.SE3 import compute_rte, compute_rre
 from utils.tools import evaluate_registration, read_trajectory, read_trajectory_info, setup_logger
 from config import make_cfg
 from dataset.dataloader import get_dataloader
 from models.BUFFERX import BufferX
 from tabulate import tabulate
+
+FIRST_A_FEW_FRAMES = 5
 
 
 def run(args, timestr, experiment_id, dataset_name):
@@ -90,7 +93,7 @@ def run(args, timestr, experiment_id, dataset_name):
     )
 
     logger.info(f"Test set size: {len(test_loader.dataset)}")
-    data_timer, model_timer = Timer(), Timer()
+    data_timer, model_timer = Timer(), GPUTimer()  # CPU timer for data, GPU timer for model
 
     # Create directory for per-sample results
     results_dir = f"per_sample_results/{exp_name}"
@@ -110,7 +113,14 @@ def run(args, timestr, experiment_id, dataset_name):
             data_timer.toc()
 
             model_timer.tic()
-            trans_est, times, num_inliers = model(data_source)
+            (
+                trans_est,
+                times,
+                num_inliers,
+                num_mutual_inliers,
+                num_inlier_ind,
+                scales_used,
+            ) = model(data_source)
             model_timer.toc()
 
             trans_est = trans_est if trans_est is not None else np.eye(4)
@@ -141,17 +151,29 @@ def run(args, timestr, experiment_id, dataset_name):
 
             # Store per-sample results with timing
             states.append(
-                [success, rte, rre, num_inliers, data_timer.diff, model_timer.diff, *times]
+                [
+                    success,
+                    rte,
+                    rre,
+                    num_inliers,
+                    num_mutual_inliers,
+                    num_inlier_ind,
+                    scales_used,
+                    data_timer.diff,
+                    model_timer.diff / 1000.0,  # Convert ms to seconds
+                    *times,
+                ]
             )
 
             if (rte > rte_thresh or rre > rre_thresh) and args.verbose:
                 logger.info(f"{i}th fragment failed, RRE: {rre:.4f}, RTE: {rte:.4f}")
 
-            curr_time = np.array([data_timer.diff, model_timer.diff, *times])
-            if overall_time is None:
-                overall_time = curr_time
-            else:
-                overall_time += curr_time
+            curr_time = np.array([data_timer.diff, model_timer.diff / 1000.0, *times])
+            if i > FIRST_A_FEW_FRAMES:
+                if overall_time is None:
+                    overall_time = curr_time
+                else:
+                    overall_time += curr_time
             all_times.append(curr_time)
             torch.cuda.empty_cache()
 
@@ -165,7 +187,8 @@ def run(args, timestr, experiment_id, dataset_name):
                 log_prefix = f"[{i + 1}/{num_batch}]"
                 log_metrics = f"Recall: {temp_recall:.4f} RTE: {temp_te:.4f} RRE: {temp_re:.4f}"
                 log_timing = (
-                    f"Data time: {data_timer.diff:.4f}s Model time: {model_timer.diff:.4f}s"
+                    f"Data time: {data_timer.diff:.4f}s "
+                    f"Model time: {model_timer.diff / 1000.0:.4f}s"
                 )
 
                 logger.info(f"{log_prefix} {log_metrics} {log_timing}")
@@ -178,6 +201,12 @@ def run(args, timestr, experiment_id, dataset_name):
     rre_std = states[states[:, 0] == 1, 2].std()
     inliers_mean = states[:, 3].mean()
     inliers_std = states[:, 3].std()
+    mutual_inliers_mean = states[:, 4].mean()
+    mutual_inliers_std = states[:, 4].std()
+    inlier_ind_mean = states[:, 5].mean()
+    inlier_ind_std = states[:, 5].std()
+    scales_used_mean = states[:, 6].mean()
+    scales_used_std = states[:, 6].std()
 
     # Save per-sample results to txt file (using parameters for ablation studies)
     per_sample_file = (
@@ -186,17 +215,20 @@ def run(args, timestr, experiment_id, dataset_name):
     )
     with open(per_sample_file, "w") as f:
         pose_method = cfg.match.pose_estimator.upper()
+        early_exit_status = "ON" if cfg.match.get("enable_early_exit", True) else "OFF"
         header = (
-            f"# Pose Estimator: {pose_method}\n"
+            f"# Pose Estimator: {pose_method} | Early Exit: {early_exit_status}\n"
             "# Sample_ID\tSuccess\tRTE(m)\tRRE(deg)\tNum_Inliers\t"
+            "Num_Mutual_Inliers\tNum_Inlier_Ind\tScales_Used\t"
             "Data_time(s)\tModel_time(s)\tDesc_time(s)\tPose_time(s)\tPoseEst_time(s)\n"
         )
         f.write(header)
         for idx, state in enumerate(states):
             success_flag = int(state[0])
             f.write(
-                f"{idx}\t{success_flag}\t{state[1]:.6f}\t{state[2]:.6f}\t{int(state[3])}\t"
-                f"{state[4]:.6f}\t{state[5]:.6f}\t{state[6]:.6f}\t{state[7]:.6f}\t{state[8]:.6f}\n"
+                f"{idx}\t{success_flag}\t{state[1]:.6f}\t{state[2]:.6f}\t"
+                f"{int(state[3])}\t{int(state[4])}\t{int(state[5])}\t{int(state[6])}\t"
+                f"{state[7]:.6f}\t{state[8]:.6f}\t{state[9]:.6f}\t{state[10]:.6f}\t{state[11]:.6f}\n"
             )
     logger.info(f"Per-sample results saved to {per_sample_file}")
 
@@ -238,22 +270,27 @@ def run(args, timestr, experiment_id, dataset_name):
     logger.info(f"RTE: {rte_mean * 100:.8f} ± {rte_std * 100:.8f}")
     logger.info(f"RRE: {rre_mean:.8f} ± {rre_std:.8f}")
     logger.info(f"Inliers: {inliers_mean:.2f} ± {inliers_std:.2f}")
+    logger.info(f"Mutual Inliers: {mutual_inliers_mean:.2f} ± {mutual_inliers_std:.2f}")
+    logger.info(f"Inlier Ind: {inlier_ind_mean:.2f} ± {inlier_ind_std:.2f}")
+    logger.info(f"Scales Used: {scales_used_mean:.2f} ± {scales_used_std:.2f}")
     logger.info(f"Pose Estimator: {cfg.match.pose_estimator}")
+    early_exit_status = "ON" if cfg.match.get("enable_early_exit", True) else "OFF"
+    logger.info(f"Early Exit: {early_exit_status}")
 
     all_times = np.array(all_times)
-    average_times = overall_time / num_batch
+    average_times = overall_time / (num_batch - FIRST_A_FEW_FRAMES)
 
-    # Exclude first few iterations (warmup) from std calculation to avoid inflation
-    warmup_iters = min(
-        5, num_batch // 10
-    )  # Skip first 5 iters or 10% of batches, whichever is smaller
-    if len(all_times) > warmup_iters:
-        std_times = all_times[warmup_iters:].std(axis=0)
+    # Exclude first FIRST_A_FEW_FRAMES iterations (warmup) from std calculation
+    if len(all_times) > FIRST_A_FEW_FRAMES:
+        std_times = all_times[FIRST_A_FEW_FRAMES:].std(axis=0)
     else:
         std_times = all_times.std(axis=0)
 
     logger.info(f"Average data_time: {average_times[0]:.4f}s ± {std_times[0]:.4f}s")
     logger.info(f"Average model_time: {average_times[1]:.4f}s ± {std_times[1]:.4f}s")
+    logger.info(f"Average desc_time: {average_times[2]:.4f}s ± {std_times[2]:.4f}s")
+    logger.info(f"Average pose_time: {average_times[3]:.4f}s ± {std_times[3]:.4f}s")
+    logger.info(f"Average pose_optim_time: {average_times[4]:.4f}s ± {std_times[4]:.4f}s")
 
     return (
         recall,
@@ -263,6 +300,12 @@ def run(args, timestr, experiment_id, dataset_name):
         rre_std,
         inliers_mean,
         inliers_std,
+        mutual_inliers_mean,
+        mutual_inliers_std,
+        inlier_ind_mean,
+        inlier_ind_std,
+        scales_used_mean,
+        scales_used_std,
         average_times[0],
         average_times[1],
         std_times[0],
@@ -377,6 +420,12 @@ if __name__ == "__main__":
             rre_std,
             inliers_mean,
             inliers_std,
+            mutual_inliers_mean,
+            mutual_inliers_std,
+            inlier_ind_mean,
+            inlier_ind_std,
+            scales_used_mean,
+            scales_used_std,
             avg_data_time,
             avg_model_time,
             std_data_time,
@@ -402,6 +451,12 @@ if __name__ == "__main__":
                 f"{rre_std:.4f}",
                 f"{inliers_mean:.2f}",
                 f"{inliers_std:.2f}",
+                f"{mutual_inliers_mean:.2f}",
+                f"{mutual_inliers_std:.2f}",
+                f"{inlier_ind_mean:.2f}",
+                f"{inlier_ind_std:.2f}",
+                f"{scales_used_mean:.2f}",
+                f"{scales_used_std:.2f}",
                 f"{avg_data_time:.4f}s",
                 f"{std_data_time:.4f}s",
                 f"{avg_model_time:.4f}s",
@@ -419,6 +474,12 @@ if __name__ == "__main__":
         "RRE std (deg)",
         "Inliers",
         "Inliers std",
+        "Mutual Inl",
+        "Mutual std",
+        "Inlier Ind",
+        "Inl Ind std",
+        "Scales Used",
+        "Scales std",
         "Avg data t",
         "Std data t",
         "Avg model t",
@@ -436,10 +497,16 @@ if __name__ == "__main__":
         "rre_std_deg": np.array([float(r[5]) for r in results]),
         "inliers_mean": np.array([float(r[6]) for r in results]),
         "inliers_std": np.array([float(r[7]) for r in results]),
-        "avg_data_time_s": np.array([float(r[8].replace("s", "")) for r in results]),
-        "std_data_time_s": np.array([float(r[9].replace("s", "")) for r in results]),
-        "avg_model_time_s": np.array([float(r[10].replace("s", "")) for r in results]),
-        "std_model_time_s": np.array([float(r[11].replace("s", "")) for r in results]),
+        "mutual_inliers_mean": np.array([float(r[8]) for r in results]),
+        "mutual_inliers_std": np.array([float(r[9]) for r in results]),
+        "inlier_ind_mean": np.array([float(r[10]) for r in results]),
+        "inlier_ind_std": np.array([float(r[11]) for r in results]),
+        "scales_used_mean": np.array([float(r[12]) for r in results]),
+        "scales_used_std": np.array([float(r[13]) for r in results]),
+        "avg_data_time_s": np.array([float(r[14].replace("s", "")) for r in results]),
+        "std_data_time_s": np.array([float(r[15].replace("s", "")) for r in results]),
+        "avg_model_time_s": np.array([float(r[16].replace("s", "")) for r in results]),
+        "std_model_time_s": np.array([float(r[17].replace("s", "")) for r in results]),
         "experiment_id": experiment_id,
         "timestamp": timestr,
     }

@@ -3,14 +3,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 import models.patchnet as pn
 from models.patch_embedder import MiniSpinNet
+from models.pose_estimator import PoseEstimator
 import pointnet2_ops.pointnet2_utils as pnt2
 from knn_cuda import KNN
 from utils.SE3 import transform, integrate_trans
 from einops import rearrange
 import kornia.geometry.conversions as Convert
-import open3d as o3d
-from utils.common import make_open3d_point_cloud
-from utils.timer import Timer
+from utils.gpu_timer import GPUTimer
 import numpy as np
 
 
@@ -80,6 +79,9 @@ class BufferX(nn.Module):
         self.Pose = CostVolume(config)
         # equivariant feature matching
         self.equi_match = EquiMatch(config)
+        # pose estimator (RANSAC or KISS-Matcher)
+        if config.stage == "test":
+            self.pose_estimator = PoseEstimator(config)
 
     def cal_so2_gt(self, src, tgt, gt_trans, integer=True, aug_rotation=None):
         _, _, s_rand_axis, s_R, _ = (
@@ -291,15 +293,39 @@ class BufferX(nn.Module):
             )
 
             #################################
-            # Multi-scale patch embedder
+            # BUFFER-X++: Incremental multi-scale processing with early exit
             #################################
-            ss_kpts_raw_list = [None] * num_scales
-            tt_kpts_raw_list = [None] * num_scales
+            is_aligned_to_global_z = data_source["is_aligned_to_global_z"]
+            enable_early_exit = cfg.match.get("enable_early_exit", True)
+            enable_timing = cfg.test.get("enable_timing", False)
 
-            # Furthest point sampling
-            desc_timer = Timer()
-            desc_timer.tic()
+            # Accumulated results across scales
+            R_accum = []
+            t_accum = []
+            ss_kpts_accum = []
+            tt_kpts_accum = []
+
+            init_pose = None
+            num_inliers = 0
+            num_inlier_ind = 0
+            scales_used = 0
+
+            desc_time_total = 0
+            pose_time_total = 0
+            pose_optim_total = 0
+
+            if enable_timing:
+                desc_timer = GPUTimer()
+                pose_timer = GPUTimer()
+
+            # Process scales incrementally (only extract keypoints/descriptors when needed)
+            should_exit = False
             for i, des_r in enumerate(des_r_list):
+                if enable_timing:
+                    desc_timer.tic()
+                #################################
+                # Extract keypoints for this scale
+                #################################
                 s_pts_flipped, t_pts_flipped = (
                     src_fds_pcd[None].transpose(1, 2).contiguous(),
                     tgt_fds_pcd[None].transpose(1, 2).contiguous(),
@@ -307,43 +333,25 @@ class BufferX(nn.Module):
                 s_fps_idx = pnt2.furthest_point_sample(src_fds_pcd[None], num_fps)
                 t_fps_idx = pnt2.furthest_point_sample(tgt_fds_pcd[None], num_fps)
 
-                kpts1 = pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
-                kpts2 = pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
-                ss_kpts_raw_list[i] = kpts1
-                tt_kpts_raw_list[i] = kpts2
-
-            ss_des_list = [None] * num_scales
-            tt_des_list = [None] * num_scales
-            is_aligned_to_global_z = data_source["is_aligned_to_global_z"]
-
-            # Multi-scale features by Mini-SpinNet
-            for i, des_r in enumerate(des_r_list):
-                src = self.Desc(
-                    src_fds_pcd[None], ss_kpts_raw_list[i], des_r, is_aligned_to_global_z
+                src_kpts = (
+                    pnt2.gather_operation(s_pts_flipped, s_fps_idx).transpose(1, 2).contiguous()
                 )
-                tgt = self.Desc(
-                    tgt_fds_pcd[None], tt_kpts_raw_list[i], des_r, is_aligned_to_global_z
+                tgt_kpts = (
+                    pnt2.gather_operation(t_pts_flipped, t_fps_idx).transpose(1, 2).contiguous()
                 )
-                ss_des_list[i] = src
-                tt_des_list[i] = tgt
-            desc_timer.toc()
-            R_list = [None] * num_scales
-            t_list = [None] * num_scales
-            ss_kpts_list = [None] * num_scales
-            tt_kpts_list = [None] * num_scales
 
-            #################################
-            # Hierachical inlier search
-            #################################
-            pose_time_total = 0
-            # For each scale
-            for i, (src_kpts, src, tgt_kpts, tgt) in enumerate(
-                zip(ss_kpts_raw_list, ss_des_list, tt_kpts_raw_list, tt_des_list)
-            ):
+                #################################
+                # Extract descriptors for this scale
+                #################################
+                src = self.Desc(src_fds_pcd[None], src_kpts, des_r, is_aligned_to_global_z)
+                tgt = self.Desc(tgt_fds_pcd[None], tgt_kpts, des_r, is_aligned_to_global_z)
+
                 src_des, src_equi, s_R = src["desc"], src["equi"], src["R"]
                 tgt_des, tgt_equi, t_R = tgt["desc"], tgt["equi"], tgt["R"]
 
+                #################################
                 # Intra-scale matching
+                #################################
                 s_mids, t_mids = self.mutual_matching(src_des, tgt_des)
 
                 ss_kpts = src_kpts[0, s_mids]
@@ -353,15 +361,17 @@ class BufferX(nn.Module):
                 tt_equi = tgt_equi[t_mids]
                 tt_R = t_R[t_mids]
 
-                pose_timer = Timer()
-                pose_timer.tic()
+                if enable_timing:
+                    desc_timer.toc()
+                    desc_time_total += desc_timer.diff / 1000.0  # Convert ms to seconds
+
+                if enable_timing:
+                    pose_timer.tic()
 
                 # Pairwise transformation estimation
                 ind = self.Pose(
                     ss_equi[:, :, 1 : cfg.patch.ele_n - 1], tt_equi[:, :, 1 : cfg.patch.ele_n - 1]
                 )
-                pose_timer.toc()
-                pose_time_total += pose_timer.diff
 
                 # Recover pose
                 angle = ind * 2 * np.pi / cfg.patch.azi_n + 1e-6
@@ -372,92 +382,74 @@ class BufferX(nn.Module):
 
                 R = tt_R @ azi_R @ ss_R.transpose(-1, -2)
                 t = tt_kpts - (R @ ss_kpts.unsqueeze(-1)).squeeze()
-                R_list[i] = R
-                t_list[i] = t
-                ss_kpts_list[i] = ss_kpts
-                tt_kpts_list[i] = tt_kpts
 
-            R = torch.cat(R_list, dim=0)
-            t = torch.cat(t_list, dim=0)
-            ss_kpts = torch.cat(ss_kpts_list, dim=0)
-            tt_kpts = torch.cat(tt_kpts_list, dim=0)
+                # Accumulate results from current scale
+                R_accum.append(R)
+                t_accum.append(t)
+                ss_kpts_accum.append(ss_kpts)
+                tt_kpts_accum.append(tt_kpts)
+                scales_used = i + 1
 
-            # Cross-scale consensus maximization
-            tss_kpts = ss_kpts[None] @ R.transpose(-1, -2) + t[:, None]
-            diffs = torch.sqrt(torch.sum((tss_kpts - tt_kpts[None]) ** 2, dim=-1))
-            thr = (
-                torch.sqrt(torch.sum(ss_kpts**2, dim=-1))
-                * np.pi
-                / cfg.patch.azi_n
-                * cfg.match.inlier_th
-            )
-            sign = diffs < thr[None]
-            inlier_num = torch.sum(sign, dim=-1)  # Number of inliers for the current des_r
-            best_ind = torch.argmax(inlier_num)
-            inlier_ind = torch.where(sign[best_ind])[0].detach().cpu().numpy()
+                # Concatenate accumulated results
+                R_cat = torch.cat(R_accum, dim=0)
+                t_cat = torch.cat(t_accum, dim=0)
+                ss_kpts_cat = torch.cat(ss_kpts_accum, dim=0)
+                tt_kpts_cat = torch.cat(tt_kpts_accum, dim=0)
 
-            # Pose estimation using RANSAC or KISS-Matcher
-            pose_timer = Timer()
-            pose_timer.tic()
-
-            if cfg.match.pose_estimator == "kiss_matcher":
-                # Use KISS-Matcher for pose estimation
-                try:
-                    from kiss_matcher import KISSMatcherConfig, KISSMatcher
-
-                    # Prepare point clouds (use inlier correspondences)
-                    src_pts = ss_kpts.detach().cpu().numpy()[inlier_ind]
-                    tgt_pts = tt_kpts.detach().cpu().numpy()[inlier_ind]
-
-                    # Configure and run KISS-Matcher
-                    kiss_config = KISSMatcherConfig(cfg.match.kiss_resolution)
-                    matcher = KISSMatcher(kiss_config)
-                    result = matcher.solve(src_pts.transpose(), tgt_pts.transpose())
-
-                    # Build transformation matrix
-                    init_pose = np.eye(4)
-                    init_pose[:3, :3] = result.rotation
-                    init_pose[:3, 3] = result.translation
-
-                    # Get inlier count
-                    num_inliers = matcher.get_num_final_inliers()
-
-                except ImportError:
-                    print(
-                        "Warning: KISS-Matcher not installed. "
-                        "Falling back to RANSAC. "
-                        "Install with: pip install kiss-matcher"
-                    )
-                    cfg.match.pose_estimator = "ransac"
-
-            if cfg.match.pose_estimator == "ransac":
-                # Use RANSAC for pose estimation
-                pcd0 = make_open3d_point_cloud(ss_kpts.detach().cpu().numpy(), [1, 0.706, 0])
-                pcd1 = make_open3d_point_cloud(tt_kpts.detach().cpu().numpy(), [0, 0.651, 0.929])
-                corr = o3d.utility.Vector2iVector(np.array([inlier_ind, inlier_ind]).T)
-                result = o3d.pipelines.registration.registration_ransac_based_on_correspondence(
-                    pcd0,
-                    pcd1,
-                    corr,
-                    cfg.match.dist_th,
-                    o3d.pipelines.registration.TransformationEstimationPointToPoint(False),
-                    3,
-                    [
-                        o3d.pipelines.registration.CorrespondenceCheckerBasedOnEdgeLength(
-                            cfg.match.similar_th
-                        ),
-                        o3d.pipelines.registration.CorrespondenceCheckerBasedOnDistance(
-                            cfg.match.dist_th
-                        ),
-                    ],
-                    o3d.pipelines.registration.RANSACConvergenceCriteria(
-                        cfg.match.iter_n, cfg.match.confidence
-                    ),
+                # Cross-scale consensus maximization on accumulated results
+                tss_kpts = ss_kpts_cat[None] @ R_cat.transpose(-1, -2) + t_cat[:, None]
+                diffs = torch.sqrt(torch.sum((tss_kpts - tt_kpts_cat[None]) ** 2, dim=-1))
+                thr = (
+                    torch.sqrt(torch.sum(ss_kpts_cat**2, dim=-1))
+                    * np.pi
+                    / cfg.patch.azi_n
+                    * cfg.match.inlier_th
                 )
-                init_pose = result.transformation
-                num_inliers = len(result.correspondence_set)
+                sign = diffs < thr[None]
+                inlier_num = torch.sum(sign, dim=-1)
+                best_ind = torch.argmax(inlier_num)
+                inlier_ind = torch.where(sign[best_ind])[0].detach().cpu().numpy()
+                num_inlier_ind = len(inlier_ind)
 
-            pose_timer.toc()
+                if enable_timing:
+                    pose_timer.toc()
+                    pose_time_total += pose_timer.diff / 1000.0  # Convert ms to seconds
+
+                # Estimate pose for early exit mode (check confidence after each scale)
+                if enable_early_exit and i == 0:
+                    if enable_timing:
+                        pose_timer.tic()
+                    init_pose, num_inliers = self.pose_estimator.estimate_pose(
+                        ss_kpts_cat, tt_kpts_cat, inlier_ind
+                    )
+                    if enable_timing:
+                        pose_timer.toc()
+                        pose_optim_total += pose_timer.diff / 1000.0  # Convert ms to seconds
+
+                    # Check confidence for early exit
+                    should_exit = self.pose_estimator.compute_confidence_score(num_inliers)
+
+                    if should_exit:
+                        # Early exit: confident enough with current scales
+                        break
+
+            # Use final accumulated results
+            ss_kpts = ss_kpts_cat
+            tt_kpts = tt_kpts_cat
+
+            # Number of mutual inliers (after mutual matching across used scales)
+            num_mutual_inliers = ss_kpts.shape[0]
+
+            # Estimate pose once at the end for non-early-exit mode
+            if not enable_early_exit or (enable_early_exit and not should_exit):
+                if enable_timing:
+                    pose_timer.tic()
+                init_pose, num_inliers = self.pose_estimator.estimate_pose(
+                    ss_kpts_cat, tt_kpts_cat, inlier_ind
+                )
+                if enable_timing:
+                    pose_timer.toc()
+                    pose_optim_total += pose_timer.diff / 1000.0  # Convert ms to seconds
 
             if cfg.test.pose_refine is True:
                 device = ss_kpts.device
@@ -466,8 +458,8 @@ class BufferX(nn.Module):
                 pose = pose[0].detach().cpu().numpy()
             else:
                 pose = init_pose
-            times = [desc_timer.diff, pose_time_total, pose_timer.diff]
-            return pose, times, num_inliers
+            times = [desc_time_total, pose_time_total, pose_optim_total]
+            return pose, times, num_inliers, num_mutual_inliers, num_inlier_ind, scales_used
 
     def mutual_matching(self, src_des, tgt_des):
         """
