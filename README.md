@@ -136,12 +136,81 @@ You can also run the evaluation script for all datasets at once by using the pro
 
 - `--experiment_id`: The ID of the experiment to use for testing.
 
+- `--pose_estimator`: Pose estimation backend. Choices: `ransac` (default) or `kiss_matcher`.
+
+- `--gpu`: GPU device index to use (default: `0`).
+
+- `--num_points_per_patch`, `--num_scales`, `--num_fps`, `--search_radius_thresholds`: Override the corresponding config values for ablation studies.
+
 Due to the large number and variety of datasets used in our experiments, we provide detailed download instructions and folder structures in a separate document:
 
 [DATASETS.md](dataset/DATASETS.md)
 
 </details>
 <br>
+
+______________________________________________________________________
+
+### Using KISS-Matcher as the Pose Solver
+
+This branch adds support for [KISS-Matcher](https://github.com/MIT-SPARK/KISS-Matcher) as an alternative to RANSAC for the final pose estimation step.
+
+#### Installation
+
+```bash
+pip install kiss-matcher
+```
+
+#### Usage
+
+Pass `--pose_estimator kiss_matcher` on the command line:
+
+```bash
+python test.py --dataset 3DMatch --experiment_id threedmatch --pose_estimator kiss_matcher --verbose
+```
+
+To use RANSAC (default behavior):
+
+```bash
+python test.py --dataset 3DMatch --experiment_id threedmatch --pose_estimator ransac --verbose
+```
+
+#### Configuration
+
+You can also set the pose estimator and its options directly in the config files (e.g., `config/indoor_config.py`):
+
+```python
+cfg.match.pose_estimator = "kiss_matcher"  # "ransac" or "kiss_matcher"
+cfg.match.kiss_resolution = 0.3            # Voxel resolution for KISS-Matcher
+```
+
+> **Note:** If `kiss-matcher` is not installed, the pipeline automatically falls back to RANSAC with a warning.
+
+______________________________________________________________________
+
+### Early Exit (Confidence-Aware Multi-Scale Processing)
+
+BUFFER-X++ introduces an **incremental multi-scale processing** strategy that stops computing additional scales once the pose estimate is already confident enough. This reduces unnecessary descriptor extraction and speeds up inference.
+
+The early exit is triggered when the number of RANSAC/KISS-Matcher inliers exceeds `early_exit_min_inliers` after the first scale.
+
+#### Configuration
+
+```python
+cfg.match.enable_early_exit = True   # Enable confidence-aware early exit (default: True)
+cfg.match.early_exit_min_inliers = 50  # Minimum inlier count to trigger early exit
+```
+
+______________________________________________________________________
+
+### Output Files
+
+After each test run, results are automatically saved:
+
+- **Per-sample `.txt`**: detailed per-frame metrics (success, RTE, RRE, inlier counts, timing) under `per_sample_results/<exp_name>/`.
+- **Summary `.mat`**: aggregated statistics (recall, RTE/RRE mean ± std, timing) saved to the root directory as `results_<exp_name>_<params>_<timestamp>.mat`. Compatible with MATLAB and `scipy.io.loadmat`.
+
+______________________________________________________________________
 
 #### Training
 
@@ -189,5 +258,6 @@ ______________________________________________________________________
 
 ### Updates
 
+- 28/02/2026: Added **KISS-Matcher** pose solver support and confidence-aware **early exit** for multi-scale processing.
 - 25/07/2025: This work is selected as a **Highlight** paper at ICCV 2025.
 - 25/06/2025: This work is accepted by ICCV 2025.
