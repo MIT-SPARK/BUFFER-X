@@ -1,11 +1,11 @@
 import argparse
+import csv
 import os
 
 import time
 import torch
 import torch.nn as nn
 import numpy as np
-from scipy.io import savemat
 from utils.timer import Timer
 from utils.gpu_timer import GPUTimer
 from utils.SE3 import compute_rte, compute_rre
@@ -100,7 +100,6 @@ def run(args, timestr, experiment_id, dataset_name):
     os.makedirs(results_dir, exist_ok=True)
 
     # Run test
-    overall_time = None
     all_times = []
     with torch.no_grad():
         states = []
@@ -169,11 +168,6 @@ def run(args, timestr, experiment_id, dataset_name):
                 logger.info(f"{i}th fragment failed, RRE: {rre:.4f}, RTE: {rte:.4f}")
 
             curr_time = np.array([data_timer.diff, model_timer.diff / 1000.0, *times])
-            if i > FIRST_A_FEW_FRAMES:
-                if overall_time is None:
-                    overall_time = curr_time
-                else:
-                    overall_time += curr_time
             all_times.append(curr_time)
             torch.cuda.empty_cache()
 
@@ -208,27 +202,54 @@ def run(args, timestr, experiment_id, dataset_name):
     scales_used_mean = states[:, 6].mean()
     scales_used_std = states[:, 6].std()
 
-    # Save per-sample results to txt file (using parameters for ablation studies)
+    # Save per-sample results to csv file (using parameters for ablation studies)
     per_sample_file = (
         f"{results_dir}/{exp_name}_{dataset_name}_"
-        f"{cfg.patch.num_points_per_patch}_{cfg.patch.num_scales}_{cfg.patch.num_fps}_{timestr}.txt"
+        f"{cfg.patch.num_points_per_patch}_{cfg.patch.num_scales}_{cfg.patch.num_fps}_{timestr}.csv"
     )
-    with open(per_sample_file, "w") as f:
+    with open(per_sample_file, "w", newline="") as f:
+        writer = csv.writer(f)
         pose_method = cfg.match.pose_estimator.upper()
         early_exit_status = "ON" if cfg.match.get("enable_early_exit", True) else "OFF"
-        header = (
-            f"# Pose Estimator: {pose_method} | Early Exit: {early_exit_status}\n"
-            "# Sample_ID\tSuccess\tRTE(m)\tRRE(deg)\tNum_Inliers\t"
-            "Num_Mutual_Inliers\tNum_Inlier_Ind\tScales_Used\t"
-            "Data_time(s)\tModel_time(s)\tDesc_time(s)\tPose_time(s)\tPoseEst_time(s)\n"
+        writer.writerow(
+            [
+                "sample_id",
+                "success",
+                "rte_m",
+                "rre_deg",
+                "num_inliers",
+                "num_mutual_inliers",
+                "num_inlier_ind",
+                "scales_used",
+                "data_time_s",
+                "model_time_s",
+                "desc_time_s",
+                "pose_time_s",
+                "poseest_time_s",
+                "pose_estimator",
+                "early_exit",
+            ]
         )
-        f.write(header)
         for idx, state in enumerate(states):
             success_flag = int(state[0])
-            f.write(
-                f"{idx}\t{success_flag}\t{state[1]:.6f}\t{state[2]:.6f}\t"
-                f"{int(state[3])}\t{int(state[4])}\t{int(state[5])}\t{int(state[6])}\t"
-                f"{state[7]:.6f}\t{state[8]:.6f}\t{state[9]:.6f}\t{state[10]:.6f}\t{state[11]:.6f}\n"
+            writer.writerow(
+                [
+                    idx,
+                    success_flag,
+                    f"{state[1]:.6f}",
+                    f"{state[2]:.6f}",
+                    int(state[3]),
+                    int(state[4]),
+                    int(state[5]),
+                    int(state[6]),
+                    f"{state[7]:.6f}",
+                    f"{state[8]:.6f}",
+                    f"{state[9]:.6f}",
+                    f"{state[10]:.6f}",
+                    f"{state[11]:.6f}",
+                    pose_method,
+                    early_exit_status,
+                ]
             )
     logger.info(f"Per-sample results saved to {per_sample_file}")
 
@@ -278,13 +299,13 @@ def run(args, timestr, experiment_id, dataset_name):
     logger.info(f"Early Exit: {early_exit_status}")
 
     all_times = np.array(all_times)
-    average_times = overall_time / (num_batch - FIRST_A_FEW_FRAMES)
-
-    # Exclude first FIRST_A_FEW_FRAMES iterations (warmup) from std calculation
+    # Exclude first FIRST_A_FEW_FRAMES iterations (warmup) from both mean and std.
     if len(all_times) > FIRST_A_FEW_FRAMES:
-        std_times = all_times[FIRST_A_FEW_FRAMES:].std(axis=0)
+        effective_times = all_times[FIRST_A_FEW_FRAMES:]
     else:
-        std_times = all_times.std(axis=0)
+        effective_times = all_times
+    average_times = effective_times.mean(axis=0)
+    std_times = effective_times.std(axis=0)
 
     logger.info(f"Average data_time: {average_times[0]:.4f}s ± {std_times[0]:.4f}s")
     logger.info(f"Average model_time: {average_times[1]:.4f}s ± {std_times[1]:.4f}s")
@@ -442,77 +463,89 @@ if __name__ == "__main__":
             num_fps = nfps
 
         results.append(
-            [
-                dataset_name,
-                f"{recall:.4f}",
-                f"{rte_mean * 100:.4f}",
-                f"{rte_std * 100:.4f}",
-                f"{rre_mean:.4f}",
-                f"{rre_std:.4f}",
-                f"{inliers_mean:.2f}",
-                f"{inliers_std:.2f}",
-                f"{mutual_inliers_mean:.2f}",
-                f"{mutual_inliers_std:.2f}",
-                f"{inlier_ind_mean:.2f}",
-                f"{inlier_ind_std:.2f}",
-                f"{scales_used_mean:.2f}",
-                f"{scales_used_std:.2f}",
-                f"{avg_data_time:.4f}s",
-                f"{std_data_time:.4f}s",
-                f"{avg_model_time:.4f}s",
-                f"{std_model_time:.4f}s",
-            ]
+            {
+                "dataset": dataset_name,
+                "recall": recall,
+                "rte_mean_cm": rte_mean * 100,
+                "rte_std_cm": rte_std * 100,
+                "rre_mean_deg": rre_mean,
+                "rre_std_deg": rre_std,
+                "inliers_mean": inliers_mean,
+                "inliers_std": inliers_std,
+                "mutual_inliers_mean": mutual_inliers_mean,
+                "mutual_inliers_std": mutual_inliers_std,
+                "inlier_ind_mean": inlier_ind_mean,
+                "inlier_ind_std": inlier_ind_std,
+                "scales_used_mean": scales_used_mean,
+                "scales_used_std": scales_used_std,
+                "avg_data_time_s": avg_data_time,
+                "std_data_time_s": std_data_time,
+                "avg_model_time_s": avg_model_time,
+                "std_model_time_s": std_model_time,
+            }
         )
 
     print("\n\033[1;32m========== Final Results Summary ==========")
-    headers = [
+    print_headers = [
         "Scene",
         "Recall",
-        "RTE (cm)",
+        "RTE mean (cm)",
         "RTE std (cm)",
-        "RRE (deg)",
+        "RRE mean (deg)",
         "RRE std (deg)",
-        "Inliers",
-        "Inliers std",
-        "Mutual Inl",
-        "Mutual std",
-        "Inlier Ind",
-        "Inl Ind std",
-        "Scales Used",
-        "Scales std",
-        "Avg data t",
-        "Std data t",
-        "Avg model t",
-        "Std model t",
+        "Avg data t (s)",
+        "Avg model t (s)",
     ]
-    print(tabulate(results, headers=headers, tablefmt="grid"), "\033[0m")
+    print_rows = [
+        [
+            r["dataset"],
+            f"{r['recall']:.4f}",
+            f"{r['rte_mean_cm']:.4f}",
+            f"{r['rte_std_cm']:.4f}",
+            f"{r['rre_mean_deg']:.4f}",
+            f"{r['rre_std_deg']:.4f}",
+            f"{r['avg_data_time_s']:.4f}",
+            f"{r['avg_model_time_s']:.4f}",
+        ]
+        for r in results
+    ]
+    print(tabulate(print_rows, headers=print_headers, tablefmt="grid"), "\033[0m")
 
-    # Save results to .mat file for Matlab
-    matlab_results = {
-        "datasets": [r[0] for r in results],
-        "recall": np.array([float(r[1]) for r in results]),
-        "rte_mean_cm": np.array([float(r[2]) for r in results]),
-        "rte_std_cm": np.array([float(r[3]) for r in results]),
-        "rre_mean_deg": np.array([float(r[4]) for r in results]),
-        "rre_std_deg": np.array([float(r[5]) for r in results]),
-        "inliers_mean": np.array([float(r[6]) for r in results]),
-        "inliers_std": np.array([float(r[7]) for r in results]),
-        "mutual_inliers_mean": np.array([float(r[8]) for r in results]),
-        "mutual_inliers_std": np.array([float(r[9]) for r in results]),
-        "inlier_ind_mean": np.array([float(r[10]) for r in results]),
-        "inlier_ind_std": np.array([float(r[11]) for r in results]),
-        "scales_used_mean": np.array([float(r[12]) for r in results]),
-        "scales_used_std": np.array([float(r[13]) for r in results]),
-        "avg_data_time_s": np.array([float(r[14].replace("s", "")) for r in results]),
-        "std_data_time_s": np.array([float(r[15].replace("s", "")) for r in results]),
-        "avg_model_time_s": np.array([float(r[16].replace("s", "")) for r in results]),
-        "std_model_time_s": np.array([float(r[17].replace("s", "")) for r in results]),
-        "experiment_id": experiment_id,
-        "timestamp": timestr,
-    }
+    # Save full results to csv
+    full_results_dir = f"full_results/{experiment_id}"
+    os.makedirs(full_results_dir, exist_ok=True)
     exp_name = experiment_id.rsplit("/", 1)[-1]
-    mat_file_path = (
-        f"results_{exp_name}_{num_points_per_patch}_{num_scales}_{num_fps}_{timestr}.mat"
+    csv_file_path = (
+        f"{full_results_dir}/results_{exp_name}_{num_points_per_patch}_{num_scales}_{num_fps}_{timestr}.csv"
     )
-    savemat(mat_file_path, matlab_results)
-    print(f"\n\033[1;34mResults saved to {mat_file_path} for Matlab\033[0m")
+    csv_headers = [
+        "dataset",
+        "recall",
+        "rte_mean_cm",
+        "rte_std_cm",
+        "rre_mean_deg",
+        "rre_std_deg",
+        "inliers_mean",
+        "inliers_std",
+        "mutual_inliers_mean",
+        "mutual_inliers_std",
+        "inlier_ind_mean",
+        "inlier_ind_std",
+        "scales_used_mean",
+        "scales_used_std",
+        "avg_data_time_s",
+        "std_data_time_s",
+        "avg_model_time_s",
+        "std_model_time_s",
+        "experiment_id",
+        "timestamp",
+    ]
+    with open(csv_file_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=csv_headers)
+        writer.writeheader()
+        for row in results:
+            row_with_meta = row.copy()
+            row_with_meta["experiment_id"] = experiment_id
+            row_with_meta["timestamp"] = timestr
+            writer.writerow(row_with_meta)
+    print(f"\n\033[1;34mResults saved to {csv_file_path}\033[0m")
