@@ -1,5 +1,71 @@
 from functools import partial
+import os
+import re
 import torch
+
+
+def _extract_scene_name(list_data):
+    """
+    Infer a stable scene identifier across datasets from the sample metadata.
+    """
+    scene_name = list_data.get("scene_name")
+    if scene_name is not None and str(scene_name) != "":
+        return str(scene_name)
+
+    dataset_name = str(list_data.get("dataset_name", ""))
+    src_id = str(list_data.get("src_id", ""))
+    sensor = str(list_data.get("sensor", ""))
+    src_id = src_id.replace("\\", "/")
+    parts = [p for p in src_id.split("/") if p]
+
+    if dataset_name in {"3DMatch", "3DLoMatch"}:
+        if "fragments" in parts:
+            frag_idx = parts.index("fragments")
+            if frag_idx + 1 < len(parts):
+                return parts[frag_idx + 1]
+        if parts:
+            return parts[0]
+
+    if dataset_name == "Scannetpp_iphone":
+        if parts:
+            return parts[0]
+
+    if dataset_name == "Scannetpp_faro":
+        if len(parts) >= 2 and parts[0] == "data":
+            return parts[1]
+        if parts:
+            return parts[0]
+
+    if dataset_name == "ETH":
+        if parts:
+            return parts[0]
+
+    if dataset_name in {"KITTI", "WOD", "MIT", "Oxford", "KAIST", "TIERS", "TIERS_hetero"}:
+        src_base = os.path.basename(src_id)
+        drive_match = re.match(r"^(.*)_(\d+)$", src_base)
+        drive = drive_match.group(1) if drive_match else src_base
+        if dataset_name == "KITTI" and str(drive).isdigit():
+            drive = f"{int(drive):02d}"
+        return drive
+
+    if dataset_name == "KAIST_hetero":
+        return "KAIST"
+
+    if dataset_name == "ModelNet40":
+        # src_id/tgt_id are object-local frame ids (e.g., "airplane_0123")
+        # so keep dataset-level grouping if object id is unavailable.
+        return "ModelNet40"
+
+    if sensor:
+        return sensor
+
+    if len(parts) >= 2:
+        return parts[-2]
+    if parts:
+        return parts[0]
+    if dataset_name:
+        return dataset_name
+    return "unknown"
 
 
 def collate_fn_descriptor(list_data, config):
@@ -16,6 +82,8 @@ def collate_fn_descriptor(list_data, config):
 
     src_sds, tgt_sds = list_data["src_sds_pts"], list_data["tgt_sds_pts"]
     src_id, tgt_id = list_data["src_id"], list_data["tgt_id"]
+    scene_name = _extract_scene_name(list_data)
+    sensor = list_data.get("sensor", "")
 
     batched_voxel_size_list.append(list_data["voxel_size"])
     batched_dataset_names.append(list_data["dataset_name"])
@@ -45,6 +113,8 @@ def collate_fn_descriptor(list_data, config):
         "relt_pose": torch.tensor(list_data["relt_pose"], dtype=torch.float32),
         "src_id": src_id,
         "tgt_id": tgt_id,
+        "scene_name": scene_name,
+        "sensor": sensor,
         "voxel_sizes": batched_voxel_sizes,
         "dataset_names": batched_dataset_names,
         "sphericity": batched_sphericity,

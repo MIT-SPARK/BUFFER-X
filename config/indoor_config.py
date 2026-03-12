@@ -73,7 +73,7 @@ class IndoorBaseConfig:
         self._C.match.kiss_resolution = 0.3  # Voxel size for KISS-Matcher
 
         # BUFFER-X++ Early Exit settings
-        self._C.match.enable_early_exit = True  # Enable confidence-aware early exit
+        self._C.match.enable_early_exit = False  # Enable confidence-aware early exit
         self._C.match.early_exit_min_inliers = 50  # Minimum absolute inlier count for early exit
 
     def get_cfg(self):

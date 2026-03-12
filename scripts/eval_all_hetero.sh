@@ -18,27 +18,21 @@ if [ $# -gt 0 ] && [[ "$1" != --* ]]; then
 fi
 EXTRA_ARGS=("$@")
 
-DATASETS=(
-  "3DMatch"
-  "3DLoMatch"
-  "Scannetpp_iphone"
-  "Scannetpp_faro"
-  "TIERS"
-  "KITTI"
-  "WOD"
-  "MIT"
-  "KAIST"
-  "ETH"
-  "Oxford"
+HETERO_PAIRS=(
+  "KAIST_hetero:Aeva->Avia"
+  "KAIST_hetero:Avia->Ouster"
+  "KAIST_hetero:Ouster->Aeva"
+  "TIERS_hetero:os0_128->os1_64"
+  "TIERS_hetero:os1_64->vel16"
+  "TIERS_hetero:vel16->os0_128"
 )
 
-DATASET_ARGS="${DATASETS[@]}"
-
 echo "============================================================"
-echo "Starting evaluation across all standard benchmark datasets"
+echo "Starting hetero evaluation across configured sensor directions"
 echo "============================================================"
 CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES_VALUE:-0}" python test.py \
-  --dataset $DATASET_ARGS \
-  --experiment_id "$EXPERIMENT_ID" \
+  --dataset KAIST_hetero TIERS_hetero \
+  --experiment_id "${EXPERIMENT_ID}" \
+  --hetero_pairs "${HETERO_PAIRS[@]}" \
   --verbose \
   "${EXTRA_ARGS[@]}"

@@ -1,6 +1,6 @@
-import argparse
-import csv
 import os
+import shutil
+import sys
 
 import time
 import torch
@@ -8,17 +8,30 @@ import torch.nn as nn
 import numpy as np
 from utils.timer import Timer
 from utils.gpu_timer import GPUTimer
+from utils.test_args import build_eval_targets, parse_test_args
+from utils.result_io import (
+    print_final_results_summary,
+    save_full_results_csv,
+    save_per_sample_results,
+)
 from utils.SE3 import compute_rte, compute_rre
+from utils.progress_format import resolve_sample_display_fields
 from utils.tools import evaluate_registration, read_trajectory, read_trajectory_info, setup_logger
 from config import make_cfg
 from dataset.dataloader import get_dataloader
 from models.BUFFERX import BufferX
-from tabulate import tabulate
 
 FIRST_A_FEW_FRAMES = 5
 
 
-def run(args, timestr, experiment_id, dataset_name):
+def run(
+    args,
+    timestr,
+    experiment_id,
+    dataset_name,
+    src_sensor_override=None,
+    tgt_sensor_override=None,
+):
     # Set default CUDA device
     torch.cuda.set_device(args.gpu)
 
@@ -33,9 +46,6 @@ def run(args, timestr, experiment_id, dataset_name):
     cfg = make_cfg(dataset_name, args.root_dir)
     cfg[cfg.data.dataset] = cfg.copy()
     cfg.stage = "test"
-
-    if dataset_name.endswith("_hetero"):
-        logger.info(f"Heterogeneous evaluation: {cfg.data.src_sensor} -> {cfg.data.tgt_sensor}")
 
     # Overwrite config with command-line arguments if provided
     if args.num_points_per_patch is not None:
@@ -53,6 +63,19 @@ def run(args, timestr, experiment_id, dataset_name):
     if args.pose_estimator is not None:
         cfg.match.pose_estimator = args.pose_estimator
         logger.info(f"\033[1;32mOverwriting pose_estimator: {args.pose_estimator}\033[0m")
+    if dataset_name.endswith("_hetero"):
+        src_sensor = src_sensor_override if src_sensor_override is not None else args.src_sensor
+        tgt_sensor = tgt_sensor_override if tgt_sensor_override is not None else args.tgt_sensor
+        if src_sensor is not None:
+            cfg.data.src_sensor = src_sensor
+            logger.info(f"Overwriting src_sensor: {src_sensor}")
+        if tgt_sensor is not None:
+            cfg.data.tgt_sensor = tgt_sensor
+            logger.info(f"Overwriting tgt_sensor: {tgt_sensor}")
+        logger.info(f"Heterogeneous evaluation: {cfg.data.src_sensor} -> {cfg.data.tgt_sensor}")
+    scene_label = dataset_name
+    if dataset_name.endswith("_hetero"):
+        scene_label = f"{dataset_name}:{cfg.data.src_sensor}->{cfg.data.tgt_sensor}"
 
     # Initialize model
     # TODO(hlim): If `cfg` specifies a different model, the model can be changed.
@@ -164,28 +187,70 @@ def run(args, timestr, experiment_id, dataset_name):
                 ]
             )
 
-            if (rte > rte_thresh or rre > rre_thresh) and args.verbose:
-                logger.info(f"{i}th fragment failed, RRE: {rre:.4f}, RTE: {rte:.4f}")
-
             curr_time = np.array([data_timer.diff, model_timer.diff / 1000.0, *times])
             all_times.append(curr_time)
             torch.cuda.empty_cache()
 
-            # logger.info progress every 100 iterations
-            if ((i + 1) % 100 == 0 or i == num_batch - 1) and args.verbose:
+            # tqdm-like single-line verbose progress (updated every iteration)
+            if args.verbose:
                 temp_states = np.array(states)
                 temp_recall = temp_states[:, 0].sum() / temp_states.shape[0]
-                temp_te = temp_states[temp_states[:, 0] == 1, 1].mean()
-                temp_re = temp_states[temp_states[:, 0] == 1, 2].mean()
+                success_mask = temp_states[:, 0] == 1
+                if success_mask.any():
+                    temp_te = temp_states[success_mask, 1].mean()
+                    temp_re = temp_states[success_mask, 2].mean()
+                else:
+                    temp_te = float("nan")
+                    temp_re = float("nan")
 
-                log_prefix = f"[{i + 1}/{num_batch}]"
-                log_metrics = f"Recall: {temp_recall:.4f} RTE: {temp_te:.4f} RRE: {temp_re:.4f}"
-                log_timing = (
-                    f"Data time: {data_timer.diff:.4f}s "
-                    f"Model time: {model_timer.diff / 1000.0:.4f}s"
+                sample_fields = resolve_sample_display_fields(
+                    data_source, fallback_dataset_name=dataset_name
+                )
+                scene_name = sample_fields["scene_name"]
+                sensor_name = sample_fields["sensor_name"]
+                src_disp = sample_fields["src_disp"]
+                tgt_disp = sample_fields["tgt_disp"]
+                fail_src = sample_fields["fail_src"]
+                fail_tgt = sample_fields["fail_tgt"]
+                sensor_prefix = f"Sensor: {sensor_name} " if sensor_name else ""
+                sensor_log = f" | Sensor: {sensor_name}" if sensor_name else ""
+
+                if rte > rte_thresh or rre > rre_thresh:
+                    sys.stdout.write("\r\033[K")
+                    sys.stdout.flush()
+                    logger.info(
+                        f"[FAIL {i + 1}/{num_batch}] Scene: {scene_name}{sensor_log} | "
+                        f"Src: {fail_src} | Tgt: {fail_tgt} | "
+                        f"RRE: {rre:.4f} (th: {rre_thresh:.4f}), "
+                        f"RTE: {rte:.4f} (th: {rte_thresh:.4f})"
+                    )
+
+                progress_line = (
+                    f"[{i + 1}/{num_batch}] "
+                    f"Scene: {scene_name} "
+                    f"{sensor_prefix}"
+                    f"Src: {src_disp} "
+                    f"Tgt: {tgt_disp} "
+                    f"Recall: {temp_recall:.4f} "
+                    f"RTE: {temp_te:.4f} "
+                    f"RRE: {temp_re:.4f} "
+                    f"Data t: {data_timer.diff:.4f}s "
+                    f"Model t: {model_timer.diff / 1000.0:.4f}s"
                 )
 
-                logger.info(f"{log_prefix} {log_metrics} {log_timing}")
+                # Keep progress on one terminal row: truncate to width and clear remainder.
+                term_width = shutil.get_terminal_size(fallback=(120, 20)).columns
+                max_len = max(1, term_width - 1)
+                if len(progress_line) > max_len:
+                    progress_line = (
+                        f"{progress_line[: max_len - 3]}..." if max_len > 3 else progress_line[:max_len]
+                    )
+                sys.stdout.write("\r\033[K" + progress_line)
+                sys.stdout.flush()
+
+    if args.verbose:
+        # Move to next line after in-place progress output.
+        print()
 
     states = np.array(states)
     recall = states[:, 0].sum() / states.shape[0]
@@ -207,50 +272,9 @@ def run(args, timestr, experiment_id, dataset_name):
         f"{results_dir}/{exp_name}_{dataset_name}_"
         f"{cfg.patch.num_points_per_patch}_{cfg.patch.num_scales}_{cfg.patch.num_fps}_{timestr}.csv"
     )
-    with open(per_sample_file, "w", newline="") as f:
-        writer = csv.writer(f)
-        pose_method = cfg.match.pose_estimator.upper()
-        early_exit_status = "ON" if cfg.match.get("enable_early_exit", True) else "OFF"
-        writer.writerow(
-            [
-                "sample_id",
-                "success",
-                "rte_m",
-                "rre_deg",
-                "num_inliers",
-                "num_mutual_inliers",
-                "num_inlier_ind",
-                "scales_used",
-                "data_time_s",
-                "model_time_s",
-                "desc_time_s",
-                "pose_time_s",
-                "poseest_time_s",
-                "pose_estimator",
-                "early_exit",
-            ]
-        )
-        for idx, state in enumerate(states):
-            success_flag = int(state[0])
-            writer.writerow(
-                [
-                    idx,
-                    success_flag,
-                    f"{state[1]:.6f}",
-                    f"{state[2]:.6f}",
-                    int(state[3]),
-                    int(state[4]),
-                    int(state[5]),
-                    int(state[6]),
-                    f"{state[7]:.6f}",
-                    f"{state[8]:.6f}",
-                    f"{state[9]:.6f}",
-                    f"{state[10]:.6f}",
-                    f"{state[11]:.6f}",
-                    pose_method,
-                    early_exit_status,
-                ]
-            )
+    pose_method = cfg.match.pose_estimator.upper()
+    early_exit_status = "ON" if cfg.match.get("enable_early_exit", True) else "OFF"
+    save_per_sample_results(states, per_sample_file, pose_method, early_exit_status)
     logger.info(f"Per-sample results saved to {per_sample_file}")
 
     if cfg.data.dataset == "3DMatch":
@@ -282,7 +306,7 @@ def run(args, timestr, experiment_id, dataset_name):
                 rmse_recall.append(temp_recall)
 
     # logger.info summary
-    logger.info(f"\n---------------Results for {dataset_name}---------------")
+    logger.info(f"\n---------------Results for {scene_label}---------------")
     logger.info(f"Recall: {recall:.8f}")
     if cfg.data.dataset == "3DMatch":
         logger.info(f"RMSE Recall (3DMatch Evaluation): {np.array(rmse_recall).mean():.8f}")
@@ -314,6 +338,7 @@ def run(args, timestr, experiment_id, dataset_name):
     logger.info(f"Average pose_optim_time: {average_times[4]:.4f}s ± {std_times[4]:.4f}s")
 
     return (
+        scene_label,
         recall,
         rte_mean,
         rre_mean,
@@ -338,91 +363,7 @@ def run(args, timestr, experiment_id, dataset_name):
 
 
 if __name__ == "__main__":
-    # Argument parser
-    parser = argparse.ArgumentParser(
-        description="Generalized Testing Script for Registration Models"
-    )
-    parser.add_argument(
-        "--root_dir", type=str, default="../datasets", help="Root directory for all datasets"
-    )
-
-    parser.add_argument(
-        "--dataset",
-        type=str,
-        required=True,
-        nargs="+",
-        choices=[
-            "3DMatch",
-            "3DLoMatch",
-            "Scannetpp_iphone",
-            "Scannetpp_faro",
-            "TIERS",
-            "TIERS_hetero",
-            "KITTI",
-            "WOD",
-            "MIT",
-            "KAIST",
-            "KAIST_hetero",
-            "ETH",
-            "Oxford",
-            "ModelNet40",
-        ],
-        help="Dataset to test on",
-    )
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="If set, print detailed progress messages during testing",
-    )
-    parser.add_argument(
-        "--experiment_id",
-        type=str,
-        default=None,
-        help="Optional experiment ID (default: uses config.test.experiment_id)",
-    )
-    parser.add_argument(
-        "--num_points_per_patch",
-        type=int,
-        default=None,
-        help="Number of points per patch (default: uses config value)",
-    )
-    parser.add_argument(
-        "--num_scales",
-        type=int,
-        default=None,
-        help="Number of scales for multi-scale patch embedder (default: uses config value)",
-    )
-    parser.add_argument(
-        "--num_fps",
-        type=int,
-        default=None,
-        help="Number of FPS (Farthest Point Sampling) points (default: uses config value)",
-    )
-    parser.add_argument(
-        "--search_radius_thresholds",
-        type=float,
-        nargs="+",
-        default=None,
-        help=(
-            "Search radius thresholds in decreasing order "
-            "(e.g., --search_radius_thresholds 5 2 0.5)"
-        ),
-    )
-    parser.add_argument(
-        "--pose_estimator",
-        type=str,
-        default=None,
-        choices=["ransac", "kiss_matcher"],
-        help='Pose estimation method: "ransac" or "kiss_matcher" (default: uses config value)',
-    )
-    parser.add_argument(
-        "--gpu",
-        type=int,
-        default=0,
-        choices=[0, 1],
-        help="GPU device to use: 0 or 1 (default: 0)",
-    )
-    args = parser.parse_args()
+    args = parse_test_args()
 
     timestr = time.strftime("%m%d%H%M")
     # NOTE(hlim): We employ the model trained 3DMatch as a default mode.
@@ -432,8 +373,10 @@ if __name__ == "__main__":
     num_scales = None
     num_fps = None
 
-    for dataset_name in args.dataset:
+    eval_targets = build_eval_targets(args)
+    for dataset_name, src_sensor_override, tgt_sensor_override in eval_targets:
         (
+            scene_label,
             recall,
             rte_mean,
             rre_mean,
@@ -454,7 +397,14 @@ if __name__ == "__main__":
             npp,
             ns,
             nfps,
-        ) = run(args, timestr, experiment_id, dataset_name)
+        ) = run(
+            args,
+            timestr,
+            experiment_id,
+            dataset_name,
+            src_sensor_override,
+            tgt_sensor_override,
+        )
 
         # Store config values from first dataset for filename
         if num_points_per_patch is None:
@@ -464,7 +414,7 @@ if __name__ == "__main__":
 
         results.append(
             {
-                "dataset": dataset_name,
+                "dataset": scene_label,
                 "recall": recall,
                 "rte_mean_cm": rte_mean * 100,
                 "rte_std_cm": rte_std * 100,
@@ -485,67 +435,14 @@ if __name__ == "__main__":
             }
         )
 
-    print("\n\033[1;32m========== Final Results Summary ==========")
-    print_headers = [
-        "Scene",
-        "Recall",
-        "RTE mean (cm)",
-        "RTE std (cm)",
-        "RRE mean (deg)",
-        "RRE std (deg)",
-        "Avg data t (s)",
-        "Avg model t (s)",
-    ]
-    print_rows = [
-        [
-            r["dataset"],
-            f"{r['recall']:.4f}",
-            f"{r['rte_mean_cm']:.4f}",
-            f"{r['rte_std_cm']:.4f}",
-            f"{r['rre_mean_deg']:.4f}",
-            f"{r['rre_std_deg']:.4f}",
-            f"{r['avg_data_time_s']:.4f}",
-            f"{r['avg_model_time_s']:.4f}",
-        ]
-        for r in results
-    ]
-    print(tabulate(print_rows, headers=print_headers, tablefmt="grid"), "\033[0m")
+    print_final_results_summary(results)
 
-    # Save full results to csv
-    full_results_dir = f"full_results/{experiment_id}"
-    os.makedirs(full_results_dir, exist_ok=True)
-    exp_name = experiment_id.rsplit("/", 1)[-1]
-    csv_file_path = (
-        f"{full_results_dir}/results_{exp_name}_{num_points_per_patch}_{num_scales}_{num_fps}_{timestr}.csv"
+    csv_file_path = save_full_results_csv(
+        results,
+        experiment_id,
+        timestr,
+        num_points_per_patch,
+        num_scales,
+        num_fps,
     )
-    csv_headers = [
-        "dataset",
-        "recall",
-        "rte_mean_cm",
-        "rte_std_cm",
-        "rre_mean_deg",
-        "rre_std_deg",
-        "inliers_mean",
-        "inliers_std",
-        "mutual_inliers_mean",
-        "mutual_inliers_std",
-        "inlier_ind_mean",
-        "inlier_ind_std",
-        "scales_used_mean",
-        "scales_used_std",
-        "avg_data_time_s",
-        "std_data_time_s",
-        "avg_model_time_s",
-        "std_model_time_s",
-        "experiment_id",
-        "timestamp",
-    ]
-    with open(csv_file_path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=csv_headers)
-        writer.writeheader()
-        for row in results:
-            row_with_meta = row.copy()
-            row_with_meta["experiment_id"] = experiment_id
-            row_with_meta["timestamp"] = timestr
-            writer.writerow(row_with_meta)
     print(f"\n\033[1;34mResults saved to {csv_file_path}\033[0m")

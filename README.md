@@ -10,7 +10,12 @@
     </p>
     <a href="https://github.com/MIT-SPARK/BUFFER-X"><img src="https://img.shields.io/badge/Python-3670A0?logo=python&logoColor=ffdd54" /></a>
     <a href="https://github.com/MIT-SPARK/BUFFER-X"><img src="https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black" /></a>
-    <a href="https://arxiv.org/abs/2503.07940"><img src="https://img.shields.io/badge/arXiv-b33737?logo=arXiv" /></a>
+    <a href="https://arxiv.org/abs/2503.07940">
+    <img src="https://img.shields.io/badge/arXiv-%20(ICCV%202025)-b33737?logo=arXiv&logoColor=white" />
+    </a>
+    <a href="https://arxiv.org/abs/2601.02759">
+    <img src="https://img.shields.io/badge/arXiv-%20(Extension%202026)-b33737?logo=arXiv&logoColor=white" />
+    </a>
     <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode"><img src="https://img.shields.io/badge/license-CC4.0-blue.svg" /></a>
   <br />
   <br />
@@ -19,7 +24,7 @@
   Official repository of BUFFER-X, a zero-shot point cloud registration method<br> across diverse scenes without retraining or tuning.</em></strong></p>
 </div>
 
-______________________________________________________________________
+________________________________
 
 ## 🧭 Structure Overview
 
@@ -117,6 +122,12 @@ You can also run the evaluation script for all datasets at once by using the pro
 ./scripts/eval_all.sh <EXPERIMENT ID>
 ```
 
+For heterogeneous evaluation settings introduced in the extended version, use:
+
+```
+./scripts/eval_all_hetero.sh <EXPERIMENT ID>
+```
+
 <details>
   <summary><strong>Detailed explanation about configuration</a></strong></summary>
 
@@ -133,6 +144,8 @@ You can also run the evaluation script for all datasets at once by using the pro
   - `KAIST`
   - `ETH`
   - `Oxford`
+  - `TIERS_hetero`
+  - `KAIST_hetero`
 
 - `--experiment_id`: The ID of the experiment to use for testing.
 
@@ -141,6 +154,17 @@ You can also run the evaluation script for all datasets at once by using the pro
 - `--gpu`: GPU device index to use (default: `0`).
 
 - `--num_points_per_patch`, `--num_scales`, `--num_fps`, `--search_radius_thresholds`: Override the corresponding config values for ablation studies.
+
+For heterogeneous evaluation, additional arguments are:
+- `--src_sensor`: Source sensor name (e.g., `os0_128`, `Aeva`).
+- `--tgt_sensor`: Target sensor name (e.g., `os1_64`, `Avia`).
+
+e.g.,
+
+```
+python test.py --dataset TIERS_hetero --src_sensor os0_128 --tgt_sensor os1_64 --experiment_id threedmatch --verbose
+```
+
 
 Due to the large number and variety of datasets used in our experiments, we provide detailed download instructions and folder structures in a separate document:
 
@@ -157,9 +181,8 @@ This branch adds support for [KISS-Matcher](https://github.com/MIT-SPARK/KISS-Ma
 
 #### Installation
 
-```bash
-pip install kiss-matcher
-```
+Please follow the official Python installation instructions provided in the KISS-Matcher repository:
+https://github.com/MIT-SPARK/KISS-Matcher?tab=readme-ov-file#package-installation
 
 #### Usage
 
@@ -197,10 +220,9 @@ The early exit is triggered when the number of RANSAC/KISS-Matcher inliers excee
 #### Configuration
 
 ```python
-cfg.match.enable_early_exit = True   # Enable confidence-aware early exit (default: True)
+cfg.match.enable_early_exit = False   # Enable confidence-aware early exit (default: False)
 cfg.match.early_exit_min_inliers = 50  # Minimum inlier count to trigger early exit
 ```
-
 ______________________________________________________________________
 
 ### Output Files
@@ -208,7 +230,7 @@ ______________________________________________________________________
 After each test run, results are automatically saved:
 
 - **Per-sample `.txt`**: detailed per-frame metrics (success, RTE, RRE, inlier counts, timing) under `per_sample_results/<exp_name>/`.
-- **Summary `.mat`**: aggregated statistics (recall, RTE/RRE mean ± std, timing) saved to the root directory as `results_<exp_name>_<params>_<timestamp>.mat`. Compatible with MATLAB and `scipy.io.loadmat`.
+- **Summary `.csv`**: aggregated statistics (recall, RTE/RRE mean ± std, timing) saved to the root directory as `full_results/results_<exp_name>_<params>_<timestamp>.csv`.
 
 ______________________________________________________________________
 
@@ -232,6 +254,19 @@ Title={BUFFER-X: Towards Zero-Shot Point Cloud Registration in Diverse Scenes},
 Author={Minkyun Seo and Hyungtae Lim and Kanghee Lee and Luca Carlone and Jaesik Park},
 Journal={2503.07940 (arXiv)},
 Year={2025}
+}
+
+```
+
+```
+@misc{lim2026zeroshotpointcloudregistration,
+title={Towards Zero-Shot Point Cloud Registration Across Diverse Scales, Scenes, and Sensor Setups}, 
+author={Hyungtae Lim and Minkyun Seo and Luca Carlone and Jaesik Park},
+year={2026},
+eprint={2601.02759},
+archivePrefix={arXiv},
+primaryClass={cs.CV},
+url={https://arxiv.org/abs/2601.02759}, 
 }
 ```
 
@@ -258,6 +293,8 @@ ______________________________________________________________________
 
 ### Updates
 
+- 03/03/2026: Refactored evaluation/testing code for cleaner structure, improved logging, and more reliable result reporting.
 - 28/02/2026: Added **KISS-Matcher** pose solver support and confidence-aware **early exit** for multi-scale processing.
+- 06/01/2026: Extended version of the paper has been uploaded.
 - 25/07/2025: This work is selected as a **Highlight** paper at ICCV 2025.
 - 25/06/2025: This work is accepted by ICCV 2025.
