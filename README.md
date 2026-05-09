@@ -17,6 +17,7 @@
     <img src="https://img.shields.io/badge/arXiv-%20(Extension%202026)-b33737?logo=arXiv&logoColor=white" />
     </a>
     <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode"><img src="https://img.shields.io/badge/license-CC4.0-blue.svg" /></a>
+    <a href="huggingface/model_card/README.md"><img src="https://img.shields.io/badge/Hugging%20Face-ready-yellow" /></a>
   <br />
   <br />
   <p align="center"><img src="https://github.com/user-attachments/assets/8cbc95e2-7dc8-46af-9691-b136eb36caad" alt="BUFFER-X" width="95%"/></p>
@@ -39,6 +40,32 @@ After cloning this repository:
 ```
 git clone https://github.com/MIT-SPARK/BUFFER-X && cd BUFFER-X
 ```
+
+#### Recommended quick install
+
+For a fresh Ubuntu + CUDA environment, use the unified installer:
+
+```bash
+conda create -n bufferx python=3.11 -y
+conda activate bufferx
+./scripts/install.sh --cuda cu124 --with-hub
+```
+
+Supported installer targets:
+
+- `--cuda cu124`: PyTorch CUDA 12.4 wheels (recommended for current CUDA 12 systems)
+- `--cuda cu118`: PyTorch CUDA 11.8 wheels
+- `--cuda cu111`: legacy PyTorch 1.9.1 + CUDA 11.1 path
+- `--cuda cpu --skip-cuda-extensions`: metadata/utilities only; full inference still requires CUDA extensions
+
+Useful optional flags:
+
+- `--with-hub`: install Hugging Face upload/download helpers
+- `--with-kiss`: install optional KISS-Matcher support
+- `--with-scannetpp`: install ScanNet++ preprocessing dependencies
+- `--no-apt`: skip system package installation when your Docker image already has build tools
+
+If you prefer manual control, `pip install -e '.[runtime]'` installs the pure-Python runtime dependencies. PyTorch and CUDA extensions should still be installed with the script above because their wheels depend on your CUDA stack. For Hugging Face upload/download helpers only, use `pip install -e '.[hub]'`.
 
 Setup your **own virtual environment** (e.g., `conda create -n bufferx python=3.x` or setting your Nvidia Docker env.) and then install the required libraries. We present some shellscripts as follows.
 
@@ -72,6 +99,12 @@ You can easily run our **generalization benchmark** with BUFFER-X. First, downlo
 
 ```
 ./scripts/download_pretrained_models.sh
+```
+
+By default this keeps the original Dropbox source. If the pretrained snapshots have been uploaded to Hugging Face, download them from the model repository instead:
+
+```bash
+python scripts/download_pretrained_models.py --source hf --repo-id <HF_ORG_OR_USER>/BUFFER-X
 ```
 
 <details>
@@ -168,10 +201,177 @@ python test.py --dataset TIERS_hetero --src_sensor os0_128 --tgt_sensor os1_64 -
 
 Due to the large number and variety of datasets used in our experiments, we provide detailed download instructions and folder structures in a separate document:
 
-[DATASETS.md](dataset/DATASETS.md)
+[dataset/README.md](dataset/README.md)
 
 </details>
 <br>
+
+______________________________________________________________________
+
+## 🤗 Hugging Face Release
+
+This repository includes Hugging Face-ready files for a model repository and a lightweight Space helper:
+
+- `huggingface/model_card/README.md`: model card template for the pretrained weights
+- `huggingface/space/`: Docker Space scaffold that checks the model repo layout and generates install commands
+- `scripts/upload_to_huggingface.py`: upload helper for model and Space repos
+
+Prepare your local snapshots first:
+
+```bash
+./scripts/download_pretrained_models.sh
+```
+
+Then authenticate and upload:
+
+```bash
+pip install -e '.[hub]'
+hf auth login
+python scripts/upload_to_huggingface.py \
+  --model-repo-id <HF_ORG_OR_USER>/BUFFER-X \
+  --space-repo-id <HF_ORG_OR_USER>/buffer-x-hub-helper
+```
+
+Before uploading, you can preview what will be sent:
+
+```bash
+python scripts/upload_to_huggingface.py \
+  --model-repo-id <HF_ORG_OR_USER>/BUFFER-X \
+  --space-repo-id <HF_ORG_OR_USER>/buffer-x-hub-helper \
+  --dry-run
+```
+
+The model repo expects the same snapshot layout used locally:
+
+```text
+snapshot/
+  threedmatch/
+    Desc/best.pth
+    Pose/best.pth
+  kitti/
+    Desc/best.pth
+    Pose/best.pth
+```
+
+The full BUFFER-X inference path requires CUDA extensions, so the included Space is intentionally a reliable CPU-only hub helper. A GPU inference Space can be added on top of the same Docker scaffold after finalizing a public point-cloud upload format.
+
+<details>
+  <summary><strong>Example: Download pretrained weights from Hugging Face</strong></summary>
+
+Use this when you want to run BUFFER-X from a Hugging Face model repository instead of the default Dropbox snapshot link.
+
+```bash
+git clone https://github.com/MIT-SPARK/BUFFER-X
+cd BUFFER-X
+
+conda create -n bufferx python=3.11 -y
+conda activate bufferx
+
+./scripts/install.sh --cuda cu124 --with-hub
+python scripts/download_pretrained_models.py \
+  --source hf \
+  --repo-id Hyungtae-Lim/BUFFER-X
+```
+
+After this, `snapshot/` should contain:
+
+```text
+snapshot/
+  threedmatch/Desc/best.pth
+  threedmatch/Pose/best.pth
+  kitti/Desc/best.pth
+  kitti/Pose/best.pth
+```
+
+</details>
+
+<details>
+  <summary><strong>Example: Evaluate with Hugging Face weights</strong></summary>
+
+After installing dependencies, downloading the Hugging Face weights, and preparing datasets, run:
+
+```bash
+python test.py \
+  --dataset 3DMatch TIERS Oxford MIT \
+  --experiment_id threedmatch \
+  --verbose
+```
+
+For KITTI-trained weights:
+
+```bash
+python test.py \
+  --dataset KITTI WOD KAIST Oxford \
+  --experiment_id kitti \
+  --verbose
+```
+
+For heterogeneous evaluation:
+
+```bash
+python test.py \
+  --dataset TIERS_hetero \
+  --src_sensor os0_128 \
+  --tgt_sensor os1_64 \
+  --experiment_id threedmatch \
+  --verbose
+```
+
+</details>
+
+<details>
+  <summary><strong>Example: Upload your own BUFFER-X release to Hugging Face</strong></summary>
+
+Do not paste your Hugging Face token into issues, pull requests, notebooks, or chat logs. Log in locally:
+
+```bash
+pip install -e '.[hub]'
+hf auth login
+```
+
+Prepare the local pretrained snapshots:
+
+```bash
+./scripts/download_pretrained_models.sh
+```
+
+Preview the upload:
+
+```bash
+python scripts/upload_to_huggingface.py \
+  --model-repo-id <HF_ORG_OR_USER>/BUFFER-X \
+  --space-repo-id <HF_ORG_OR_USER>/buffer-x-hub-helper \
+  --dry-run
+```
+
+Upload the model card, snapshots, and Space helper:
+
+```bash
+python scripts/upload_to_huggingface.py \
+  --model-repo-id <HF_ORG_OR_USER>/BUFFER-X \
+  --space-repo-id <HF_ORG_OR_USER>/buffer-x-hub-helper
+```
+
+</details>
+
+<details>
+  <summary><strong>Example: Use only the lightweight Hugging Face Space helper</strong></summary>
+
+The included Space helper is CPU-only. It verifies that the model repo has the expected snapshot files and generates installation commands for users.
+
+```bash
+python scripts/upload_to_huggingface.py \
+  --model-repo-id Hyungtae-Lim/BUFFER-X \
+  --space-repo-id Hyungtae-Lim/buffer-x-hub-helper
+```
+
+Then open the Space URL:
+
+```text
+https://huggingface.co/spaces/Hyungtae-Lim/buffer-x-hub-helper
+```
+
+</details>
 
 ______________________________________________________________________
 
