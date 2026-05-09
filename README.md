@@ -16,7 +16,7 @@
     <a href="https://arxiv.org/abs/2601.02759">
     <img src="https://img.shields.io/badge/arXiv-%20(Extension%202026)-b33737?logo=arXiv&logoColor=white" />
     </a>
-    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode"><img src="https://img.shields.io/badge/license-CC4.0-blue.svg" /></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
     <a href="huggingface/model_card/README.md"><img src="https://img.shields.io/badge/Hugging%20Face-ready-yellow" /></a>
   <br />
   <br />
