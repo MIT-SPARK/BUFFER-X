@@ -1,0 +1,4 @@
+imageio>=2.34
+lz4>=4.3
+munch>=4.0
+PyYAML>=6.0

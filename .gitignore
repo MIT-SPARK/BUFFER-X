@@ -15,6 +15,9 @@ snapshot/
 *.npz
 *.npy
 *.csv
+!requirements/*.txt
+!config/splits/*.txt
+!huggingface/space/requirements.txt
 
 .idea/
 .vscode/
