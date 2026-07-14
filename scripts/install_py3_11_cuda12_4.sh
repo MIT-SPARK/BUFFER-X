@@ -39,11 +39,11 @@ export CUDA_HOME=$(dirname $(dirname $(which nvcc)))
 # NOTE(hlim): With Newer GPU architecture, CUDA compatibilities and architecture versions should be updated
 # So we clone modified version of `Pointnet2_PyTorch`
 git clone https://github.com/LucasColas/Pointnet2_PyTorch.git
-cd Pointnet2_PyTorch/ && pip3 install pointnet2_ops_lib/. --verbose
+cd Pointnet2_PyTorch/ && pip3 install pointnet2_ops_lib/. --verbose --no-build-isolation
 cd ..
 rm -rf Pointnet2_PyTorch/
 
-pip3 install --upgrade https://github.com/unlimblue/KNN_CUDA/releases/download/0.2/KNN_CUDA-0.2-py3-none-any.whl
+pip3 install --upgrade git+https://github.com/MinkyunSeo/knn_cuda.git@8b21dbfc86988f56588a5ed8ca3cc354122c5656
 pip3 install ninja kornia einops easydict tensorboard tensorboardX tabulate pathlib
 
 # In my desktop, below command did not work

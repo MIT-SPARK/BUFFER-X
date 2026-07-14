@@ -209,14 +209,14 @@ install_cuda_extensions() {
   TMP_DIR="$(mktemp -d)"
 
   git clone --depth 1 https://github.com/LucasColas/Pointnet2_PyTorch.git "$TMP_DIR/Pointnet2_PyTorch"
-  pip_install "$TMP_DIR/Pointnet2_PyTorch/pointnet2_ops_lib/." --verbose
+  pip_install "$TMP_DIR/Pointnet2_PyTorch/pointnet2_ops_lib/." --verbose --no-build-isolation
 
-  pip_install --upgrade https://github.com/unlimblue/KNN_CUDA/releases/download/0.2/KNN_CUDA-0.2-py3-none-any.whl
+  pip_install --upgrade git+https://github.com/MinkyunSeo/knn_cuda.git@8b21dbfc86988f56588a5ed8ca3cc354122c5656
 
-  sh cpp_wrappers/compile_wrappers.sh
+  PYTHON="$PYTHON_BIN" sh cpp_wrappers/compile_wrappers.sh
 
   git clone --depth 1 https://github.com/KinglittleQ/torch-batch-svd.git "$TMP_DIR/torch-batch-svd"
-  pip_install "$TMP_DIR/torch-batch-svd"
+  pip_install "$TMP_DIR/torch-batch-svd" --no-build-isolation
 }
 
 install_system_packages
