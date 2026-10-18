@@ -1,6 +1,7 @@
 <div align="center">
-    <h1>BUFFER-X (ICCV 2025, 🌟Highlight🌟)</h1>
+    <h1>BUFFER-X (ICCV 2025, 🌟Highlight🌟 · TPAMI 2026)</h1>
     <p align="center">
+      <strong>ICCV 2025:</strong><br />
       <a href="https://scholar.google.com/citations?user=esoiHnYAAAAJ&hl=en">Minkyun Seo*</a>,
       <a href="https://scholar.google.com/citations?user=S1A3nbIAAAAJ&hl=en">Hyungtae Lim*</a>,
       <a href="https://scholar.google.com/citations?user=s-haNkwAAAAJ&hl=en">Kanghee Lee</a>,
@@ -14,7 +15,10 @@
     <img src="https://img.shields.io/badge/arXiv-%20(ICCV%202025)-b33737?logo=arXiv&logoColor=white" />
     </a>
     <a href="https://arxiv.org/abs/2601.02759">
-    <img src="https://img.shields.io/badge/arXiv-%20(Extension%202026)-b33737?logo=arXiv&logoColor=white" />
+    <img src="https://img.shields.io/badge/arXiv-%20(TPAMI%202026)-b33737?logo=arXiv&logoColor=white" />
+    </a>
+    <a href="https://ieeexplore.ieee.org/document/11651365">
+    <img src="https://img.shields.io/badge/IEEE-TPAMI%202026-00629B" alt="TPAMI 2026 paper" />
     </a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
     <a href="huggingface/model_card/README.md"><img src="https://img.shields.io/badge/Hugging%20Face-ready-brightgreen" /></a>
@@ -26,6 +30,15 @@
 </div>
 
 ________________________________
+
+## 📄 Papers
+
+- **ICCV 2025 (Highlight):** [BUFFER-X: Towards Zero-Shot Point Cloud Registration in Diverse Scenes](https://openaccess.thecvf.com/content/ICCV2025/html/Seo_BUFFER-X_Towards_Zero-Shot_Point_Cloud_Registration_in_Diverse_Scenes_ICCV_2025_paper.html). Minkyun Seo, Hyungtae Lim, Kanghee Lee, Luca Carlone, and Jaesik Park.
+- **TPAMI 2026 (journal extension):** [Toward Zero-Shot Point Cloud Registration Across Diverse Scales, Scenes, and Sensor Setups](https://ieeexplore.ieee.org/document/11651365). Hyungtae Lim, Minkyun Seo, Luca Carlone, and Jaesik Park. *IEEE Transactions on Pattern Analysis and Machine Intelligence*, 48(11):15234–15251. [Open-access version](https://arxiv.org/abs/2601.02759).
+
+The journal extension expands evaluation to **12 datasets**, covering object-scale, indoor, and outdoor scenes as well as heterogeneous LiDAR sensor setups. It also introduces **BUFFER-X-Lite**, combining adaptive early exit with a fast, robust pose solver to reduce total computation time by **43%** relative to BUFFER-X while maintaining comparable accuracy in the reported experiments. The descriptor model is trained once and applied without target-domain retraining or parameter tuning.
+
+See the [heterogeneous evaluation instructions](#test-on-our-generalization-benchmark), [KISS-Matcher integration](#using-kiss-matcher-as-the-pose-solver), and [early-exit configuration](#early-exit-confidence-aware-multi-scale-processing) below.
 
 ## 🧭 Structure Overview
 
@@ -173,7 +186,7 @@ ______________________________________________________________________
 
 ### Early Exit (Confidence-Aware Multi-Scale Processing)
 
-BUFFER-X++ introduces an **incremental multi-scale processing** strategy that stops computing additional scales once the pose estimate is already confident enough. This reduces unnecessary descriptor extraction and speeds up inference.
+BUFFER-X-Lite, introduced in the TPAMI extension, uses an **incremental multi-scale processing** strategy that stops computing additional scales once the pose estimate is already confident enough. This reduces unnecessary descriptor extraction and speeds up inference.
 
 The early exit is triggered when the number of RANSAC/KISS-Matcher inliers exceeds `early_exit_min_inliers` after the first scale.
 
@@ -206,27 +219,30 @@ ______________________________________________________________________
 
 ### 📝 Citation
 
-If you find our work useful in your research, please consider citing:
+If you find our work useful in your research, please consider citing the ICCV paper and its TPAMI journal extension:
 
-```
-@article{Seo_BUFFERX_arXiv_2025,
-Title={BUFFER-X: Towards Zero-Shot Point Cloud Registration in Diverse Scenes},
-Author={Minkyun Seo and Hyungtae Lim and Kanghee Lee and Luca Carlone and Jaesik Park},
-Journal={2503.07940 (arXiv)},
-Year={2025}
+```bibtex
+@inproceedings{Seo_2025_ICCV,
+  title={BUFFER-X: Towards Zero-Shot Point Cloud Registration in Diverse Scenes},
+  author={Seo, Minkyun and Lim, Hyungtae and Lee, Kanghee and Carlone, Luca and Park, Jaesik},
+  booktitle={Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)},
+  year={2025},
+  pages={3851--3862}
 }
-
 ```
 
-```
-@misc{lim2026zeroshotpointcloudregistration,
-title={Towards Zero-Shot Point Cloud Registration Across Diverse Scales, Scenes, and Sensor Setups}, 
-author={Hyungtae Lim and Minkyun Seo and Luca Carlone and Jaesik Park},
-year={2026},
-eprint={2601.02759},
-archivePrefix={arXiv},
-primaryClass={cs.CV},
-url={https://arxiv.org/abs/2601.02759}, 
+```bibtex
+@article{Lim_2026_TPAMI,
+  title={Toward Zero-Shot Point Cloud Registration Across Diverse Scales, Scenes, and Sensor Setups},
+  author={Lim, Hyungtae and Seo, Minkyun and Carlone, Luca and Park, Jaesik},
+  journal={IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  year={2026},
+  volume={48},
+  number={11},
+  pages={15234--15251},
+  month=nov,
+  doi={10.1109/TPAMI.2026.3722524},
+  url={https://ieeexplore.ieee.org/document/11651365}
 }
 ```
 
@@ -253,6 +269,7 @@ ______________________________________________________________________
 
 ### Updates
 
+- 2026: The [journal extension](https://ieeexplore.ieee.org/document/11651365) is published in **IEEE TPAMI**, introducing BUFFER-X-Lite and an expanded 12-dataset benchmark.
 - 03/03/2026: Refactored evaluation/testing code for cleaner structure, improved logging, and more reliable result reporting.
 - 28/02/2026: Added **KISS-Matcher** pose solver support and confidence-aware **early exit** for multi-scale processing.
 - 06/01/2026: Extended version of the paper has been uploaded.
